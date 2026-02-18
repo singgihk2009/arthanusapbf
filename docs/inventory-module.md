@@ -1,6 +1,6 @@
 # Inventory System Blueprint (Laravel + Inertia + MySQL)
 
-Dokumen ini adalah implementasi awal modul inventory laboratorium dengan pendekatan **stock ledger first**: stok tidak diubah manual, semua perubahan berasal dari dokumen transaksi yang diposting.
+Dokumen ini menjelaskan implementasi awal modul inventory laboratorium dengan pendekatan **stock ledger first**: stok tidak diubah manual, semua perubahan berasal dari dokumen transaksi yang diposting.
 
 ## 1. Prinsip inti implementasi
 
@@ -9,7 +9,7 @@ Dokumen ini adalah implementasi awal modul inventory laboratorium dengan pendeka
 - Seluruh kuantitas stok disimpan dalam `qty_base` (base UOM).
 - Snapshot realtime disimpan di `stock_balances` untuk query cepat.
 
-## 2. Struktur tabel yang sudah dibuat (migration)
+## 2. Struktur tabel (migration)
 
 ### Master
 - `warehouses`
@@ -42,18 +42,42 @@ Dokumen ini adalah implementasi awal modul inventory laboratorium dengan pendeka
 - `document_charges`
 - `document_taxes`
 
-## 3. Alur posting transaksi (disarankan untuk service layer)
+## 3. Service layer yang sudah ditambahkan
 
-1. Validasi status dokumen = boleh diposting.
-2. Konversi `qty_input` ke `qty_base` via `item_uom_conversions`.
-3. Tentukan batch (FEFO untuk item `track_expired = true`).
-4. Insert ke `stock_ledgers`:
-   - IN: qty_base positif
-   - OUT: qty_base negatif
-5. Update `stock_balances` per `(warehouse_id, item_id, batch_id)`.
-6. Simpan audit user (`created_by`, `posted_by`) dan timestamp posting.
+- `App\Services\Inventory\StockService`
+  - method `postMutation(array $payload)` untuk membuat ledger dan trigger event sinkronisasi balance.
+- `App\Services\Inventory\UomConversionService`
+  - method `toBase(itemId, uomId, qty)` untuk konversi qty input ke base UOM.
+- `App\Services\Inventory\BatchAllocationService`
+  - method `allocateFefo(warehouseId, itemId, requiredQtyBase)` untuk alokasi FEFO dari `stock_balances`.
 
-## 4. Cara menjalankan migrasi
+## 4. Event / Listener sinkronisasi stock balance
+
+- Event: `App\Events\Inventory\StockLedgerCreated`
+- Listener: `App\Listeners\Inventory\UpdateStockBalanceFromLedger`
+- Registrasi listener ada di `AppServiceProvider::boot()`.
+
+Flow:
+1. Transaksi posting panggil `StockService::postMutation(...)`
+2. Ledger baru dibuat di tabel `stock_ledgers`
+3. Event `StockLedgerCreated` dipublish
+4. Listener upsert + update `stock_balances.on_hand_base`
+
+## 5. Endpoint report yang sudah tersedia
+
+Semua endpoint berada di bawah middleware `auth`:
+
+- `GET /apps/reports/inventory/stock-balance`
+  - filter opsional: `warehouse_id`, `item_id`
+- `GET /apps/reports/inventory/stock-card`
+  - wajib: `warehouse_id`, `item_id`, `start_date`, `end_date`
+  - return: opening balance, rows mutasi, closing balance
+- `GET /apps/reports/inventory/expired-soon`
+  - filter opsional: `warehouse_id`, `days` (default 30)
+- `GET /apps/reports/inventory/minimum-stock-alerts`
+  - filter opsional: `warehouse_id`
+
+## 6. Cara menjalankan migrasi
 
 ### Lokal (SQLite default starter)
 1. Pastikan file DB ada:
@@ -100,12 +124,9 @@ Dokumen ini adalah implementasi awal modul inventory laboratorium dengan pendeka
   php artisan migrate:status
   ```
 
-## 5. Next step yang direkomendasikan
+## 7. Next step yang direkomendasikan
 
-- Implement `StockService`, `UomConversionService`, `BatchAllocationService`.
-- Tambah Observer/Event: saat ledger tercipta, sinkronisasi `stock_balances`.
-- Buat endpoint report:
-  - Stock balance
-  - Stock card / mutasi dengan running balance
-  - Expired monitoring (H-30, H-60)
-  - Minimum stock alert per gudang
+- Integrasikan service ke controller posting dokumen (GRN, Transfer, Sales, Usage, Adjustment).
+- Tambahkan test feature untuk report endpoint.
+- Tambahkan permission per endpoint report (mis. `report-stock-balance`, dst).
+- Tambahkan UI Inertia untuk report filters + tabel result.
