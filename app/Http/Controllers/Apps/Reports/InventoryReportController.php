@@ -7,10 +7,22 @@ use App\Models\Inventory\StockLedger;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
 
-class InventoryReportController extends Controller
+class InventoryReportController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:report-stock-balance', only: ['stockBalance']),
+            new Middleware('permission:report-stock-card', only: ['stockCard']),
+            new Middleware('permission:report-expired-soon', only: ['expiredSoon']),
+            new Middleware('permission:report-minimum-stock-alerts', only: ['minimumStockAlerts']),
+        ];
+    }
+
     public function stockBalance(Request $request): JsonResponse
     {
         $data = DB::table('stock_balances')
@@ -95,7 +107,7 @@ class InventoryReportController extends Controller
 
     public function expiredSoon(Request $request): JsonResponse
     {
-        $days = (int) $request->integer('days', 30);
+        $days = max(1, (int) $request->integer('days', 30));
         $today = now()->startOfDay();
         $limitDate = now()->addDays($days)->endOfDay();
 

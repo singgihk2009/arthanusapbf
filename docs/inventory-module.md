@@ -12,17 +12,9 @@ Dokumen ini menjelaskan implementasi awal modul inventory laboratorium dengan pe
 ## 2. Struktur tabel (migration)
 
 ### Master
-- `warehouses`
-- `categories`
-- `uoms`
-- `suppliers`
-- `customers`
-- `items`
-- `item_barcodes`
-- `item_uom_conversions`
-- `warehouse_item_settings`
-- `item_batches`
-- `tax_configs`
+- `warehouses`, `categories`, `uoms`, `suppliers`, `customers`
+- `items`, `item_barcodes`, `item_uom_conversions`, `warehouse_item_settings`
+- `item_batches`, `tax_configs`
 
 ### Procurement
 - `purchase_requisitions` + `purchase_requisition_lines`
@@ -44,59 +36,89 @@ Dokumen ini menjelaskan implementasi awal modul inventory laboratorium dengan pe
 
 ## 3. Service layer yang sudah ditambahkan
 
-- `App\Services\Inventory\StockService`
-  - method `postMutation(array $payload)` untuk membuat ledger dan trigger event sinkronisasi balance.
-- `App\Services\Inventory\UomConversionService`
-  - method `toBase(itemId, uomId, qty)` untuk konversi qty input ke base UOM.
-- `App\Services\Inventory\BatchAllocationService`
-  - method `allocateFefo(warehouseId, itemId, requiredQtyBase)` untuk alokasi FEFO dari `stock_balances`.
+- `StockService::postMutation(array $payload)`
+- `UomConversionService::toBase(itemId, uomId, qty)`
+- `BatchAllocationService::allocateFefo(warehouseId, itemId, requiredQtyBase)`
 
 ## 4. Event / Listener sinkronisasi stock balance
 
 - Event: `App\Events\Inventory\StockLedgerCreated`
 - Listener: `App\Listeners\Inventory\UpdateStockBalanceFromLedger`
-- Registrasi listener ada di `AppServiceProvider::boot()`.
+- Registrasi listener: `AppServiceProvider::boot()`
 
-Flow:
-1. Transaksi posting panggil `StockService::postMutation(...)`
-2. Ledger baru dibuat di tabel `stock_ledgers`
-3. Event `StockLedgerCreated` dipublish
-4. Listener upsert + update `stock_balances.on_hand_base`
+## 5. Integrasi posting dokumen (sudah diimplementasikan)
 
-## 5. Endpoint report yang sudah tersedia
+Controller: `App\Http\Controllers\Apps\InventoryPostingController`
 
-Semua endpoint berada di bawah middleware `auth`:
+Endpoint (auth + permission):
+- `POST /apps/inventory/posting/grn/{goodsReceipt}`
+- `POST /apps/inventory/posting/transfer/{transferId}`
+- `POST /apps/inventory/posting/sale/{saleId}`
+- `POST /apps/inventory/posting/usage/{usageId}`
+- `POST /apps/inventory/posting/adjustment/{adjustmentId}`
 
-- `GET /apps/reports/inventory/stock-balance`
-  - filter opsional: `warehouse_id`, `item_id`
-- `GET /apps/reports/inventory/stock-card`
-  - wajib: `warehouse_id`, `item_id`, `start_date`, `end_date`
-  - return: opening balance, rows mutasi, closing balance
-- `GET /apps/reports/inventory/expired-soon`
-  - filter opsional: `warehouse_id`, `days` (default 30)
-- `GET /apps/reports/inventory/minimum-stock-alerts`
-  - filter opsional: `warehouse_id`
+Ringkas flow:
+1. Validasi dokumen ada dan belum `POSTED`/`RECEIVED`.
+2. Resolve `qty_base` (pakai nilai existing line atau konversi UOM bila kosong).
+3. Buat ledger IN/OUT sesuai jenis transaksi.
+4. Untuk sale item expired-tracked: alokasi batch FEFO.
+5. Update status dokumen ke posted.
 
-## 6. Cara menjalankan migrasi
+## 6. Endpoint report API + permission
+
+Controller: `App\Http\Controllers\Apps\Reports\InventoryReportController`
+
+- `GET /apps/reports/inventory/stock-balance` → `permission:report-stock-balance`
+- `GET /apps/reports/inventory/stock-card` → `permission:report-stock-card`
+- `GET /apps/reports/inventory/expired-soon` → `permission:report-expired-soon`
+- `GET /apps/reports/inventory/minimum-stock-alerts` → `permission:report-minimum-stock-alerts`
+
+## 7. UI Inertia report (sudah ditambahkan)
+
+- Route halaman: `GET /apps/reports/inventory` (`permission:inventory-reports-access`)
+- Controller: `InventoryReportPageController`
+- Page: `resources/js/Pages/Apps/Reports/Inventory/Index.jsx`
+- Fitur UI:
+  - filter tipe report
+  - filter gudang, item, date range, dan days
+  - tabel hasil report dinamis
+  - ringkasan opening/closing balance untuk stock card
+
+## 8. Seeder permission (ditambahkan)
+
+Permission tambahan:
+- `inventory-reports-access`
+- `report-stock-balance`, `report-stock-card`, `report-expired-soon`, `report-minimum-stock-alerts`
+- `inventory-posting-grn`, `inventory-posting-transfer`, `inventory-posting-sale`, `inventory-posting-usage`, `inventory-posting-adjustment`
+
+Role tambahan:
+- `inventory-reports-access` (permission report + page access)
+- `inventory-posting-access`
+
+## 9. Feature test report (ditambahkan)
+
+File test:
+- `tests/Feature/Inventory/InventoryReportEndpointsTest.php`
+
+Cakupan test:
+- endpoint stock balance
+- endpoint stock card (termasuk running/closing balance)
+- endpoint minimum stock alerts
+
+## 10. Cara menjalankan migrasi
 
 ### Lokal (SQLite default starter)
-1. Pastikan file DB ada:
-   ```bash
-   touch database/database.sqlite
-   ```
-2. Atur `.env`:
+1. `touch database/database.sqlite`
+2. `.env`:
    ```env
    DB_CONNECTION=sqlite
    DB_DATABASE=/workspace/inventory/database/database.sqlite
    ```
-3. Jalankan migrasi:
-   ```bash
-   php artisan migrate
-   ```
+3. `php artisan migrate`
 
-### MySQL (sesuai target Ubuntu VPS)
-1. Buat database baru, contoh: `inventory_lab`.
-2. Atur `.env`:
+### MySQL (Ubuntu VPS)
+1. Buat DB, contoh `inventory_lab`
+2. `.env`:
    ```env
    DB_CONNECTION=mysql
    DB_HOST=127.0.0.1
@@ -105,28 +127,9 @@ Semua endpoint berada di bawah middleware `auth`:
    DB_USERNAME=<user_mysql>
    DB_PASSWORD=<password_mysql>
    ```
-3. Jalankan migrasi:
-   ```bash
-   php artisan migrate
-   ```
+3. `php artisan migrate`
 
-### Perintah tambahan berguna
-- rollback 1 batch:
-  ```bash
-  php artisan migrate:rollback
-  ```
-- reset + migrate ulang:
-  ```bash
-  php artisan migrate:fresh
-  ```
-- lihat status migration:
-  ```bash
-  php artisan migrate:status
-  ```
-
-## 7. Next step yang direkomendasikan
-
-- Integrasikan service ke controller posting dokumen (GRN, Transfer, Sales, Usage, Adjustment).
-- Tambahkan test feature untuk report endpoint.
-- Tambahkan permission per endpoint report (mis. `report-stock-balance`, dst).
-- Tambahkan UI Inertia untuk report filters + tabel result.
+Perintah tambahan:
+- `php artisan migrate:rollback`
+- `php artisan migrate:fresh`
+- `php artisan migrate:status`
