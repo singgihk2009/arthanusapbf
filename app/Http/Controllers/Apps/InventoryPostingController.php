@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Apps;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Inventory\OpeningBalanceRequest;
 use App\Models\Inventory\Item;
 use App\Services\Inventory\BatchAllocationService;
 use App\Services\Inventory\StockService;
@@ -30,7 +31,33 @@ class InventoryPostingController extends Controller implements HasMiddleware
             new Middleware('permission:inventory-posting-sale', only: ['postSale']),
             new Middleware('permission:inventory-posting-usage', only: ['postInternalUsage']),
             new Middleware('permission:inventory-posting-adjustment', only: ['postStockAdjustment']),
+            new Middleware('permission:inventory-posting-opening-balance', only: ['postOpeningBalance']),
         ];
+    }
+
+    public function postOpeningBalance(OpeningBalanceRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $qtyBase = $this->resolveQtyBase((int) $validated['item_id'], (int) $validated['uom_id'], (float) $validated['qty'], 0);
+
+        $ledger = $this->stockService->postMutation([
+            'trx_type' => 'OPENING_BALANCE',
+            'trx_id' => (int) now()->format('YmdHis'),
+            'warehouse_id' => $validated['warehouse_id'],
+            'item_id' => $validated['item_id'],
+            'batch_id' => $validated['batch_id'] ?? null,
+            'qty_base' => $qtyBase,
+            'uom_id' => $validated['uom_id'],
+            'qty_input' => $validated['qty'],
+            'unit_cost' => $validated['unit_cost'],
+            'trx_datetime' => $validated['trx_datetime'] ?? now(),
+            'created_by' => $request->user()?->id,
+        ]);
+
+        return response()->json([
+            'message' => 'Opening balance posted',
+            'id' => $ledger->id,
+        ]);
     }
 
     public function postGoodsReceipt(Request $request, int $goodsReceipt): JsonResponse
