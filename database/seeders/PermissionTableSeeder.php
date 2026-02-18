@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
 class PermissionTableSeeder extends Seeder
 {
@@ -13,28 +12,48 @@ class PermissionTableSeeder extends Seeder
      */
     public function run(): void
     {
-        // dashboard permissions
-        Permission::create(['name' => 'dashboard-access']);
+        $permissions = [
+            // dashboard permissions
+            'dashboard-access',
 
-         // users permissions
-         Permission::create(['name' => 'users-access']);
-         Permission::create(['name' => 'users-data']);
-         Permission::create(['name' => 'users-create']);
-         Permission::create(['name' => 'users-update']);
-         Permission::create(['name' => 'users-delete']);
+            // users permissions
+            'users-access',
+            'users-data',
+            'users-create',
+            'users-update',
+            'users-delete',
 
-         // roles permissions
-         Permission::create(['name' => 'roles-access']);
-         Permission::create(['name' => 'roles-data']);
-         Permission::create(['name' => 'roles-create']);
-         Permission::create(['name' => 'roles-update']);
-         Permission::create(['name' => 'roles-delete']);
+            // roles permissions
+            'roles-access',
+            'roles-data',
+            'roles-create',
+            'roles-update',
+            'roles-delete',
 
-         // permissions permissions
-         Permission::create(['name' => 'permissions-access']);
-         Permission::create(['name' => 'permissions-data']);
-         Permission::create(['name' => 'permissions-create']);
-         Permission::create(['name' => 'permissions-update']);
-         Permission::create(['name' => 'permissions-delete']);
+            // permissions permissions
+            'permissions-access',
+            'permissions-data',
+            'permissions-create',
+            'permissions-update',
+            'permissions-delete',
+
+            // inventory reports permissions
+            'inventory-reports-access',
+            'report-stock-balance',
+            'report-stock-card',
+            'report-expired-soon',
+            'report-minimum-stock-alerts',
+
+            // inventory posting permissions
+            'inventory-posting-grn',
+            'inventory-posting-transfer',
+            'inventory-posting-sale',
+            'inventory-posting-usage',
+            'inventory-posting-adjustment',
+        ];
+
+        foreach ($permissions as $permission) {
+            Permission::findOrCreate($permission, 'web');
+        }
     }
 }

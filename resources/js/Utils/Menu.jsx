@@ -146,16 +146,16 @@ export default function Menu() {
                     subdetails: [
                         {
                             title: 'Stock Balance',
-                            href: '/apps/dashboard',
+                            href: '/apps/reports/inventory?type=stock-balance',
                             icon: <IconStack2 size={20} strokeWidth={1.5} />,
-                            active: url === '/apps/dashboard',
+                            active: url.startsWith('/apps/reports/inventory') && url.includes('stock-balance'),
                             permissions: true,
                         },
                         {
                             title: 'Stock Mutasi',
-                            href: '/apps/dashboard',
+                            href: '/apps/reports/inventory?type=stock-card',
                             icon: <IconArrowsExchange size={20} strokeWidth={1.5} />,
-                            active: url === '/apps/dashboard',
+                            active: url.startsWith('/apps/reports/inventory') && url.includes('stock-card'),
                             permissions: true,
                         },
                     ],
