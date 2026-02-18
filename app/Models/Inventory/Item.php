@@ -3,10 +3,12 @@
 namespace App\Models\Inventory;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Item extends Model
 {
+    use SoftDeletes;
     protected $fillable = [
         'sku',
         'name',
@@ -28,5 +30,10 @@ class Item extends Model
     public function baseUom(): BelongsTo
     {
         return $this->belongsTo(Uom::class, 'base_uom_id');
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class, 'category_id');
     }
 }

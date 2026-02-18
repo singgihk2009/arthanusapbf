@@ -37,6 +37,25 @@ class PermissionTableSeeder extends Seeder
             'permissions-update',
             'permissions-delete',
 
+
+            // inventory master-data permissions
+            'master-warehouse-data',
+            'master-warehouse-create',
+            'master-warehouse-update',
+            'master-warehouse-delete',
+            'master-category-data',
+            'master-category-create',
+            'master-category-update',
+            'master-category-delete',
+            'master-uom-data',
+            'master-uom-create',
+            'master-uom-update',
+            'master-uom-delete',
+            'master-item-data',
+            'master-item-create',
+            'master-item-update',
+            'master-item-delete',
+
             // inventory reports permissions
             'inventory-reports-access',
             'report-stock-balance',

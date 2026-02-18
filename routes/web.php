@@ -4,6 +4,10 @@ use App\Http\Controllers\Apps\DashboardController;
 use App\Http\Controllers\Apps\PermissionController;
 use App\Http\Controllers\Apps\RoleController;
 use App\Http\Controllers\Apps\UserController;
+use App\Http\Controllers\Apps\MasterData\ItemController;
+use App\Http\Controllers\Apps\MasterData\UomController;
+use App\Http\Controllers\Apps\MasterData\CategoryController;
+use App\Http\Controllers\Apps\MasterData\WarehouseController;
 use App\Http\Controllers\Apps\Reports\InventoryReportPageController;
 use App\Http\Controllers\Apps\InventoryPostingController;
 use App\Http\Controllers\Apps\Reports\InventoryReportController;
@@ -36,6 +40,15 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     Route::resource('/roles', RoleController::class)->except(['create', 'edit', 'show']);
     // users route
     Route::resource('/users', UserController::class)->except('show');
+
+
+    // inventory master data routes
+    Route::prefix('master-data')->name('master-data.')->group(function () {
+        Route::resource('/warehouses', WarehouseController::class);
+        Route::resource('/categories', CategoryController::class);
+        Route::resource('/uoms', UomController::class);
+        Route::resource('/items', ItemController::class);
+    });
 
     // inventory report page
     Route::get('/reports/inventory', InventoryReportPageController::class)->name('reports.inventory.index');

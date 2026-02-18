@@ -17,6 +17,7 @@ class RoleTableSeeder extends Seeder
             'users-access' => '%users%',
             'roles-access' => '%roles%',
             'permission-access' => '%permissions%',
+            'inventory-master-access' => 'master-%',
             'inventory-reports-access' => 'report-%',
             'inventory-posting-access' => 'inventory-posting-%',
         ];

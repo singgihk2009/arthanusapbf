@@ -133,3 +133,28 @@ Perintah tambahan:
 - `php artisan migrate:rollback`
 - `php artisan migrate:fresh`
 - `php artisan migrate:status`
+
+
+
+## 11. CRUD Master Data (sudah ditambahkan)
+
+CRUD backend + Inertia pages:
+- Warehouses (`/apps/master-data/warehouses`)
+- Categories (`/apps/master-data/categories`)
+- UOM (`/apps/master-data/uoms`)
+- Items (`/apps/master-data/items`)
+
+Masing-masing sudah mencakup:
+- index + search + pagination
+- create
+- edit
+- delete (single dan bulk halaman)
+
+Permission master data:
+- `master-warehouse-*`
+- `master-category-*`
+- `master-uom-*`
+- `master-item-*`
+
+Route resources berada pada group:
+- `Route::prefix('master-data')->name('master-data.')`
