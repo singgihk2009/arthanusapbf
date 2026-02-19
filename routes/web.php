@@ -61,6 +61,13 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     Route::post('/inventory/posting/adjustment/{adjustmentId}', [InventoryPostingController::class, 'postStockAdjustment'])->name('inventory.posting.adjustment');
     Route::post('/inventory/posting/opening-balance', [InventoryPostingController::class, 'postOpeningBalance'])->name('inventory.posting.opening-balance');
 
+
+    // opening balance page + import tools
+    Route::get('/inventory/opening-balance', [InventoryPostingController::class, 'openingBalancePage'])->name('inventory.opening-balance.index');
+    Route::post('/inventory/opening-balance/import', [InventoryPostingController::class, 'importOpeningBalance'])->name('inventory.opening-balance.import');
+    Route::get('/inventory/opening-balance/template/csv', [InventoryPostingController::class, 'downloadOpeningBalanceTemplateCsv'])->name('inventory.opening-balance.template.csv');
+    Route::get('/inventory/opening-balance/template/excel', [InventoryPostingController::class, 'downloadOpeningBalanceTemplateExcel'])->name('inventory.opening-balance.template.excel');
+
     // inventory reports api
     Route::prefix('reports/inventory')->name('reports.inventory.')->group(function () {
         Route::get('/stock-balance', [InventoryReportController::class, 'stockBalance'])->name('stock-balance');

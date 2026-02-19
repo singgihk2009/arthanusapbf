@@ -2,10 +2,12 @@
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 
 use function Pest\Laravel\actingAs;
+use function Pest\Laravel\get;
 use function Pest\Laravel\postJson;
 
 uses(RefreshDatabase::class);
@@ -58,6 +60,11 @@ beforeEach(function () {
     ]);
 });
 
+it('renders opening balance page', function () {
+    get(route('apps.inventory.opening-balance.index'))
+        ->assertOk();
+});
+
 it('posts opening balance with qty, uom, and unit cost', function () {
     postJson(route('apps.inventory.posting.opening-balance'), [
         'warehouse_id' => $this->warehouseId,
@@ -80,6 +87,35 @@ it('posts opening balance with qty, uom, and unit cost', function () {
 
     expect($balance)->not->toBeNull()
         ->and((float) $balance->on_hand_base)->toBe(20.0);
+});
+
+it('imports opening balance from csv template', function () {
+    $csv = "warehouse_code,item_sku,qty,uom_code,unit_cost,batch_no,trx_datetime\n".
+        "WH-OB,ITEM-OB-01,3,BOX,20000,B-1,".now()->format('Y-m-d H:i:s')."\n";
+
+    $file = UploadedFile::fake()->createWithContent('opening.csv', $csv);
+
+    postJson(route('apps.inventory.opening-balance.import'), [
+        'file' => $file,
+    ])->assertOk()
+        ->assertJsonPath('created', 1)
+        ->assertJsonPath('errors', []);
+
+    $ledger = DB::table('stock_ledgers')->first();
+
+    expect($ledger)->not->toBeNull()
+        ->and($ledger->trx_type)->toBe('OPENING_BALANCE')
+        ->and((float) $ledger->qty_base)->toBe(30.0)
+        ->and((float) $ledger->unit_cost)->toBe(20000.0);
+});
+
+it('downloads csv and excel templates', function () {
+    get(route('apps.inventory.opening-balance.template.csv'))
+        ->assertOk()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    get(route('apps.inventory.opening-balance.template.excel'))
+        ->assertOk();
 });
 
 it('validates required fields for opening balance input', function () {

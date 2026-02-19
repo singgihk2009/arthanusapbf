@@ -140,6 +140,13 @@ export default function Menu() {
                     permissions: true,
                 },
                 {
+                    title: 'Saldo Awal',
+                    href: '/apps/inventory/opening-balance',
+                    active: url.startsWith('/apps/inventory/opening-balance'),
+                    icon: <IconClipboardCheck size={20} strokeWidth={1.5} />,
+                    permissions: true,
+                },
+                {
                     title: 'Reports',
                     icon: <IconReportAnalytics size={20} strokeWidth={1.5} />,
                     permissions: true,
