@@ -1,87 +1,22 @@
 import AppLayout from '@/Layouts/AppLayout';
-import { Head, usePage } from '@inertiajs/react';
-import React, { useMemo, useState } from 'react';
-
-const emptyLine = {
-    item_id: '',
-    qty: '',
-    uom_id: '',
-    price: '',
-    batch_number: '',
-    expired_date: '',
-    notes: '',
-};
-
-const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
-const lineInputClassName = 'rounded border border-gray-300 bg-white px-2 py-1 text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 
 export default function Index() {
-    const { items, uoms, warehouses, transactionCodes } = usePage().props;
-    const [form, setForm] = useState({
-        warehouse_id: '',
-        transaction_date: new Date().toISOString().slice(0, 10),
-        transaction_code: 'PEMBELIAN',
-        reference: '',
-        vendor_name: '',
-        notes: '',
-        lines: [{ ...emptyLine }],
-    });
-    const [errors, setErrors] = useState({});
-    const [message, setMessage] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const { entries, flash } = usePage().props;
+    const [deletingId, setDeletingId] = useState(null);
 
-    const totalValue = useMemo(
-        () => form.lines.reduce((sum, line) => sum + ((Number(line.qty) || 0) * (Number(line.price) || 0)), 0),
-        [form.lines],
-    );
+    const handleDelete = async (id) => {
+        if (!window.confirm('Yakin hapus receiving entry ini?')) {
+            return;
+        }
 
-    const updateHeader = (field, value) => {
-        setForm((prev) => ({ ...prev, [field]: value }));
-    };
-
-    const updateLine = (index, field, value) => {
-        setForm((prev) => {
-            const lines = [...prev.lines];
-            lines[index] = { ...lines[index], [field]: value };
-            return { ...prev, lines };
-        });
-    };
-
-    const addLine = () => setForm((prev) => ({ ...prev, lines: [...prev.lines, { ...emptyLine }] }));
-
-    const removeLine = (index) => {
-        setForm((prev) => ({
-            ...prev,
-            lines: prev.lines.length === 1 ? [{ ...emptyLine }] : prev.lines.filter((_, idx) => idx !== index),
-        }));
-    };
-
-    const submit = async (event) => {
-        event.preventDefault();
-        setLoading(true);
-        setErrors({});
-        setMessage(null);
-
+        setDeletingId(id);
         try {
-            await window.axios.post(route('apps.inbound.receiving.store'), form);
-            setMessage({ type: 'success', text: 'Receiving entry berhasil disimpan.' });
-            setForm((prev) => ({
-                ...prev,
-                warehouse_id: '',
-                reference: '',
-                vendor_name: '',
-                notes: '',
-                lines: [{ ...emptyLine }],
-            }));
-        } catch (error) {
-            if (error.response?.status === 422) {
-                setErrors(error.response.data.errors ?? {});
-                setMessage({ type: 'error', text: 'Validasi gagal. Cek field yang ditandai.' });
-            } else {
-                setMessage({ type: 'error', text: 'Gagal menyimpan receiving entry.' });
-            }
+            await window.axios.delete(route('apps.inbound.receiving.destroy', id));
+            window.location.reload();
         } finally {
-            setLoading(false);
+            setDeletingId(null);
         }
     };
 
@@ -90,119 +25,61 @@ export default function Index() {
             <Head title="Receiving Entry" />
 
             <div className="space-y-4">
+                {flash?.success && <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">{flash.success}</div>}
+
                 <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-900 dark:bg-gray-950">
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Receiving Entry</h2>
-                    <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Input barang masuk multi line dalam satu dokumen.</p>
-
-                    <form onSubmit={submit} className="space-y-4">
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                            <div>
-                                <label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Warehouse</label>
-                                <select value={form.warehouse_id} onChange={(e) => updateHeader('warehouse_id', e.target.value)} className={inputClassName}>
-                                    <option value="">Pilih Warehouse</option>
-                                    {warehouses.map((warehouse) => (
-                                        <option key={warehouse.id} value={warehouse.id}>{warehouse.code} - {warehouse.name}</option>
-                                    ))}
-                                </select>
-                                {errors.warehouse_id && <p className="mt-1 text-xs text-red-500">{errors.warehouse_id[0]}</p>}
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Tanggal</label>
-                                <input type="date" value={form.transaction_date} onChange={(e) => updateHeader('transaction_date', e.target.value)} className={inputClassName} />
-                                {errors.transaction_date && <p className="mt-1 text-xs text-red-500">{errors.transaction_date[0]}</p>}
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Kode Transaksi</label>
-                                <select value={form.transaction_code} onChange={(e) => updateHeader('transaction_code', e.target.value)} className={inputClassName}>
-                                    {transactionCodes.map((code) => <option key={code} value={code}>{code}</option>)}
-                                </select>
-                                {errors.transaction_code && <p className="mt-1 text-xs text-red-500">{errors.transaction_code[0]}</p>}
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Referensi</label>
-                                <input value={form.reference} onChange={(e) => updateHeader('reference', e.target.value)} className={inputClassName} />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Vendor</label>
-                                <input value={form.vendor_name} onChange={(e) => updateHeader('vendor_name', e.target.value)} className={inputClassName} />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Keterangan</label>
-                                <input value={form.notes} onChange={(e) => updateHeader('notes', e.target.value)} className={inputClassName} />
-                            </div>
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Receiving Entry</h2>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">List dokumen receiving barang masuk.</p>
                         </div>
-
-                        <div className="overflow-x-auto rounded-lg border border-gray-300 dark:border-gray-800">
-                            <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-900">
-                                <thead className="bg-gray-100 dark:bg-gray-900">
-                                    <tr>
-                                        <th className="px-2 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Item</th>
-                                        <th className="px-2 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Qty</th>
-                                        <th className="px-2 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">UOM</th>
-                                        <th className="px-2 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Price</th>
-                                        <th className="px-2 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Value</th>
-                                        <th className="px-2 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Batch Number</th>
-                                        <th className="px-2 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Expired Date</th>
-                                        <th className="px-2 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Keterangan</th>
-                                        <th className="px-2 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                    {form.lines.map((line, index) => {
-                                        const value = (Number(line.qty) || 0) * (Number(line.price) || 0);
-
-                                        return (
-                                            <tr key={index} className="text-gray-800 dark:text-gray-100">
-                                                <td className="p-2">
-                                                    <select value={line.item_id} onChange={(e) => updateLine(index, 'item_id', e.target.value)} className={`w-56 ${lineInputClassName}`}>
-                                                        <option value="">Pilih Item</option>
-                                                        {items.map((item) => <option key={item.id} value={item.id}>{item.sku} - {item.name}</option>)}
-                                                    </select>
-                                                    {errors[`lines.${index}.item_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.item_id`][0]}</p>}
-                                                </td>
-                                                <td className="p-2">
-                                                    <input type="number" min="0" step="0.000001" value={line.qty} onChange={(e) => updateLine(index, 'qty', e.target.value)} className={`w-28 ${lineInputClassName}`} />
-                                                    {errors[`lines.${index}.qty`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.qty`][0]}</p>}
-                                                </td>
-                                                <td className="p-2">
-                                                    <select value={line.uom_id} onChange={(e) => updateLine(index, 'uom_id', e.target.value)} className={`w-36 ${lineInputClassName}`}>
-                                                        <option value="">UOM</option>
-                                                        {uoms.map((uom) => <option key={uom.id} value={uom.id}>{uom.code}</option>)}
-                                                    </select>
-                                                    {errors[`lines.${index}.uom_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.uom_id`][0]}</p>}
-                                                </td>
-                                                <td className="p-2">
-                                                    <input type="number" min="0" step="0.000001" value={line.price} onChange={(e) => updateLine(index, 'price', e.target.value)} className={`w-36 ${lineInputClassName}`} />
-                                                    {errors[`lines.${index}.price`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.price`][0]}</p>}
-                                                </td>
-                                                <td className="p-2 font-medium text-gray-900 dark:text-gray-100">{value.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                                <td className="p-2"><input value={line.batch_number} onChange={(e) => updateLine(index, 'batch_number', e.target.value)} className={`w-36 ${lineInputClassName}`} /></td>
-                                                <td className="p-2"><input type="date" value={line.expired_date} onChange={(e) => updateLine(index, 'expired_date', e.target.value)} className={`w-44 ${lineInputClassName}`} /></td>
-                                                <td className="p-2"><input value={line.notes} onChange={(e) => updateLine(index, 'notes', e.target.value)} className={`w-44 ${lineInputClassName}`} /></td>
-                                                <td className="p-2"><button type="button" onClick={() => removeLine(index)} className="rounded border border-red-300 px-2 py-1 text-red-600">Hapus</button></td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                        <div className="flex gap-2">
+                            <a href={route('apps.inbound.receiving.export.excel')} className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">Export Excel</a>
+                            <Link href={route('apps.inbound.receiving.create')} className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white dark:bg-gray-100 dark:text-gray-900">Add New Receive</Link>
                         </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <button type="button" onClick={addLine} className="rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:text-gray-100">+ Tambah Line</button>
-                            <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">Total Value: {totalValue.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                        </div>
-
-                        <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">
-                            {loading ? 'Menyimpan...' : 'Simpan Receiving Entry'}
-                        </button>
-                    </form>
-                </div>
-
-                {message && (
-                    <div className={`rounded-lg border p-3 text-sm ${message.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
-                        {message.text}
                     </div>
-                )}
+
+                    <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
+                        <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+                            <thead className="bg-gray-50 dark:bg-gray-900">
+                                <tr>
+                                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">No</th>
+                                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Number</th>
+                                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Tanggal</th>
+                                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Warehouse</th>
+                                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Kode Transaksi</th>
+                                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Vendor</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-200">Total</th>
+                                    <th className="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-200">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                {entries.data.length === 0 && (
+                                    <tr>
+                                        <td colSpan={8} className="px-3 py-4 text-center text-gray-500">Belum ada data receiving.</td>
+                                    </tr>
+                                )}
+                                {entries.data.map((entry, idx) => (
+                                    <tr key={entry.id} className="text-gray-800 dark:text-gray-100">
+                                        <td className="px-3 py-2">{entries.from ? entries.from + idx : idx + 1}</td>
+                                        <td className="px-3 py-2">{entry.number}</td>
+                                        <td className="px-3 py-2">{entry.transaction_date}</td>
+                                        <td className="px-3 py-2">{entry.warehouse_label}</td>
+                                        <td className="px-3 py-2">{entry.transaction_code}</td>
+                                        <td className="px-3 py-2">{entry.vendor_name || '-'}</td>
+                                        <td className="px-3 py-2 text-right">{Number(entry.total_value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex justify-center gap-2">
+                                                <Link href={route('apps.inbound.receiving.edit', entry.id)} className="rounded border border-gray-300 px-2 py-1 text-xs">Edit</Link>
+                                                <button type="button" onClick={() => handleDelete(entry.id)} disabled={deletingId === entry.id} className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 disabled:opacity-50">Hapus</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </>
     );
