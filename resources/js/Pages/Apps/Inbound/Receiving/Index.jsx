@@ -1,14 +1,32 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head, Link, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 
 export default function Index() {
-    const { entries } = usePage().props;
+    const { entries, flash } = usePage().props;
+    const [deletingId, setDeletingId] = useState(null);
+
+    const handleDelete = async (id) => {
+        if (!window.confirm('Yakin hapus receiving entry ini?')) {
+            return;
+        }
+
+        setDeletingId(id);
+        try {
+            await window.axios.delete(route('apps.inbound.receiving.destroy', id));
+            window.location.reload();
+        } finally {
+            setDeletingId(null);
+        }
+    };
 
     return (
         <>
             <Head title="Receiving Entry" />
 
             <div className="space-y-4">
+                {flash?.success && <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">{flash.success}</div>}
+
                 <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-900 dark:bg-gray-950">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                         <div>
@@ -16,12 +34,8 @@ export default function Index() {
                             <p className="text-sm text-gray-600 dark:text-gray-400">List dokumen receiving barang masuk.</p>
                         </div>
                         <div className="flex gap-2">
-                            <a href={route('apps.inbound.receiving.export.excel')} className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">
-                                Export Excel
-                            </a>
-                            <Link href={route('apps.inbound.receiving.create')} className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white dark:bg-gray-100 dark:text-gray-900">
-                                Add New Receive
-                            </Link>
+                            <a href={route('apps.inbound.receiving.export.excel')} className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">Export Excel</a>
+                            <Link href={route('apps.inbound.receiving.create')} className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white dark:bg-gray-100 dark:text-gray-900">Add New Receive</Link>
                         </div>
                     </div>
 
@@ -36,12 +50,13 @@ export default function Index() {
                                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Kode Transaksi</th>
                                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Vendor</th>
                                     <th className="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-200">Total</th>
+                                    <th className="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-200">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                 {entries.data.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="px-3 py-4 text-center text-gray-500">Belum ada data receiving.</td>
+                                        <td colSpan={8} className="px-3 py-4 text-center text-gray-500">Belum ada data receiving.</td>
                                     </tr>
                                 )}
                                 {entries.data.map((entry, idx) => (
@@ -53,6 +68,12 @@ export default function Index() {
                                         <td className="px-3 py-2">{entry.transaction_code}</td>
                                         <td className="px-3 py-2">{entry.vendor_name || '-'}</td>
                                         <td className="px-3 py-2 text-right">{Number(entry.total_value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex justify-center gap-2">
+                                                <Link href={route('apps.inbound.receiving.edit', entry.id)} className="rounded border border-gray-300 px-2 py-1 text-xs">Edit</Link>
+                                                <button type="button" onClick={() => handleDelete(entry.id)} disabled={deletingId === entry.id} className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 disabled:opacity-50">Hapus</button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

@@ -73,6 +73,9 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     Route::get('/inbound/receiving', [ReceivingEntryController::class, 'index'])->name('inbound.receiving.index');
     Route::get('/inbound/receiving/create', [ReceivingEntryController::class, 'create'])->name('inbound.receiving.create');
     Route::post('/inbound/receiving', [ReceivingEntryController::class, 'store'])->name('inbound.receiving.store');
+    Route::get('/inbound/receiving/{receivingEntry}/edit', [ReceivingEntryController::class, 'edit'])->name('inbound.receiving.edit');
+    Route::put('/inbound/receiving/{receivingEntry}', [ReceivingEntryController::class, 'update'])->name('inbound.receiving.update');
+    Route::delete('/inbound/receiving/{receivingEntry}', [ReceivingEntryController::class, 'destroy'])->name('inbound.receiving.destroy');
     Route::get('/inbound/receiving/export/excel', [ReceivingEntryController::class, 'exportExcel'])->name('inbound.receiving.export.excel');
 
     // inventory reports api
