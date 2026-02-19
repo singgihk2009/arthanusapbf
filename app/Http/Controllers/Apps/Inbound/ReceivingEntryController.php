@@ -16,6 +16,7 @@ class ReceivingEntryController extends Controller
         return Inertia::render('Apps/Inbound/Receiving/Index', [
             'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
+            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
             'transactionCodes' => ['PEMBELIAN', 'RETUR', 'ADJUSTMENT'],
         ]);
     }
@@ -30,6 +31,7 @@ class ReceivingEntryController extends Controller
 
             $entryId = DB::table('receiving_entries')->insertGetId([
                 'number' => $number,
+                'warehouse_id' => $validated['warehouse_id'],
                 'transaction_date' => $validated['transaction_date'],
                 'transaction_code' => $validated['transaction_code'],
                 'reference' => $validated['reference'] ?? null,

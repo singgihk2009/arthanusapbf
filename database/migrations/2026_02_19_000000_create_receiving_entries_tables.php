@@ -10,6 +10,7 @@ return new class extends Migration {
         Schema::create('receiving_entries', function (Blueprint $table) {
             $table->id();
             $table->string('number')->unique();
+            $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
             $table->date('transaction_date');
             $table->enum('transaction_code', ['PEMBELIAN', 'RETUR', 'ADJUSTMENT']);
             $table->string('reference')->nullable();

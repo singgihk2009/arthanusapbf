@@ -15,6 +15,7 @@ class ReceivingEntryRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
             'transaction_date' => ['required', 'date'],
             'transaction_code' => ['required', Rule::in(['PEMBELIAN', 'RETUR', 'ADJUSTMENT'])],
             'reference' => ['nullable', 'string', 'max:100'],

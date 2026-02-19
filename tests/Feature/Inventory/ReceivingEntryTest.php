@@ -14,6 +14,13 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     actingAs($this->user);
 
+    $this->warehouseId = DB::table('warehouses')->insertGetId([
+        'code' => 'WH-RCV',
+        'name' => 'Warehouse Receiving',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
     $this->uomId = DB::table('uoms')->insertGetId([
         'code' => 'PCS',
         'name' => 'Pieces',
@@ -37,8 +44,9 @@ it('renders receiving entry page', function () {
         ->assertOk();
 });
 
-it('stores receiving entry with multi line items and auto value', function () {
+it('stores receiving entry with warehouse and multi line items and auto value', function () {
     post(route('apps.inbound.receiving.store'), [
+        'warehouse_id' => $this->warehouseId,
         'transaction_date' => now()->format('Y-m-d'),
         'transaction_code' => 'PEMBELIAN',
         'reference' => 'PO-12345',
@@ -69,6 +77,7 @@ it('stores receiving entry with multi line items and auto value', function () {
     $entry = DB::table('receiving_entries')->first();
 
     expect($entry)->not->toBeNull()
+        ->and((int) $entry->warehouse_id)->toBe($this->warehouseId)
         ->and($entry->transaction_code)->toBe('PEMBELIAN')
         ->and((float) $entry->total_value)->toBe(35000.0)
         ->and($entry->vendor_name)->toBe('Vendor Bebas');
