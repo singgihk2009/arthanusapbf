@@ -44,24 +44,17 @@ class ReceivingEntryController extends Controller
                 'updated_at' => now(),
             ];
 
-            if ($this->hasColumn('receiving_entries', 'warehouse_id')) {
-                $entryPayload['warehouse_id'] = $validated['warehouse_id'];
-            } elseif ($this->hasColumn('receiving_entries', 'gudang_id')) {
-                $entryPayload['gudang_id'] = $validated['warehouse_id'];
-            } elseif ($this->hasColumn('receiving_entries', 'warehouse_code')) {
-                $entryPayload['warehouse_code'] = $warehouse?->code;
-            } elseif ($this->hasColumn('receiving_entries', 'warehouse')) {
-                $entryPayload['warehouse'] = $warehouse?->code;
-            } else {
-                throw new \RuntimeException('Kolom warehouse pada tabel receiving_entries tidak ditemukan.');
+            $warehouseColumn = $this->resolveWarehouseColumn('receiving_entries');
+            if ($warehouseColumn) {
+                $entryPayload[$warehouseColumn] = $this->resolveWarehouseValue($warehouseColumn, $validated['warehouse_id'], $warehouse?->code);
             }
 
             $entryId = DB::table('receiving_entries')->insertGetId($this->filterColumns('receiving_entries', $entryPayload));
 
             $totalValue = 0;
             $linesToInsert = [];
-            $lineForeignKey = $this->hasColumn('receiving_entry_lines', 'receiving_entry_id') ? 'receiving_entry_id' : 'receiving_id';
-            $batchColumn = $this->hasColumn('receiving_entry_lines', 'batch_number') ? 'batch_number' : 'batch_no';
+            $lineForeignKey = $this->resolveColumn('receiving_entry_lines', ['receiving_entry_id', 'receiving_id', 'entry_id', 'header_id']) ?? 'receiving_entry_id';
+            $batchColumn = $this->resolveColumn('receiving_entry_lines', ['batch_number', 'batch_no', 'no_batch']) ?? 'batch_number';
 
             foreach ($validated['lines'] as $line) {
                 $qty = (float) $line['qty'];
@@ -112,6 +105,57 @@ class ReceivingEntryController extends Controller
         $sequence = str_pad((string) ($lastSequence + 1), 4, '0', STR_PAD_LEFT);
 
         return "$prefix-$datePart-$sequence";
+    }
+
+
+    private function resolveWarehouseColumn(string $table): ?string
+    {
+        $column = $this->resolveColumn($table, [
+            'warehouse_id',
+            'gudang_id',
+            'id_warehouse',
+            'id_gudang',
+            'warehouse_code',
+            'kode_gudang',
+            'warehouse',
+            'gudang',
+        ]);
+
+        if ($column) {
+            return $column;
+        }
+
+        foreach (Schema::getColumnListing($table) as $candidate) {
+            if (preg_match('/(warehouse|gudang)/i', $candidate) === 1) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveWarehouseValue(string $column, int $warehouseId, ?string $warehouseCode): int|string|null
+    {
+        if (str_contains($column, 'code') || str_contains($column, 'kode')) {
+            return $warehouseCode;
+        }
+
+        if (str_contains($column, '_id') || str_starts_with($column, 'id_')) {
+            return $warehouseId;
+        }
+
+        return $warehouseCode ?? $warehouseId;
+    }
+
+    private function resolveColumn(string $table, array $candidates): ?string
+    {
+        foreach ($candidates as $column) {
+            if ($this->hasColumn($table, $column)) {
+                return $column;
+            }
+        }
+
+        return null;
     }
 
     private function hasColumn(string $table, string $column): bool
