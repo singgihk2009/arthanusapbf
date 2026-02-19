@@ -69,6 +69,7 @@ class PermissionTableSeeder extends Seeder
             'inventory-posting-sale',
             'inventory-posting-usage',
             'inventory-posting-adjustment',
+            'inventory-posting-opening-balance',
         ];
 
         foreach ($permissions as $permission) {
