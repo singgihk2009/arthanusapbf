@@ -9,12 +9,31 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReceivingEntryController extends Controller
 {
     public function index(): Response
     {
+        $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
+
+        $entries = DB::table('receiving_entries')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->through(function (object $entry) use ($warehouseCodes): object {
+                $entry->warehouse_label = $this->resolveEntryWarehouseLabel($entry, $warehouseCodes);
+
+                return $entry;
+            });
+
         return Inertia::render('Apps/Inbound/Receiving/Index', [
+            'entries' => $entries,
+        ]);
+    }
+
+    public function create(): Response
+    {
+        return Inertia::render('Apps/Inbound/Receiving/Create', [
             'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
@@ -86,7 +105,37 @@ class ReceivingEntryController extends Controller
             ]));
         });
 
-        return back()->with('success', 'Receiving entry berhasil disimpan.');
+        return to_route('apps.inbound.receiving.index')->with('success', 'Receiving entry berhasil disimpan.');
+    }
+
+    public function exportExcel(): StreamedResponse
+    {
+        $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
+        $rows = DB::table('receiving_entries')->orderByDesc('id')->get();
+
+        $filename = 'receiving-entries-'.now()->format('Ymd-His').'.csv';
+
+        return response()->streamDownload(function () use ($rows, $warehouseCodes): void {
+            $output = fopen('php://output', 'w');
+            fputcsv($output, ['Number', 'Tanggal', 'Kode Transaksi', 'Warehouse', 'Referensi', 'Vendor', 'Total Value', 'Catatan']);
+
+            foreach ($rows as $row) {
+                fputcsv($output, [
+                    $row->number,
+                    $row->transaction_date,
+                    $row->transaction_code,
+                    $this->resolveEntryWarehouseLabel($row, $warehouseCodes),
+                    $row->reference,
+                    $row->vendor_name,
+                    (float) $row->total_value,
+                    $row->notes,
+                ]);
+            }
+
+            fclose($output);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 
     private function generateNumber(string $transactionCode): string
@@ -106,7 +155,6 @@ class ReceivingEntryController extends Controller
 
         return "$prefix-$datePart-$sequence";
     }
-
 
     private function resolveWarehouseColumn(string $table): ?string
     {
@@ -145,6 +193,27 @@ class ReceivingEntryController extends Controller
         }
 
         return $warehouseCode ?? $warehouseId;
+    }
+
+    private function resolveEntryWarehouseLabel(object $entry, \Illuminate\Support\Collection $warehouseCodes): string
+    {
+        if (property_exists($entry, 'warehouse_id') && $entry->warehouse_id) {
+            return (string) ($warehouseCodes->get((int) $entry->warehouse_id) ?? $entry->warehouse_id);
+        }
+
+        foreach (['warehouse_code', 'kode_gudang', 'warehouse', 'gudang'] as $candidate) {
+            if (property_exists($entry, $candidate) && ! empty($entry->{$candidate})) {
+                return (string) $entry->{$candidate};
+            }
+        }
+
+        foreach (['gudang_id', 'id_gudang', 'id_warehouse'] as $candidate) {
+            if (property_exists($entry, $candidate) && ! empty($entry->{$candidate})) {
+                return (string) ($warehouseCodes->get((int) $entry->{$candidate}) ?? $entry->{$candidate});
+            }
+        }
+
+        return '-';
     }
 
     private function resolveColumn(string $table, array $candidates): ?string
