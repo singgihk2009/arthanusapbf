@@ -97,9 +97,9 @@ export default function Menu() {
                         },
                         {
                             title: 'Receiving',
-                            href: '/apps/dashboard',
+                            href: '/apps/inbound/receiving',
                             icon: <IconClipboardCheck size={20} strokeWidth={1.5} />,
-                            active: url === '/apps/dashboard',
+                            active: url.startsWith('/apps/inbound/receiving'),
                             permissions: true,
                         },
                     ],

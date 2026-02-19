@@ -1,0 +1,97 @@
+<?php
+
+namespace App\Http\Controllers\Apps\Inbound;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Inventory\ReceivingEntryRequest;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class ReceivingEntryController extends Controller
+{
+    public function index(): Response
+    {
+        return Inertia::render('Apps/Inbound/Receiving/Index', [
+            'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
+            'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
+            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
+            'transactionCodes' => ['PEMBELIAN', 'RETUR', 'ADJUSTMENT'],
+        ]);
+    }
+
+    public function store(ReceivingEntryRequest $request): RedirectResponse
+    {
+        $validated = $request->validated();
+        $userId = $request->user()?->id;
+
+        DB::transaction(function () use ($validated, $userId): void {
+            $number = $this->generateNumber($validated['transaction_code']);
+
+            $entryId = DB::table('receiving_entries')->insertGetId([
+                'number' => $number,
+                'warehouse_id' => $validated['warehouse_id'],
+                'transaction_date' => $validated['transaction_date'],
+                'transaction_code' => $validated['transaction_code'],
+                'reference' => $validated['reference'] ?? null,
+                'vendor_name' => $validated['vendor_name'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'total_value' => 0,
+                'created_by' => $userId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $totalValue = 0;
+            $linesToInsert = [];
+
+            foreach ($validated['lines'] as $line) {
+                $qty = (float) $line['qty'];
+                $price = (float) $line['price'];
+                $value = round($qty * $price, 6);
+                $totalValue += $value;
+
+                $linesToInsert[] = [
+                    'receiving_entry_id' => $entryId,
+                    'item_id' => $line['item_id'],
+                    'uom_id' => $line['uom_id'],
+                    'qty' => $qty,
+                    'price' => $price,
+                    'value' => $value,
+                    'batch_number' => $line['batch_number'] ?? null,
+                    'expired_date' => $line['expired_date'] ?? null,
+                    'notes' => $line['notes'] ?? null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            DB::table('receiving_entry_lines')->insert($linesToInsert);
+            DB::table('receiving_entries')->where('id', $entryId)->update([
+                'total_value' => round($totalValue, 6),
+                'updated_at' => now(),
+            ]);
+        });
+
+        return back()->with('success', 'Receiving entry berhasil disimpan.');
+    }
+
+    private function generateNumber(string $transactionCode): string
+    {
+        $prefix = match ($transactionCode) {
+            'PEMBELIAN' => 'RCV-PBL',
+            'RETUR' => 'RCV-RTR',
+            default => 'RCV-ADJ',
+        };
+
+        $datePart = now()->format('Ymd');
+        $lastSequence = DB::table('receiving_entries')
+            ->where('number', 'like', "$prefix-$datePart-%")
+            ->count();
+
+        $sequence = str_pad((string) ($lastSequence + 1), 4, '0', STR_PAD_LEFT);
+
+        return "$prefix-$datePart-$sequence";
+    }
+}

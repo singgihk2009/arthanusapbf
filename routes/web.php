@@ -9,6 +9,7 @@ use App\Http\Controllers\Apps\MasterData\UomController;
 use App\Http\Controllers\Apps\MasterData\CategoryController;
 use App\Http\Controllers\Apps\MasterData\WarehouseController;
 use App\Http\Controllers\Apps\Reports\InventoryReportPageController;
+use App\Http\Controllers\Apps\Inbound\ReceivingEntryController;
 use App\Http\Controllers\Apps\InventoryPostingController;
 use App\Http\Controllers\Apps\Reports\InventoryReportController;
 use App\Http\Controllers\ProfileController;
@@ -67,6 +68,10 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     Route::post('/inventory/opening-balance/import', [InventoryPostingController::class, 'importOpeningBalance'])->name('inventory.opening-balance.import');
     Route::get('/inventory/opening-balance/template/csv', [InventoryPostingController::class, 'downloadOpeningBalanceTemplateCsv'])->name('inventory.opening-balance.template.csv');
     Route::get('/inventory/opening-balance/template/excel', [InventoryPostingController::class, 'downloadOpeningBalanceTemplateExcel'])->name('inventory.opening-balance.template.excel');
+
+    // inbound receiving entry
+    Route::get('/inbound/receiving', [ReceivingEntryController::class, 'index'])->name('inbound.receiving.index');
+    Route::post('/inbound/receiving', [ReceivingEntryController::class, 'store'])->name('inbound.receiving.store');
 
     // inventory reports api
     Route::prefix('reports/inventory')->name('reports.inventory.')->group(function () {
