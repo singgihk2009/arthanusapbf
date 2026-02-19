@@ -6,14 +6,34 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\ReceivingEntryRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReceivingEntryController extends Controller
 {
     public function index(): Response
     {
+        $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
+
+        $entries = DB::table('receiving_entries')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->through(function (object $entry) use ($warehouseCodes): object {
+                $entry->warehouse_label = $this->resolveEntryWarehouseLabel($entry, $warehouseCodes);
+
+                return $entry;
+            });
+
         return Inertia::render('Apps/Inbound/Receiving/Index', [
+            'entries' => $entries,
+        ]);
+    }
+
+    public function create(): Response
+    {
+        return Inertia::render('Apps/Inbound/Receiving/Create', [
             'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
@@ -28,10 +48,10 @@ class ReceivingEntryController extends Controller
 
         DB::transaction(function () use ($validated, $userId): void {
             $number = $this->generateNumber($validated['transaction_code']);
+            $warehouse = DB::table('warehouses')->where('id', $validated['warehouse_id'])->first(['id', 'code', 'name']);
 
-            $entryId = DB::table('receiving_entries')->insertGetId([
+            $entryPayload = [
                 'number' => $number,
-                'warehouse_id' => $validated['warehouse_id'],
                 'transaction_date' => $validated['transaction_date'],
                 'transaction_code' => $validated['transaction_code'],
                 'reference' => $validated['reference'] ?? null,
@@ -41,10 +61,19 @@ class ReceivingEntryController extends Controller
                 'created_by' => $userId,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
+
+            $warehouseColumn = $this->resolveWarehouseColumn('receiving_entries');
+            if ($warehouseColumn) {
+                $entryPayload[$warehouseColumn] = $this->resolveWarehouseValue($warehouseColumn, $validated['warehouse_id'], $warehouse?->code);
+            }
+
+            $entryId = DB::table('receiving_entries')->insertGetId($this->filterColumns('receiving_entries', $entryPayload));
 
             $totalValue = 0;
             $linesToInsert = [];
+            $lineForeignKey = $this->resolveColumn('receiving_entry_lines', ['receiving_entry_id', 'receiving_id', 'entry_id', 'header_id']) ?? 'receiving_entry_id';
+            $batchColumn = $this->resolveColumn('receiving_entry_lines', ['batch_number', 'batch_no', 'no_batch']) ?? 'batch_number';
 
             foreach ($validated['lines'] as $line) {
                 $qty = (float) $line['qty'];
@@ -52,29 +81,61 @@ class ReceivingEntryController extends Controller
                 $value = round($qty * $price, 6);
                 $totalValue += $value;
 
-                $linesToInsert[] = [
-                    'receiving_entry_id' => $entryId,
+                $linePayload = [
+                    $lineForeignKey => $entryId,
                     'item_id' => $line['item_id'],
                     'uom_id' => $line['uom_id'],
                     'qty' => $qty,
                     'price' => $price,
                     'value' => $value,
-                    'batch_number' => $line['batch_number'] ?? null,
+                    $batchColumn => $line['batch_number'] ?? null,
                     'expired_date' => $line['expired_date'] ?? null,
                     'notes' => $line['notes'] ?? null,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
+
+                $linesToInsert[] = $this->filterColumns('receiving_entry_lines', $linePayload);
             }
 
             DB::table('receiving_entry_lines')->insert($linesToInsert);
-            DB::table('receiving_entries')->where('id', $entryId)->update([
+            DB::table('receiving_entries')->where('id', $entryId)->update($this->filterColumns('receiving_entries', [
                 'total_value' => round($totalValue, 6),
                 'updated_at' => now(),
-            ]);
+            ]));
         });
 
-        return back()->with('success', 'Receiving entry berhasil disimpan.');
+        return to_route('apps.inbound.receiving.index')->with('success', 'Receiving entry berhasil disimpan.');
+    }
+
+    public function exportExcel(): StreamedResponse
+    {
+        $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
+        $rows = DB::table('receiving_entries')->orderByDesc('id')->get();
+
+        $filename = 'receiving-entries-'.now()->format('Ymd-His').'.csv';
+
+        return response()->streamDownload(function () use ($rows, $warehouseCodes): void {
+            $output = fopen('php://output', 'w');
+            fputcsv($output, ['Number', 'Tanggal', 'Kode Transaksi', 'Warehouse', 'Referensi', 'Vendor', 'Total Value', 'Catatan']);
+
+            foreach ($rows as $row) {
+                fputcsv($output, [
+                    $row->number,
+                    $row->transaction_date,
+                    $row->transaction_code,
+                    $this->resolveEntryWarehouseLabel($row, $warehouseCodes),
+                    $row->reference,
+                    $row->vendor_name,
+                    (float) $row->total_value,
+                    $row->notes,
+                ]);
+            }
+
+            fclose($output);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 
     private function generateNumber(string $transactionCode): string
@@ -93,5 +154,92 @@ class ReceivingEntryController extends Controller
         $sequence = str_pad((string) ($lastSequence + 1), 4, '0', STR_PAD_LEFT);
 
         return "$prefix-$datePart-$sequence";
+    }
+
+    private function resolveWarehouseColumn(string $table): ?string
+    {
+        $column = $this->resolveColumn($table, [
+            'warehouse_id',
+            'gudang_id',
+            'id_warehouse',
+            'id_gudang',
+            'warehouse_code',
+            'kode_gudang',
+            'warehouse',
+            'gudang',
+        ]);
+
+        if ($column) {
+            return $column;
+        }
+
+        foreach (Schema::getColumnListing($table) as $candidate) {
+            if (preg_match('/(warehouse|gudang)/i', $candidate) === 1) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveWarehouseValue(string $column, int $warehouseId, ?string $warehouseCode): int|string|null
+    {
+        if (str_contains($column, 'code') || str_contains($column, 'kode')) {
+            return $warehouseCode;
+        }
+
+        if (str_contains($column, '_id') || str_starts_with($column, 'id_')) {
+            return $warehouseId;
+        }
+
+        return $warehouseCode ?? $warehouseId;
+    }
+
+    private function resolveEntryWarehouseLabel(object $entry, \Illuminate\Support\Collection $warehouseCodes): string
+    {
+        if (property_exists($entry, 'warehouse_id') && $entry->warehouse_id) {
+            return (string) ($warehouseCodes->get((int) $entry->warehouse_id) ?? $entry->warehouse_id);
+        }
+
+        foreach (['warehouse_code', 'kode_gudang', 'warehouse', 'gudang'] as $candidate) {
+            if (property_exists($entry, $candidate) && ! empty($entry->{$candidate})) {
+                return (string) $entry->{$candidate};
+            }
+        }
+
+        foreach (['gudang_id', 'id_gudang', 'id_warehouse'] as $candidate) {
+            if (property_exists($entry, $candidate) && ! empty($entry->{$candidate})) {
+                return (string) ($warehouseCodes->get((int) $entry->{$candidate}) ?? $entry->{$candidate});
+            }
+        }
+
+        return '-';
+    }
+
+    private function resolveColumn(string $table, array $candidates): ?string
+    {
+        foreach ($candidates as $column) {
+            if ($this->hasColumn($table, $column)) {
+                return $column;
+            }
+        }
+
+        return null;
+    }
+
+    private function hasColumn(string $table, string $column): bool
+    {
+        return Schema::hasColumn($table, $column);
+    }
+
+    private function filterColumns(string $table, array $payload): array
+    {
+        $validColumns = array_flip(Schema::getColumnListing($table));
+
+        return array_filter(
+            $payload,
+            fn (string $column): bool => isset($validColumns[$column]),
+            ARRAY_FILTER_USE_KEY,
+        );
     }
 }
