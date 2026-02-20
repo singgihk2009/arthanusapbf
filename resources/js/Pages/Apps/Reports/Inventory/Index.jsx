@@ -17,8 +17,8 @@ export default function Index() {
     };
 
     const reportTypes = [
-        { value: 'stock-balance', label: 'Stock Balance' },
-        { value: 'stock-card', label: 'Stock Card' },
+        { value: 'stock-balance', label: 'Stock Balance per Item' },
+        { value: 'stock-card', label: 'Kartu Stok per Item' },
         { value: 'expired-soon', label: 'Expired Soon' },
         { value: 'minimum-stock-alerts', label: 'Minimum Stock Alerts' },
     ];
@@ -87,6 +87,12 @@ export default function Index() {
                             placeholder="days"
                         />
                     </div>
+
+                    {filters.type === 'stock-card' && !filters.item_id && (
+                        <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+                            Pilih item terlebih dahulu untuk menampilkan kartu stok.
+                        </p>
+                    )}
                 </div>
 
                 <Table.Card title={reportData.title}>
@@ -114,6 +120,7 @@ export default function Index() {
 
                 {filters.type === 'stock-card' && (
                     <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm dark:border-gray-900 dark:bg-gray-950">
+                        <div>Item ID: <strong>{filters.item_id ?? '-'}</strong></div>
                         <div>Opening Balance: <strong>{reportData.opening_balance ?? 0}</strong></div>
                         <div>Closing Balance: <strong>{reportData.closing_balance ?? 0}</strong></div>
                     </div>

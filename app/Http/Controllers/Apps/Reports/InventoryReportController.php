@@ -55,7 +55,7 @@ class InventoryReportController extends Controller implements HasMiddleware
     public function stockCard(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'warehouse_id' => ['required', 'integer'],
+            'warehouse_id' => ['nullable', 'integer'],
             'item_id' => ['required', 'integer'],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
@@ -65,14 +65,14 @@ class InventoryReportController extends Controller implements HasMiddleware
         $end = Carbon::parse($validated['end_date'])->endOfDay();
 
         $openingBalance = (float) StockLedger::query()
-            ->where('warehouse_id', $validated['warehouse_id'])
             ->where('item_id', $validated['item_id'])
+            ->when(! empty($validated['warehouse_id']), fn ($q) => $q->where('warehouse_id', $validated['warehouse_id']))
             ->where('trx_datetime', '<', $start)
             ->sum('qty_base');
 
         $movements = StockLedger::query()
-            ->where('warehouse_id', $validated['warehouse_id'])
             ->where('item_id', $validated['item_id'])
+            ->when(! empty($validated['warehouse_id']), fn ($q) => $q->where('warehouse_id', $validated['warehouse_id']))
             ->whereBetween('trx_datetime', [$start, $end])
             ->orderBy('trx_datetime')
             ->orderBy('id')
@@ -95,7 +95,7 @@ class InventoryReportController extends Controller implements HasMiddleware
         });
 
         return response()->json([
-            'warehouse_id' => (int) $validated['warehouse_id'],
+            'warehouse_id' => ! empty($validated['warehouse_id']) ? (int) $validated['warehouse_id'] : null,
             'item_id' => (int) $validated['item_id'],
             'start_date' => $start->toDateString(),
             'end_date' => $end->toDateString(),
