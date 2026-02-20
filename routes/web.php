@@ -108,6 +108,8 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
 
     // outbound stock opname
     Route::get('/outbound/stock-opname', [StockOpnameController::class, 'index'])->name('outbound.stock-opname.index');
+    Route::get('/outbound/stock-opname/template/excel', [StockOpnameController::class, 'downloadTemplateExcel'])->name('outbound.stock-opname.template.excel');
+    Route::post('/outbound/stock-opname/import/excel', [StockOpnameController::class, 'importExcel'])->name('outbound.stock-opname.import.excel');
     Route::get('/outbound/stock-opname/create', [StockOpnameController::class, 'create'])->name('outbound.stock-opname.create');
     Route::post('/outbound/stock-opname', [StockOpnameController::class, 'store'])->name('outbound.stock-opname.store');
     Route::get('/outbound/stock-opname/{stockOpname}/edit', [StockOpnameController::class, 'edit'])->name('outbound.stock-opname.edit');

@@ -8,9 +8,12 @@ use App\Services\Inventory\StockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use ZipArchive;
 
 class StockOpnameController extends Controller
 {
@@ -33,6 +36,136 @@ class StockOpnameController extends Controller
 
         return Inertia::render('Apps/Outbound/StockOpname/Index', [
             'entries' => $entries,
+            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('code')->get(),
+        ]);
+    }
+
+    public function downloadTemplateExcel(Request $request)
+    {
+        $validated = $request->validate([
+            'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+        ]);
+
+        $warehouse = DB::table('warehouses')->where('id', $validated['warehouse_id'])->first();
+        abort_if(! $warehouse, 404);
+
+        $rows = $this->buildTemplateRows((int) $validated['warehouse_id'], (string) $warehouse->code, (string) $warehouse->name);
+        $tempPath = storage_path('app/stock-opname-template-'.$validated['warehouse_id'].'-'.now()->format('YmdHis').'.xlsx');
+        $this->buildTemplateXlsx($tempPath, $rows);
+
+        return response()->download($tempPath, 'stock-opname-template-'.$warehouse->code.'.xlsx')->deleteFileAfterSend(true);
+    }
+
+    public function importExcel(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+            'document_date' => ['required', 'date'],
+            'type' => ['required', 'in:FULL,CYCLE'],
+            'notes' => ['nullable', 'string'],
+            'file' => ['required', 'file', 'mimes:xlsx,csv,txt'],
+        ]);
+
+        $rows = $this->parseImportRows($request->file('file'));
+        $lines = [];
+        $errors = [];
+
+        foreach ($rows as $index => $row) {
+            if ($this->isRowEmpty($row)) {
+                continue;
+            }
+
+            $countedQty = trim((string) ($row['counted_qty_base'] ?? ''));
+            if ($countedQty === '') {
+                continue;
+            }
+
+            try {
+                $data = validator($row, [
+                    'item_sku' => ['required', 'string'],
+                    'counted_qty_base' => ['required', 'numeric', 'gte:0'],
+                    'batch_number_system' => ['nullable', 'string'],
+                    'counted_batch_number' => ['nullable', 'string'],
+                    'counted_expired_date' => ['nullable', 'date'],
+                ])->validate();
+
+                $item = DB::table('items')->where('sku', $data['item_sku'])->first();
+                if (! $item) {
+                    throw new \RuntimeException('SKU tidak ditemukan: '.$data['item_sku']);
+                }
+
+                $batchNumber = trim((string) ($data['counted_batch_number'] ?: $data['batch_number_system'] ?: ''));
+                $batchId = null;
+                if ($batchNumber !== '') {
+                    $expiredDate = ! empty($data['counted_expired_date']) ? $data['counted_expired_date'] : null;
+                    $batchId = DB::table('item_batches')
+                        ->where('item_id', $item->id)
+                        ->where('batch_no', $batchNumber)
+                        ->where('expired_date', $expiredDate)
+                        ->value('id');
+
+                    if (! $batchId) {
+                        $batchId = DB::table('item_batches')->insertGetId([
+                            'item_id' => $item->id,
+                            'batch_no' => $batchNumber,
+                            'expired_date' => $expiredDate,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+
+                $lineKey = $item->id.'|'.($batchId ?: 0);
+                if (! isset($lines[$lineKey])) {
+                    $lines[$lineKey] = [
+                        'item_id' => (int) $item->id,
+                        'batch_id' => $batchId ? (int) $batchId : null,
+                        'counted_qty_base' => 0,
+                    ];
+                }
+
+                $lines[$lineKey]['counted_qty_base'] += (float) $data['counted_qty_base'];
+            } catch (\Throwable $exception) {
+                $errors[] = [
+                    'row' => $index + 2,
+                    'message' => $exception->getMessage(),
+                ];
+            }
+        }
+
+        if (! empty($errors)) {
+            return response()->json([
+                'message' => 'Import gagal, periksa data file.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        if (empty($lines)) {
+            return response()->json([
+                'message' => 'Tidak ada baris qty opname yang dapat diproses.',
+            ], 422);
+        }
+
+        $entryId = 0;
+        DB::transaction(function () use ($validated, $request, &$entryId, $lines): void {
+            $entryId = DB::table('stock_opnames')->insertGetId([
+                'number' => $this->generateNumber(),
+                'warehouse_id' => $validated['warehouse_id'],
+                'document_date' => $validated['document_date'],
+                'type' => $validated['type'],
+                'status' => 'DRAFT',
+                'notes' => $validated['notes'] ?? 'Imported from stock opname excel',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->replaceLines($entryId, (int) $validated['warehouse_id'], array_values($lines));
+            $this->postById($entryId, $request->user()?->id);
+        });
+
+        return response()->json([
+            'message' => 'Import stock opname berhasil dan adjustment otomatis dibuat.',
+            'id' => $entryId,
         ]);
     }
 
@@ -139,6 +272,13 @@ class StockOpnameController extends Controller
 
     public function post(Request $request, int $stockOpname): JsonResponse
     {
+        $this->postById($stockOpname, $request->user()?->id);
+
+        return response()->json(['message' => 'Stock opname posted', 'id' => $stockOpname]);
+    }
+
+    private function postById(int $stockOpname, ?int $userId): void
+    {
         $header = DB::table('stock_opnames')->where('id', $stockOpname)->first();
         abort_unless($header, 404, 'Stock opname not found');
         abort_if($header->status === 'POSTED', 422, 'Stock opname already posted');
@@ -161,7 +301,7 @@ class StockOpnameController extends Controller
         $adjustmentId = null;
         $varianceLines = $recalculatedLines->filter(fn (object $line) => (float) $line->variance_qty_base !== 0.0)->values();
 
-        DB::transaction(function () use ($header, $request, $stockOpname, $recalculatedLines, $varianceLines, &$adjustmentId): void {
+        DB::transaction(function () use ($header, $userId, $stockOpname, $recalculatedLines, $varianceLines, &$adjustmentId): void {
             foreach ($recalculatedLines as $line) {
                 DB::table('stock_opname_lines')
                     ->where('id', $line->id)
@@ -180,7 +320,7 @@ class StockOpnameController extends Controller
                     'reason_code' => 'OPNAME',
                     'status' => 'POSTED',
                     'notes' => 'Auto generated from stock opname '.$header->number,
-                    'posted_by' => $request->user()?->id,
+                    'posted_by' => $userId,
                     'posted_at' => now(),
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -209,7 +349,7 @@ class StockOpnameController extends Controller
                         'qty_base' => $line->variance_qty_base,
                         'uom_id' => $this->resolveDefaultUomId((int) $line->item_id),
                         'qty_input' => abs((float) $line->variance_qty_base),
-                        'created_by' => $request->user()?->id,
+                        'created_by' => $userId,
                     ]);
                 }
             }
@@ -217,13 +357,208 @@ class StockOpnameController extends Controller
             DB::table('stock_opnames')->where('id', $stockOpname)->update([
                 'status' => 'POSTED',
                 'adjustment_id' => $adjustmentId,
-                'posted_by' => $request->user()?->id,
+                'posted_by' => $userId,
                 'posted_at' => now(),
                 'updated_at' => now(),
             ]);
         });
+    }
 
-        return response()->json(['message' => 'Stock opname posted', 'id' => $stockOpname]);
+    private function buildTemplateRows(int $warehouseId, string $warehouseCode, string $warehouseName): array
+    {
+        $items = DB::table('items')
+            ->join('uoms', 'uoms.id', '=', 'items.base_uom_id')
+            ->select('items.id', 'items.sku', 'items.name', 'uoms.code as base_uom')
+            ->orderBy('items.sku')
+            ->get();
+
+        $balancesByItem = DB::table('stock_balances')
+            ->leftJoin('item_batches', 'item_batches.id', '=', 'stock_balances.batch_id')
+            ->where('stock_balances.warehouse_id', $warehouseId)
+            ->select('stock_balances.item_id', 'stock_balances.on_hand_base', 'item_batches.batch_no')
+            ->orderBy('stock_balances.item_id')
+            ->orderBy('item_batches.batch_no')
+            ->get()
+            ->groupBy('item_id');
+
+        $rows = [[
+            'warehouse_code',
+            'warehouse_name',
+            'item_sku',
+            'item_name',
+            'system_qty_base',
+            'base_uom',
+            'batch_number_system',
+            'counted_qty_base',
+            'counted_batch_number',
+            'counted_expired_date',
+        ]];
+
+        foreach ($items as $item) {
+            $itemBalances = $balancesByItem->get($item->id);
+
+            if (! $itemBalances || $itemBalances->isEmpty()) {
+                $rows[] = [$warehouseCode, $warehouseName, $item->sku, $item->name, '0', $item->base_uom, '', '', '', ''];
+                continue;
+            }
+
+            foreach ($itemBalances as $balance) {
+                $rows[] = [
+                    $warehouseCode,
+                    $warehouseName,
+                    $item->sku,
+                    $item->name,
+                    (string) $balance->on_hand_base,
+                    $item->base_uom,
+                    (string) ($balance->batch_no ?? ''),
+                    '',
+                    '',
+                    '',
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
+    private function parseImportRows(UploadedFile $file): Collection
+    {
+        $ext = strtolower($file->getClientOriginalExtension());
+
+        return match ($ext) {
+            'xlsx' => $this->parseXlsxRows($file->getRealPath()),
+            default => $this->parseCsvRows($file->getRealPath()),
+        };
+    }
+
+    private function parseCsvRows(string $path): Collection
+    {
+        $rows = [];
+        $handle = fopen($path, 'r');
+        if (! $handle) {
+            return collect();
+        }
+
+        $header = null;
+        while (($data = fgetcsv($handle)) !== false) {
+            if (! $header) {
+                $header = array_map(fn ($item) => trim((string) $item), $data);
+                continue;
+            }
+
+            $rows[] = collect($header)->mapWithKeys(function ($key, $index) use ($data) {
+                return [$key => trim((string) ($data[$index] ?? ''))];
+            })->all();
+        }
+
+        fclose($handle);
+
+        return collect($rows);
+    }
+
+    private function parseXlsxRows(string $path): Collection
+    {
+        $zip = new ZipArchive();
+        $opened = $zip->open($path);
+        if ($opened !== true) {
+            return collect();
+        }
+
+        $sharedStrings = [];
+        $sharedXml = $zip->getFromName('xl/sharedStrings.xml');
+        if ($sharedXml) {
+            $shared = simplexml_load_string($sharedXml);
+            if ($shared !== false && isset($shared->si)) {
+                foreach ($shared->si as $si) {
+                    $sharedStrings[] = isset($si->t) ? (string) $si->t : '';
+                }
+            }
+        }
+
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+        if (! $sheetXml) {
+            return collect();
+        }
+
+        $xml = simplexml_load_string($sheetXml);
+        if ($xml === false || ! isset($xml->sheetData->row)) {
+            return collect();
+        }
+
+        $table = [];
+        foreach ($xml->sheetData->row as $row) {
+            $line = [];
+            foreach ($row->c as $cell) {
+                $type = (string) ($cell['t'] ?? '');
+                $value = '';
+
+                if ($type === 's') {
+                    $idx = (int) ($cell->v ?? 0);
+                    $value = $sharedStrings[$idx] ?? '';
+                } elseif ($type === 'inlineStr' && isset($cell->is->t)) {
+                    $value = (string) $cell->is->t;
+                } else {
+                    $value = isset($cell->v) ? (string) $cell->v : '';
+                }
+
+                $line[] = trim($value);
+            }
+
+            $table[] = $line;
+        }
+
+        if (count($table) < 2) {
+            return collect();
+        }
+
+        $header = $table[0];
+        $rows = [];
+
+        foreach (array_slice($table, 1) as $line) {
+            $rows[] = collect($header)->mapWithKeys(function ($key, $index) use ($line) {
+                return [$key => trim((string) ($line[$index] ?? ''))];
+            })->all();
+        }
+
+        return collect($rows);
+    }
+
+    private function buildTemplateXlsx(string $path, array $rows): void
+    {
+        $zip = new ZipArchive();
+        if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            return;
+        }
+
+        $sheetRows = '';
+        foreach ($rows as $rowIndex => $row) {
+            $cellXml = '';
+            foreach ($row as $colIndex => $value) {
+                $column = chr(65 + $colIndex);
+                $escaped = htmlspecialchars((string) $value, ENT_XML1);
+                $cellXml .= "<c r=\"{$column}".($rowIndex + 1)."\" t=\"inlineStr\"><is><t>{$escaped}</t></is></c>";
+            }
+            $sheetRows .= "<row r=\"".($rowIndex + 1)."\">{$cellXml}</row>";
+        }
+
+        $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+        $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+        $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Template" sheetId="1" r:id="rId1"/></sheets></workbook>');
+        $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
+        $zip->addFromString('xl/worksheets/sheet1.xml', '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'.$sheetRows.'</sheetData></worksheet>');
+        $zip->close();
+    }
+
+    private function isRowEmpty(array $row): bool
+    {
+        foreach ($row as $value) {
+            if (trim((string) $value) !== '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function replaceLines(int $entryId, int $warehouseId, array $lines): void
