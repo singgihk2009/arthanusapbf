@@ -8,6 +8,9 @@ use App\Http\Controllers\Apps\MasterData\ItemController;
 use App\Http\Controllers\Apps\MasterData\UomController;
 use App\Http\Controllers\Apps\MasterData\CategoryController;
 use App\Http\Controllers\Apps\MasterData\WarehouseController;
+use App\Http\Controllers\Apps\MasterData\ItemBarcodeController;
+use App\Http\Controllers\Apps\MasterData\ItemUomConversionController;
+use App\Http\Controllers\Apps\MasterData\MinStockController;
 use App\Http\Controllers\Apps\Reports\InventoryReportPageController;
 use App\Http\Controllers\Apps\Inbound\ReceivingEntryController;
 use App\Http\Controllers\Apps\Outbound\InternalUsageController;
@@ -51,6 +54,9 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::resource('/categories', CategoryController::class);
         Route::resource('/uoms', UomController::class);
         Route::resource('/items', ItemController::class);
+        Route::resource('/conversions', ItemUomConversionController::class)->parameters(['conversions' => 'conversion']);
+        Route::resource('/barcodes', ItemBarcodeController::class)->parameters(['barcodes' => 'barcode']);
+        Route::resource('/min-stocks', MinStockController::class)->parameters(['min-stocks' => 'min_stock']);
     });
 
     // inventory report page
