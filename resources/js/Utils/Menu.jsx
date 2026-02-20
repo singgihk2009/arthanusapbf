@@ -134,10 +134,24 @@ export default function Menu() {
                 },
                 {
                     title: 'Adjustment & Stock Opname',
-                    href: '/apps/dashboard',
-                    active: url.startsWith('/apps/dashboard'),
                     icon: <IconClipboardCheck size={20} strokeWidth={1.5} />,
                     permissions: true,
+                    subdetails: [
+                        {
+                            title: 'Stock Adjustment',
+                            href: '/apps/outbound/stock-adjustment',
+                            icon: <IconExchange size={20} strokeWidth={1.5} />,
+                            active: url.startsWith('/apps/outbound/stock-adjustment'),
+                            permissions: true,
+                        },
+                        {
+                            title: 'Stock Opname',
+                            href: '/apps/outbound/stock-opname',
+                            icon: <IconClipboardCheck size={20} strokeWidth={1.5} />,
+                            active: url.startsWith('/apps/outbound/stock-opname'),
+                            permissions: true,
+                        },
+                    ],
                 },
                 {
                     title: 'Saldo Awal',
