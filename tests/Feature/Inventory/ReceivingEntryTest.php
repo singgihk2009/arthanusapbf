@@ -97,6 +97,56 @@ it('stores receiving entry with warehouse and multi line items and auto value', 
 });
 
 
+
+it('generates next receiving number from max sequence even when there are gaps', function () {
+    $today = now()->format('Ymd');
+
+    DB::table('receiving_entries')->insert([
+        [
+            'number' => "RCV-PBL-$today-0001",
+            'warehouse_id' => $this->warehouseId,
+            'transaction_date' => now()->format('Y-m-d'),
+            'transaction_code' => 'PEMBELIAN',
+            'total_value' => 0,
+            'status' => 'DRAFT',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+        [
+            'number' => "RCV-PBL-$today-0002",
+            'warehouse_id' => $this->warehouseId,
+            'transaction_date' => now()->format('Y-m-d'),
+            'transaction_code' => 'PEMBELIAN',
+            'total_value' => 0,
+            'status' => 'DRAFT',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+    ]);
+
+    DB::table('receiving_entries')->where('number', "RCV-PBL-$today-0001")->delete();
+
+    post(route('apps.inbound.receiving.store'), [
+        'warehouse_id' => $this->warehouseId,
+        'transaction_date' => now()->format('Y-m-d'),
+        'transaction_code' => 'PEMBELIAN',
+        'reference' => 'PO-GAP-001',
+        'vendor_name' => 'Vendor Gap',
+        'lines' => [
+            [
+                'item_id' => $this->itemId,
+                'qty' => 1,
+                'uom_id' => $this->uomId,
+                'price' => 1000,
+            ],
+        ],
+    ])->assertRedirect();
+
+    $latestNumber = DB::table('receiving_entries')->orderByDesc('id')->value('number');
+
+    expect($latestNumber)->toBe("RCV-PBL-$today-0003");
+});
+
 it('posts receiving entry and increases stock balance', function () {
     post(route('apps.inbound.receiving.store'), [
         'warehouse_id' => $this->warehouseId,

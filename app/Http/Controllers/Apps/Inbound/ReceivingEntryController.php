@@ -303,8 +303,18 @@ class ReceivingEntryController extends Controller
         };
 
         $datePart = now()->format('Ymd');
-        $lastSequence = DB::table('receiving_entries')->where('number', 'like', "$prefix-$datePart-%")->count();
-        $sequence = str_pad((string) ($lastSequence + 1), 4, '0', STR_PAD_LEFT);
+        $maxSequence = DB::table('receiving_entries')
+            ->where('number', 'like', "$prefix-$datePart-%")
+            ->pluck('number')
+            ->map(function (string $number): int {
+                $parts = explode('-', $number);
+                $suffix = end($parts);
+
+                return ctype_digit((string) $suffix) ? (int) $suffix : 0;
+            })
+            ->max() ?? 0;
+
+        $sequence = str_pad((string) ($maxSequence + 1), 4, '0', STR_PAD_LEFT);
 
         return "$prefix-$datePart-$sequence";
     }
