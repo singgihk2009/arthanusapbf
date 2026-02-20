@@ -14,6 +14,8 @@ use App\Http\Controllers\Apps\MasterData\MinStockController;
 use App\Http\Controllers\Apps\Reports\InventoryReportPageController;
 use App\Http\Controllers\Apps\Inbound\ReceivingEntryController;
 use App\Http\Controllers\Apps\Outbound\InternalUsageController;
+use App\Http\Controllers\Apps\Outbound\StockAdjustmentController;
+use App\Http\Controllers\Apps\Outbound\StockOpnameController;
 use App\Http\Controllers\Apps\Transfer\WarehouseTransferController;
 use App\Http\Controllers\Apps\InventoryPostingController;
 use App\Http\Controllers\Apps\Reports\InventoryReportController;
@@ -69,6 +71,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     Route::post('/inventory/posting/sale/{saleId}', [InventoryPostingController::class, 'postSale'])->name('inventory.posting.sale');
     Route::post('/inventory/posting/usage/{usageId}', [InventoryPostingController::class, 'postInternalUsage'])->name('inventory.posting.usage');
     Route::post('/inventory/posting/adjustment/{adjustmentId}', [InventoryPostingController::class, 'postStockAdjustment'])->name('inventory.posting.adjustment');
+    Route::post('/inventory/posting/opname/{stockOpname}', [StockOpnameController::class, 'post'])->name('inventory.posting.opname');
     Route::post('/inventory/posting/opening-balance', [InventoryPostingController::class, 'postOpeningBalance'])->name('inventory.posting.opening-balance');
 
 
@@ -94,6 +97,22 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     Route::get('/outbound/internal-usage/{internalUsage}/edit', [InternalUsageController::class, 'edit'])->name('outbound.internal-usage.edit');
     Route::put('/outbound/internal-usage/{internalUsage}', [InternalUsageController::class, 'update'])->name('outbound.internal-usage.update');
     Route::delete('/outbound/internal-usage/{internalUsage}', [InternalUsageController::class, 'destroy'])->name('outbound.internal-usage.destroy');
+
+    // outbound stock adjustment
+    Route::get('/outbound/stock-adjustment', [StockAdjustmentController::class, 'index'])->name('outbound.stock-adjustment.index');
+    Route::get('/outbound/stock-adjustment/create', [StockAdjustmentController::class, 'create'])->name('outbound.stock-adjustment.create');
+    Route::post('/outbound/stock-adjustment', [StockAdjustmentController::class, 'store'])->name('outbound.stock-adjustment.store');
+    Route::get('/outbound/stock-adjustment/{stockAdjustment}/edit', [StockAdjustmentController::class, 'edit'])->name('outbound.stock-adjustment.edit');
+    Route::put('/outbound/stock-adjustment/{stockAdjustment}', [StockAdjustmentController::class, 'update'])->name('outbound.stock-adjustment.update');
+    Route::delete('/outbound/stock-adjustment/{stockAdjustment}', [StockAdjustmentController::class, 'destroy'])->name('outbound.stock-adjustment.destroy');
+
+    // outbound stock opname
+    Route::get('/outbound/stock-opname', [StockOpnameController::class, 'index'])->name('outbound.stock-opname.index');
+    Route::get('/outbound/stock-opname/create', [StockOpnameController::class, 'create'])->name('outbound.stock-opname.create');
+    Route::post('/outbound/stock-opname', [StockOpnameController::class, 'store'])->name('outbound.stock-opname.store');
+    Route::get('/outbound/stock-opname/{stockOpname}/edit', [StockOpnameController::class, 'edit'])->name('outbound.stock-opname.edit');
+    Route::put('/outbound/stock-opname/{stockOpname}', [StockOpnameController::class, 'update'])->name('outbound.stock-opname.update');
+    Route::delete('/outbound/stock-opname/{stockOpname}', [StockOpnameController::class, 'destroy'])->name('outbound.stock-opname.destroy');
 
     // transfer antar gudang
     Route::get('/transfer/warehouse', [WarehouseTransferController::class, 'index'])->name('transfer.warehouse.index');
