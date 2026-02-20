@@ -118,9 +118,9 @@ export default function Menu() {
                         },
                         {
                             title: 'Internal Use',
-                            href: '/apps/master-data/items',
+                            href: '/apps/outbound/internal-usage',
                             icon: <IconBox size={20} strokeWidth={1.5} />,
-                            active: url.startsWith('/apps/master-data/items'),
+                            active: url.startsWith('/apps/outbound/internal-usage'),
                             permissions: true,
                         },
                     ],
