@@ -37,6 +37,7 @@ class DashboardController extends Controller implements HasMiddleware
                     $join->on('sb.warehouse_id', '=', 'wis.warehouse_id')
                         ->on('sb.item_id', '=', 'wis.item_id');
                 })
+                ->select('wis.warehouse_id', 'wis.item_id', 'wis.min_stock_base')
                 ->groupBy('wis.warehouse_id', 'wis.item_id', 'wis.min_stock_base')
                 ->havingRaw('COALESCE(SUM(sb.on_hand_base), 0) <= wis.min_stock_base')
                 ->get()
