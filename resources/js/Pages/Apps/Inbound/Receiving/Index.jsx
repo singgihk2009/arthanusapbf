@@ -4,19 +4,34 @@ import { useState } from 'react';
 
 export default function Index() {
     const { entries, flash } = usePage().props;
-    const [deletingId, setDeletingId] = useState(null);
+    const [processingId, setProcessingId] = useState(null);
 
     const handleDelete = async (id) => {
         if (!window.confirm('Yakin hapus receiving entry ini?')) {
             return;
         }
 
-        setDeletingId(id);
+        setProcessingId(id);
         try {
             await window.axios.delete(route('apps.inbound.receiving.destroy', id));
             window.location.reload();
         } finally {
-            setDeletingId(null);
+            setProcessingId(null);
+        }
+    };
+
+
+    const handlePost = async (id) => {
+        if (!window.confirm('Posting dokumen ini? Stok akan bertambah.')) {
+            return;
+        }
+
+        setProcessingId(id);
+        try {
+            await window.axios.post(route('apps.inventory.posting.receiving', id));
+            window.location.reload();
+        } finally {
+            setProcessingId(null);
         }
     };
 
@@ -49,6 +64,7 @@ export default function Index() {
                                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Warehouse</th>
                                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Kode Transaksi</th>
                                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Vendor</th>
+                                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Status</th>
                                     <th className="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-200">Total</th>
                                     <th className="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-200">Aksi</th>
                                 </tr>
@@ -56,7 +72,7 @@ export default function Index() {
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                 {entries.data.length === 0 && (
                                     <tr>
-                                        <td colSpan={8} className="px-3 py-4 text-center text-gray-500">Belum ada data receiving.</td>
+                                        <td colSpan={9} className="px-3 py-4 text-center text-gray-500">Belum ada data receiving.</td>
                                     </tr>
                                 )}
                                 {entries.data.map((entry, idx) => (
@@ -67,11 +83,13 @@ export default function Index() {
                                         <td className="px-3 py-2">{entry.warehouse_label}</td>
                                         <td className="px-3 py-2">{entry.transaction_code}</td>
                                         <td className="px-3 py-2">{entry.vendor_name || '-'}</td>
+                                        <td className="px-3 py-2"><span className="rounded border border-gray-300 px-2 py-1 text-xs">{entry.status || 'DRAFT'}</span></td>
                                         <td className="px-3 py-2 text-right">{Number(entry.total_value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                         <td className="px-3 py-2">
                                             <div className="flex justify-center gap-2">
                                                 <Link href={route('apps.inbound.receiving.edit', entry.id)} className="rounded border border-gray-300 px-2 py-1 text-xs">Edit</Link>
-                                                <button type="button" onClick={() => handleDelete(entry.id)} disabled={deletingId === entry.id} className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 disabled:opacity-50">Hapus</button>
+                                                {entry.status !== 'POSTED' && <button type="button" onClick={() => handlePost(entry.id)} disabled={processingId === entry.id} className="rounded border border-blue-300 px-2 py-1 text-xs text-blue-700 disabled:opacity-50">Post</button>}
+                                                <button type="button" onClick={() => handleDelete(entry.id)} disabled={processingId === entry.id || entry.status === 'POSTED'} className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 disabled:opacity-50">Hapus</button>
                                             </div>
                                         </td>
                                     </tr>

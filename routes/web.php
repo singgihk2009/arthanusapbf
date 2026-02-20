@@ -58,6 +58,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
 
     // inventory posting actions
     Route::post('/inventory/posting/grn/{goodsReceipt}', [InventoryPostingController::class, 'postGoodsReceipt'])->name('inventory.posting.grn');
+    Route::post('/inventory/posting/receiving/{receivingEntry}', [InventoryPostingController::class, 'postReceivingEntry'])->name('inventory.posting.receiving');
     Route::post('/inventory/posting/transfer/{transferId}', [InventoryPostingController::class, 'postTransfer'])->name('inventory.posting.transfer');
     Route::post('/inventory/posting/sale/{saleId}', [InventoryPostingController::class, 'postSale'])->name('inventory.posting.sale');
     Route::post('/inventory/posting/usage/{usageId}', [InventoryPostingController::class, 'postInternalUsage'])->name('inventory.posting.usage');
