@@ -11,6 +11,7 @@ use App\Http\Controllers\Apps\MasterData\WarehouseController;
 use App\Http\Controllers\Apps\Reports\InventoryReportPageController;
 use App\Http\Controllers\Apps\Inbound\ReceivingEntryController;
 use App\Http\Controllers\Apps\Outbound\InternalUsageController;
+use App\Http\Controllers\Apps\Transfer\WarehouseTransferController;
 use App\Http\Controllers\Apps\InventoryPostingController;
 use App\Http\Controllers\Apps\Reports\InventoryReportController;
 use App\Http\Controllers\ProfileController;
@@ -86,6 +87,14 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     Route::get('/outbound/internal-usage/{internalUsage}/edit', [InternalUsageController::class, 'edit'])->name('outbound.internal-usage.edit');
     Route::put('/outbound/internal-usage/{internalUsage}', [InternalUsageController::class, 'update'])->name('outbound.internal-usage.update');
     Route::delete('/outbound/internal-usage/{internalUsage}', [InternalUsageController::class, 'destroy'])->name('outbound.internal-usage.destroy');
+
+    // transfer antar gudang
+    Route::get('/transfer/warehouse', [WarehouseTransferController::class, 'index'])->name('transfer.warehouse.index');
+    Route::get('/transfer/warehouse/create', [WarehouseTransferController::class, 'create'])->name('transfer.warehouse.create');
+    Route::post('/transfer/warehouse', [WarehouseTransferController::class, 'store'])->name('transfer.warehouse.store');
+    Route::get('/transfer/warehouse/{warehouseTransfer}/edit', [WarehouseTransferController::class, 'edit'])->name('transfer.warehouse.edit');
+    Route::put('/transfer/warehouse/{warehouseTransfer}', [WarehouseTransferController::class, 'update'])->name('transfer.warehouse.update');
+    Route::delete('/transfer/warehouse/{warehouseTransfer}', [WarehouseTransferController::class, 'destroy'])->name('transfer.warehouse.destroy');
 
     // inventory reports api
     Route::prefix('reports/inventory')->name('reports.inventory.')->group(function () {

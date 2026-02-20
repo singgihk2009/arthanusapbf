@@ -127,8 +127,8 @@ export default function Menu() {
                 },
                 {
                     title: 'Transfer Antar Gudang',
-                    href: '/apps/dashboard',
-                    active: url.startsWith('/apps/dashboard'),
+                    href: '/apps/transfer/warehouse',
+                    active: url.startsWith('/apps/transfer/warehouse'),
                     icon: <IconArrowsExchange size={20} strokeWidth={1.5} />,
                     permissions: true,
                 },
