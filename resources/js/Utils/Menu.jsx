@@ -159,7 +159,7 @@ export default function Menu() {
                             permissions: true,
                         },
                         {
-                            title: 'Stock Mutasi',
+                            title: 'Kartu Stok',
                             href: '/apps/reports/inventory?type=stock-card',
                             icon: <IconArrowsExchange size={20} strokeWidth={1.5} />,
                             active: url.startsWith('/apps/reports/inventory') && url.includes('stock-card'),

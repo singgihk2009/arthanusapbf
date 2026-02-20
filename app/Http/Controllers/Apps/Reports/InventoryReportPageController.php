@@ -88,7 +88,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
 
     private function stockCardData(array $filters): array
     {
-        if (! $filters['warehouse_id'] || ! $filters['item_id']) {
+        if (! $filters['item_id']) {
             return [
                 'title' => 'Stock Card',
                 'opening_balance' => 0,
@@ -101,19 +101,24 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         $end = Carbon::parse($filters['end_date'])->endOfDay();
 
         $opening = (float) StockLedger::query()
-            ->where('warehouse_id', $filters['warehouse_id'])
             ->where('item_id', $filters['item_id'])
+            ->when($filters['warehouse_id'], fn ($q, $warehouseId) => $q->where('warehouse_id', $warehouseId))
             ->where('trx_datetime', '<', $start)
             ->sum('qty_base');
 
         $movements = StockLedger::query()
-            ->where('warehouse_id', $filters['warehouse_id'])
+            ->join('warehouses', 'warehouses.id', '=', 'stock_ledgers.warehouse_id')
             ->where('item_id', $filters['item_id'])
+            ->when($filters['warehouse_id'], fn ($q, $warehouseId) => $q->where('stock_ledgers.warehouse_id', $warehouseId))
             ->whereBetween('trx_datetime', [$start, $end])
-            ->orderBy('trx_datetime')
-            ->orderBy('id')
+            ->orderBy('stock_ledgers.trx_datetime')
+            ->orderBy('stock_ledgers.id')
             ->limit(500)
-            ->get();
+            ->get([
+                'stock_ledgers.*',
+                'warehouses.code as warehouse_code',
+                'warehouses.name as warehouse_name',
+            ]);
 
         $running = $opening;
         $rows = $movements->map(function (StockLedger $ledger) use (&$running) {
@@ -121,6 +126,8 @@ class InventoryReportPageController extends Controller implements HasMiddleware
 
             return [
                 'trx_datetime' => optional($ledger->trx_datetime)->format('Y-m-d H:i:s'),
+                'warehouse_code' => $ledger->warehouse_code,
+                'warehouse_name' => $ledger->warehouse_name,
                 'trx_type' => $ledger->trx_type,
                 'qty_base' => (float) $ledger->qty_base,
                 'running_balance' => $running,
