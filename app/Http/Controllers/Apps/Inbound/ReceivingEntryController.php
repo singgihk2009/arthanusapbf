@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Apps\Inbound;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\ReceivingEntryRequest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -42,7 +43,7 @@ class ReceivingEntryController extends Controller
         ]);
     }
 
-    public function store(ReceivingEntryRequest $request): RedirectResponse
+    public function store(ReceivingEntryRequest $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validated();
         $userId = $request->user()?->id;
@@ -51,6 +52,10 @@ class ReceivingEntryController extends Controller
             $entryId = $this->insertEntryHeader($validated, $userId);
             $this->replaceEntryLines($entryId, $validated['lines']);
         });
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Receiving entry berhasil disimpan.']);
+        }
 
         return to_route('apps.inbound.receiving.index')->with('success', 'Receiving entry berhasil disimpan.');
     }
@@ -95,7 +100,7 @@ class ReceivingEntryController extends Controller
         ]);
     }
 
-    public function update(ReceivingEntryRequest $request, int $receivingEntry): RedirectResponse
+    public function update(ReceivingEntryRequest $request, int $receivingEntry): RedirectResponse|JsonResponse
     {
         $validated = $request->validated();
 
@@ -125,6 +130,10 @@ class ReceivingEntryController extends Controller
 
             $this->replaceEntryLines($receivingEntry, $validated['lines']);
         });
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Receiving entry berhasil diperbarui.']);
+        }
 
         return to_route('apps.inbound.receiving.index')->with('success', 'Receiving entry berhasil diperbarui.');
     }
