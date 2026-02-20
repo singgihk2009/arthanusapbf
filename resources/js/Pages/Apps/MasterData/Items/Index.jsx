@@ -31,7 +31,7 @@ export default function Index() {
 
             <Table.Card title={'Data Item'}>
                 <Table>
-                    <Table.Thead><tr><Table.Th className="w-10">No</Table.Th><Table.Th>SKU</Table.Th><Table.Th>Nama</Table.Th><Table.Th>Kategori</Table.Th><Table.Th>Base UOM</Table.Th><Table.Th>Status</Table.Th><Table.Th className="w-32"></Table.Th></tr></Table.Thead>
+                    <Table.Thead><tr><Table.Th className="w-10">No</Table.Th><Table.Th>SKU</Table.Th><Table.Th>Nama</Table.Th><Table.Th>Kategori</Table.Th><Table.Th>Base UOM</Table.Th><Table.Th>Min. Stok</Table.Th><Table.Th>Status</Table.Th><Table.Th className="w-32"></Table.Th></tr></Table.Thead>
                     <Table.Tbody>
                         {items.data.length ? items.data.map((item, i) => (
                             <tr key={item.id} className="hover:bg-gray-100 dark:hover:bg-gray-900">
@@ -40,10 +40,11 @@ export default function Index() {
                                 <Table.Td>{item.name}</Table.Td>
                                 <Table.Td>{item.category?.name ?? '-'}</Table.Td>
                                 <Table.Td>{item.base_uom?.code ?? '-'}</Table.Td>
+                                <Table.Td>{Number(item.minimum_stock_base ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 6 })}</Table.Td>
                                 <Table.Td>{item.is_active ? 'Aktif' : 'Nonaktif'}</Table.Td>
                                 <Table.Td><div className="flex gap-2">{hasAnyPermission(['master-item-update']) && <Button type="edit" href={route('apps.master-data.items.edit', item.id)} icon={<IconPencilCog size={16} strokeWidth={1.5} />} variant="orange" />}{hasAnyPermission(['master-item-delete']) && <Button type="delete" url={route('apps.master-data.items.destroy', item.id)} icon={<IconTrash size={16} strokeWidth={1.5} />} variant="rose" />}</div></Table.Td>
                             </tr>
-                        )) : <Table.Empty colSpan={7} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto text-gray-500 dark:text-white mb-2'/><span className='text-gray-500'>Data item tidak ditemukan.</span></>} />}
+                        )) : <Table.Empty colSpan={8} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto text-gray-500 dark:text-white mb-2'/><span className='text-gray-500'>Data item tidak ditemukan.</span></>} />}
                     </Table.Tbody>
                 </Table>
             </Table.Card>

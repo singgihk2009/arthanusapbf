@@ -21,6 +21,8 @@ class ItemRequest extends FormRequest
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'base_uom_id' => ['required', 'integer', 'exists:uoms,id'],
             'default_barcode' => ['nullable', 'string', 'max:100'],
+            'warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
+            'min_stock_base' => ['nullable', 'numeric', 'min:0'],
             'track_expired' => ['required', 'boolean'],
             'is_active' => ['required', 'boolean'],
         ];
