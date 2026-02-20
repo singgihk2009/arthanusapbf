@@ -158,3 +158,37 @@ Permission master data:
 
 Route resources berada pada group:
 - `Route::prefix('master-data')->name('master-data.')`
+
+## 12. Logika perhitungan Stock Opname (auto adjustment)
+
+Saat dokumen stock opname di-**POST**, sistem tidak langsung overwrite stok menjadi `counted_qty_base`.
+Sistem menghitung **selisih (variance)** dulu, lalu membuat dokumen `stock_adjustments` otomatis.
+
+Rumus per baris:
+- `system_qty_base` = snapshot `stock_balances.on_hand_base` untuk kombinasi `warehouse_id + item_id + batch_id`.
+  Jika `batch_id` kosong, sistem menjumlahkan semua batch item tersebut di warehouse terkait.
+- `variance_qty_base` = `counted_qty_base - system_qty_base`
+- `qty_adjusted` yang diposting ke ledger = `variance_qty_base`
+- running balance berubah dengan menambahkan nilai `qty_base` dari ledger tersebut
+
+Referensi implementasi:
+- Hitung `system_qty_base` dan `variance_qty_base` pada saat simpan/edit line opname.
+- Saat post opname, sistem menghitung ulang `system_qty_base` dari snapshot terkini agar variance mengikuti stok aktual saat posting.
+- Hanya line dengan variance ≠ 0 yang dibuatkan `stock_adjustment_lines` dan `stock_ledgers` bertipe `ADJ_OPNAME`.
+
+Catatan penting pembacaan hasil:
+- Jika variance terlihat “terlalu besar”, biasanya karena `system_qty_base` yang dipakai berasal dari snapshot stok aktual saat dokumen disimpan (per item+batch), bukan dari angka visual terakhir yang sedang dilihat user pada report tertentu.
+- Jika item yang sama muncul di beberapa batch/line, variance dihitung per line (per kombinasi item+batch), bukan digabung dulu.
+
+
+### Dari mana `system_qty_base` berasal?
+
+`system_qty_base` **bukan** hasil scan manual semua dokumen satu per satu saat tombol post ditekan.
+Nilai ini dibaca dari tabel snapshot `stock_balances.on_hand_base` (per `warehouse + item + batch`, atau dijumlahkan seluruh batch jika batch kosong) saat line disimpan dan dihitung ulang lagi saat posting.
+
+Implikasi terhadap status dokumen/transaksi:
+- **Transaksi sudah posted/received**: masuk ke `stock_ledgers`, lalu listener menambah/mengurangi `stock_balances` → **ikut terhitung**.
+- **Transaksi belum posted (draft)**: belum membuat ledger → **tidak ikut terhitung**.
+- **Dokumen posted yang dihapus**: pada flow saat ini umumnya diblokir (`Dokumen POSTED tidak dapat dihapus`), jadi mutasi yang sudah posted tetap menjadi basis snapshot.
+
+Jika ada koreksi, mekanisme normalnya adalah membuat transaksi pembalik/adjustment baru, bukan menghapus ledger historis.

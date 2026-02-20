@@ -145,10 +145,33 @@ class StockOpnameController extends Controller
 
         $lines = DB::table('stock_opname_lines')->where('stock_opname_id', $stockOpname)->get();
 
-        $adjustmentId = null;
-        $varianceLines = $lines->filter(fn (object $line) => (float) $line->variance_qty_base !== 0.0)->values();
+        $recalculatedLines = $lines->map(function (object $line) use ($header): object {
+            $systemQty = $this->getSystemQtyBase(
+                (int) $header->warehouse_id,
+                (int) $line->item_id,
+                $line->batch_id ? (int) $line->batch_id : null,
+            );
 
-        DB::transaction(function () use ($header, $request, $stockOpname, $varianceLines, &$adjustmentId): void {
+            $line->system_qty_base = $systemQty;
+            $line->variance_qty_base = (float) $line->counted_qty_base - $systemQty;
+
+            return $line;
+        });
+
+        $adjustmentId = null;
+        $varianceLines = $recalculatedLines->filter(fn (object $line) => (float) $line->variance_qty_base !== 0.0)->values();
+
+        DB::transaction(function () use ($header, $request, $stockOpname, $recalculatedLines, $varianceLines, &$adjustmentId): void {
+            foreach ($recalculatedLines as $line) {
+                DB::table('stock_opname_lines')
+                    ->where('id', $line->id)
+                    ->update([
+                        'system_qty_base' => $line->system_qty_base,
+                        'variance_qty_base' => $line->variance_qty_base,
+                        'updated_at' => now(),
+                    ]);
+            }
+
             if ($varianceLines->isNotEmpty()) {
                 $adjustmentId = DB::table('stock_adjustments')->insertGetId([
                     'number' => $this->generateAdjustmentNumber(),
@@ -208,11 +231,11 @@ class StockOpnameController extends Controller
         DB::table('stock_opname_lines')->where('stock_opname_id', $entryId)->delete();
 
         foreach ($lines as $line) {
-            $systemQty = (float) DB::table('stock_balances')
-                ->where('warehouse_id', $warehouseId)
-                ->where('item_id', $line['item_id'])
-                ->when(! empty($line['batch_id']), fn ($q) => $q->where('batch_id', $line['batch_id']), fn ($q) => $q->whereNull('batch_id'))
-                ->value('on_hand_base') ?: 0;
+            $systemQty = $this->getSystemQtyBase(
+                $warehouseId,
+                (int) $line['item_id'],
+                ! empty($line['batch_id']) ? (int) $line['batch_id'] : null,
+            );
 
             $countedQty = (float) $line['counted_qty_base'];
 
@@ -232,6 +255,15 @@ class StockOpnameController extends Controller
     private function resolveDefaultUomId(int $itemId): int
     {
         return (int) DB::table('items')->where('id', $itemId)->value('base_uom_id');
+    }
+
+    private function getSystemQtyBase(int $warehouseId, int $itemId, ?int $batchId): float
+    {
+        return (float) DB::table('stock_balances')
+            ->where('warehouse_id', $warehouseId)
+            ->where('item_id', $itemId)
+            ->when($batchId, fn ($q, $id) => $q->where('batch_id', $id))
+            ->sum('on_hand_base');
     }
 
     private function generateNumber(): string
