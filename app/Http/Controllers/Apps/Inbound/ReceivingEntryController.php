@@ -102,6 +102,7 @@ class ReceivingEntryController extends Controller
         DB::transaction(function () use ($validated, $receivingEntry): void {
             $entry = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
             abort_if(! $entry, 404);
+            abort_if(($entry->status ?? null) === 'POSTED', 422, 'Dokumen POSTED tidak dapat diubah.');
 
             $warehouse = DB::table('warehouses')->where('id', $validated['warehouse_id'])->first(['id', 'code']);
             $headerPayload = [
@@ -131,6 +132,10 @@ class ReceivingEntryController extends Controller
     public function destroy(int $receivingEntry): RedirectResponse
     {
         DB::transaction(function () use ($receivingEntry): void {
+            $entry = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
+            abort_if(! $entry, 404);
+            abort_if(($entry->status ?? null) === 'POSTED', 422, 'Dokumen POSTED tidak dapat dihapus.');
+
             $lineForeignKey = $this->resolveLineForeignKeyColumn();
             DB::table('receiving_entry_lines')->where($lineForeignKey, $receivingEntry)->delete();
             DB::table('receiving_entries')->where('id', $receivingEntry)->delete();
@@ -180,6 +185,7 @@ class ReceivingEntryController extends Controller
             'vendor_name' => $validated['vendor_name'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'total_value' => 0,
+            'status' => 'DRAFT',
             'created_by' => $userId,
             'created_at' => now(),
             'updated_at' => now(),

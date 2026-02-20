@@ -31,7 +31,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:inventory-posting-grn', only: ['postGoodsReceipt']),
+            new Middleware('permission:inventory-posting-grn', only: ['postGoodsReceipt', 'postReceivingEntry']),
             new Middleware('permission:inventory-posting-transfer', only: ['postTransfer']),
             new Middleware('permission:inventory-posting-sale', only: ['postSale']),
             new Middleware('permission:inventory-posting-usage', only: ['postInternalUsage']),
@@ -200,6 +200,62 @@ class InventoryPostingController extends Controller implements HasMiddleware
         ]);
 
         return response()->json(['message' => 'Goods receipt posted', 'id' => $goodsReceipt]);
+    }
+
+
+    public function postReceivingEntry(Request $request, int $receivingEntry): JsonResponse
+    {
+        $header = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
+        abort_unless($header, 404, 'Receiving entry not found');
+        abort_if(($header->status ?? null) === 'POSTED', 422, 'Receiving entry already posted');
+
+        $lines = DB::table('receiving_entry_lines')->where('receiving_entry_id', $receivingEntry)->get();
+
+        foreach ($lines as $line) {
+            $qtyBase = $this->resolveQtyBase((int) $line->item_id, (int) $line->uom_id, (float) $line->qty, 0);
+            $batchId = null;
+
+            if (! empty($line->batch_number)) {
+                $batchId = DB::table('item_batches')
+                    ->where('item_id', $line->item_id)
+                    ->where('batch_no', $line->batch_number)
+                    ->where('expired_date', $line->expired_date)
+                    ->value('id');
+
+                if (! $batchId) {
+                    $batchId = DB::table('item_batches')->insertGetId([
+                        'item_id' => $line->item_id,
+                        'batch_no' => $line->batch_number,
+                        'expired_date' => $line->expired_date,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+
+            $this->stockService->postMutation([
+                'trx_type' => 'RCV_IN',
+                'trx_id' => $receivingEntry,
+                'trx_line_id' => $line->id,
+                'warehouse_id' => $header->warehouse_id,
+                'item_id' => $line->item_id,
+                'batch_id' => $batchId,
+                'qty_base' => $qtyBase,
+                'uom_id' => $line->uom_id,
+                'qty_input' => $line->qty,
+                'unit_cost' => $line->price,
+                'created_by' => $request->user()?->id,
+            ]);
+        }
+
+        DB::table('receiving_entries')->where('id', $receivingEntry)->update([
+            'status' => 'POSTED',
+            'posted_at' => now(),
+            'posted_by' => $request->user()?->id,
+            'updated_at' => now(),
+        ]);
+
+        return response()->json(['message' => 'Receiving entry posted', 'id' => $receivingEntry]);
     }
 
     public function postTransfer(Request $request, int $transferId): JsonResponse
