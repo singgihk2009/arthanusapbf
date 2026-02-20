@@ -7,13 +7,15 @@ import { IconBox, IconPencilPlus } from '@tabler/icons-react';
 import React from 'react';
 
 export default function Edit() {
-    const { item, categories, uoms } = usePage().props;
+    const { item, categories, uoms, warehouses, minimumStockSetting } = usePage().props;
     const { data, setData, post, errors } = useForm({
         sku: item.sku,
         name: item.name,
         category_id: item.category_id ?? '',
         base_uom_id: item.base_uom_id,
         default_barcode: item.default_barcode ?? '',
+        warehouse_id: minimumStockSetting?.warehouse_id ?? '',
+        min_stock_base: minimumStockSetting?.min_stock_base ?? '',
         track_expired: item.track_expired,
         is_active: item.is_active,
         _method: 'PUT',
@@ -47,7 +49,16 @@ export default function Edit() {
                         </select>
                         {errors.base_uom_id && <small className='text-xs text-red-500'>{errors.base_uom_id}</small>}
                     </div>
-                    <Input label="Default Barcode" type="text" value={data.default_barcode} onChange={(e) => setData('default_barcode', e.target.value)} errors={errors.default_barcode} className="md:col-span-2" />
+                    <Input label="Default Barcode" type="text" value={data.default_barcode} onChange={(e) => setData('default_barcode', e.target.value)} errors={errors.default_barcode} />
+                    <div className='flex flex-col gap-2'>
+                        <label className='text-gray-600 text-sm'>Gudang Minimum Stok</label>
+                        <select value={data.warehouse_id} onChange={(e) => setData('warehouse_id', e.target.value)} className='w-full px-3 py-1.5 border text-sm rounded-md bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'>
+                            <option value=''>-</option>
+                            {warehouses.map((warehouse) => <option value={warehouse.id} key={warehouse.id}>{warehouse.code} - {warehouse.name}</option>)}
+                        </select>
+                        {errors.warehouse_id && <small className='text-xs text-red-500'>{errors.warehouse_id}</small>}
+                    </div>
+                    <Input label="Minimum Stok" type="number" min="0" step="0.000001" value={data.min_stock_base} onChange={(e) => setData('min_stock_base', e.target.value)} errors={errors.min_stock_base} className="md:col-span-2" />
                 </div>
                 <div className="mt-4 flex gap-6">
                     <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={data.track_expired} onChange={(e) => setData('track_expired', e.target.checked)} /> Track Expired</label>

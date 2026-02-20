@@ -42,4 +42,9 @@ class Item extends Model
     {
         return $this->hasMany(ItemBarcode::class);
     }
+
+    public function warehouseItemSettings(): HasMany
+    {
+        return $this->hasMany(WarehouseItemSetting::class);
+    }
 }
