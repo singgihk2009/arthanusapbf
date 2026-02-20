@@ -16,6 +16,7 @@ use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Response;
 use ZipArchive;
 
@@ -209,23 +210,30 @@ class InventoryPostingController extends Controller implements HasMiddleware
         abort_unless($header, 404, 'Receiving entry not found');
         abort_if(($header->status ?? null) === 'POSTED', 422, 'Receiving entry already posted');
 
-        $lines = DB::table('receiving_entry_lines')->where('receiving_entry_id', $receivingEntry)->get();
+        $lineForeignKey = $this->resolveColumn('receiving_entry_lines', ['receiving_entry_id', 'receiving_id', 'entry_id', 'header_id']) ?? 'receiving_entry_id';
+        $batchColumn = $this->resolveColumn('receiving_entry_lines', ['batch_number', 'batch_no', 'no_batch']) ?? 'batch_number';
+        $warehouseId = $this->resolveWarehouseId($header);
+
+        abort_if(! $warehouseId, 422, 'Warehouse receiving entry tidak valid.');
+
+        $lines = DB::table('receiving_entry_lines')->where($lineForeignKey, $receivingEntry)->get();
 
         foreach ($lines as $line) {
             $qtyBase = $this->resolveQtyBase((int) $line->item_id, (int) $line->uom_id, (float) $line->qty, 0);
             $batchId = null;
+            $batchNumber = $line->{$batchColumn} ?? null;
 
-            if (! empty($line->batch_number)) {
+            if (! empty($batchNumber)) {
                 $batchId = DB::table('item_batches')
                     ->where('item_id', $line->item_id)
-                    ->where('batch_no', $line->batch_number)
+                    ->where('batch_no', $batchNumber)
                     ->where('expired_date', $line->expired_date)
                     ->value('id');
 
                 if (! $batchId) {
                     $batchId = DB::table('item_batches')->insertGetId([
                         'item_id' => $line->item_id,
-                        'batch_no' => $line->batch_number,
+                        'batch_no' => $batchNumber,
                         'expired_date' => $line->expired_date,
                         'created_at' => now(),
                         'updated_at' => now(),
@@ -237,7 +245,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'trx_type' => 'RCV_IN',
                 'trx_id' => $receivingEntry,
                 'trx_line_id' => $line->id,
-                'warehouse_id' => $header->warehouse_id,
+                'warehouse_id' => $warehouseId,
                 'item_id' => $line->item_id,
                 'batch_id' => $batchId,
                 'qty_base' => $qtyBase,
@@ -248,12 +256,12 @@ class InventoryPostingController extends Controller implements HasMiddleware
             ]);
         }
 
-        DB::table('receiving_entries')->where('id', $receivingEntry)->update([
+        DB::table('receiving_entries')->where('id', $receivingEntry)->update($this->filterColumns('receiving_entries', [
             'status' => 'POSTED',
             'posted_at' => now(),
             'posted_by' => $request->user()?->id,
             'updated_at' => now(),
-        ]);
+        ]));
 
         return response()->json(['message' => 'Receiving entry posted', 'id' => $receivingEntry]);
     }
@@ -601,5 +609,44 @@ class InventoryPostingController extends Controller implements HasMiddleware
         }
 
         return $this->uomConversionService->toBase($itemId, $uomId, $qtyInput);
+    }
+
+    private function resolveWarehouseId(object $header): int
+    {
+        foreach (['warehouse_id', 'gudang_id', 'id_gudang', 'id_warehouse'] as $column) {
+            if (property_exists($header, $column) && ! empty($header->{$column})) {
+                return (int) $header->{$column};
+            }
+        }
+
+        foreach (['warehouse_code', 'kode_gudang', 'warehouse', 'gudang'] as $column) {
+            if (property_exists($header, $column) && ! empty($header->{$column})) {
+                return (int) DB::table('warehouses')->where('code', (string) $header->{$column})->value('id');
+            }
+        }
+
+        return 0;
+    }
+
+    private function resolveColumn(string $table, array $candidates): ?string
+    {
+        foreach ($candidates as $column) {
+            if (Schema::hasColumn($table, $column)) {
+                return $column;
+            }
+        }
+
+        return null;
+    }
+
+    private function filterColumns(string $table, array $payload): array
+    {
+        $validColumns = array_flip(Schema::getColumnListing($table));
+
+        return array_filter(
+            $payload,
+            fn (string $column): bool => isset($validColumns[$column]),
+            ARRAY_FILTER_USE_KEY,
+        );
     }
 }
