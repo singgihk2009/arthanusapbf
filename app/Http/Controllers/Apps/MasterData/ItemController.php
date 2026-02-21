@@ -10,34 +10,89 @@ use App\Models\Inventory\ItemBarcode;
 use App\Models\Inventory\Uom;
 use App\Models\Inventory\Warehouse;
 use App\Models\Inventory\WarehouseItemSetting;
+use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ItemController extends Controller implements HasMiddleware
 {
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:master-item-data', only: ['index']),
+            new Middleware('permission:master-item-data', only: ['index', 'exportExcel']),
             new Middleware('permission:master-item-create', only: ['create', 'store']),
             new Middleware('permission:master-item-update', only: ['edit', 'update']),
             new Middleware('permission:master-item-delete', only: ['destroy']),
         ];
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $items = Item::query()
-            ->with(['baseUom:id,code,name', 'category:id,name'])
-            ->withSum('warehouseItemSettings as minimum_stock_base', 'min_stock_base')
-            ->when(request()->search, fn ($query) => $query->where('name', 'like', '%'.request()->search.'%')->orWhere('sku', 'like', '%'.request()->search.'%'))
-            ->latest()
+        $filters = [
+            'search_item' => trim((string) $request->string('search_item')->toString()),
+            'search_category' => trim((string) $request->string('search_category')->toString()),
+            'sort_by' => $request->input('sort_by', 'created_at'),
+            'sort_dir' => strtolower($request->input('sort_dir', 'desc')),
+        ];
+
+        if (! in_array($filters['sort_by'], ['sku', 'name', 'category_name', 'created_at'], true)) {
+            $filters['sort_by'] = 'created_at';
+        }
+
+        if (! in_array($filters['sort_dir'], ['asc', 'desc'], true)) {
+            $filters['sort_dir'] = 'desc';
+        }
+
+        $items = $this->baseItemQuery($filters)
             ->paginate(10)
             ->withQueryString();
 
         return inertia('Apps/MasterData/Items/Index', [
             'items' => $items,
+            'filters' => $filters,
+        ]);
+    }
+
+    public function exportExcel(Request $request): StreamedResponse
+    {
+        $filters = [
+            'search_item' => trim((string) $request->string('search_item')->toString()),
+            'search_category' => trim((string) $request->string('search_category')->toString()),
+            'sort_by' => $request->input('sort_by', 'created_at'),
+            'sort_dir' => strtolower($request->input('sort_dir', 'desc')),
+        ];
+
+        if (! in_array($filters['sort_by'], ['sku', 'name', 'category_name', 'created_at'], true)) {
+            $filters['sort_by'] = 'created_at';
+        }
+
+        if (! in_array($filters['sort_dir'], ['asc', 'desc'], true)) {
+            $filters['sort_dir'] = 'desc';
+        }
+
+        $rows = $this->baseItemQuery($filters)->get();
+
+        return response()->streamDownload(function () use ($rows): void {
+            $output = fopen('php://output', 'w');
+            fputcsv($output, ['SKU', 'Nama', 'Kategori', 'Base UOM', 'Minimum Stok', 'Status']);
+
+            foreach ($rows as $item) {
+                fputcsv($output, [
+                    $item->sku,
+                    $item->name,
+                    $item->category?->name ?? '-',
+                    $item->baseUom?->code ?? '-',
+                    (float) ($item->minimum_stock_base ?? 0),
+                    $item->is_active ? 'Aktif' : 'Nonaktif',
+                ]);
+            }
+
+            fclose($output);
+        }, 'master-items-'.now()->format('Ymd-His').'.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 
@@ -91,7 +146,7 @@ class ItemController extends Controller implements HasMiddleware
         return to_route('apps.master-data.items.index');
     }
 
-    public function destroy(string $id)
+    public function destroy(string $id): RedirectResponse
     {
         $ids = explode(',', $id);
 
@@ -127,5 +182,25 @@ class ItemController extends Controller implements HasMiddleware
                 'min_stock_base' => $minimumStock,
             ]
         );
+    }
+
+    private function baseItemQuery(array $filters)
+    {
+        return Item::query()
+            ->leftJoin('categories', 'items.category_id', '=', 'categories.id')
+            ->with(['baseUom:id,code,name', 'category:id,name'])
+            ->withSum('warehouseItemSettings as minimum_stock_base', 'min_stock_base')
+            ->select('items.*')
+            ->when($filters['search_item'] !== '', function ($query) use ($filters) {
+                $query->where(function ($innerQuery) use ($filters) {
+                    $innerQuery
+                        ->where('items.name', 'like', '%'.$filters['search_item'].'%')
+                        ->orWhere('items.sku', 'like', '%'.$filters['search_item'].'%');
+                });
+            })
+            ->when($filters['search_category'] !== '', fn ($query) => $query->where('categories.name', 'like', '%'.$filters['search_category'].'%'))
+            ->when($filters['sort_by'] === 'category_name', fn ($query) => $query->orderBy('categories.name', $filters['sort_dir']))
+            ->when($filters['sort_by'] !== 'category_name', fn ($query) => $query->orderBy('items.'.$filters['sort_by'], $filters['sort_dir']))
+            ->orderBy('items.id', 'desc');
     }
 }

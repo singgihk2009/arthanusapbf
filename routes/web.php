@@ -55,6 +55,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::resource('/warehouses', WarehouseController::class);
         Route::resource('/categories', CategoryController::class);
         Route::resource('/uoms', UomController::class);
+        Route::get('/items/export/excel', [ItemController::class, 'exportExcel'])->name('items.export.excel');
         Route::resource('/items', ItemController::class);
         Route::resource('/conversions', ItemUomConversionController::class)->parameters(['conversions' => 'conversion']);
         Route::resource('/barcodes', ItemBarcodeController::class)->parameters(['barcodes' => 'barcode']);
