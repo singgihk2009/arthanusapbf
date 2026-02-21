@@ -8,6 +8,7 @@ import {
     IconClipboardCheck,
     IconExchange,
     IconFileBarcode,
+    IconLayoutDashboard,
     IconListCheck,
     IconPackageExport,
     IconPackageImport,
@@ -16,6 +17,7 @@ import {
     IconRulerMeasure,
     IconShoppingCart,
     IconStack2,
+    IconUsers,
 } from '@tabler/icons-react';
 import React from 'react';
 
@@ -23,6 +25,26 @@ export default function Menu() {
     const { url } = usePage();
 
     const menuNavigation = [
+        {
+            title: 'Main Menu',
+            permissions: true,
+            details: [
+                {
+                    title: 'Dashboard',
+                    href: '/apps/dashboard',
+                    active: url.startsWith('/apps/dashboard'),
+                    icon: <IconLayoutDashboard size={20} strokeWidth={1.5} />,
+                    permissions: true,
+                },
+                {
+                    title: 'User Management',
+                    href: '/apps/users',
+                    active: url.startsWith('/apps/users'),
+                    icon: <IconUsers size={20} strokeWidth={1.5} />,
+                    permissions: true,
+                },
+            ],
+        },
         {
             title: 'Inventory Management',
             permissions: true,
