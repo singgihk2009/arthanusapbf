@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Item extends Model
 {
@@ -46,5 +47,15 @@ class Item extends Model
     public function warehouseItemSettings(): HasMany
     {
         return $this->hasMany(WarehouseItemSetting::class);
+    }
+
+    public function pictures(): HasMany
+    {
+        return $this->hasMany(ItemPicture::class)->latest();
+    }
+
+    public function defaultPicture(): HasOne
+    {
+        return $this->hasOne(ItemPicture::class)->where('is_default', true);
     }
 }

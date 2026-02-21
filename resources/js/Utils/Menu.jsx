@@ -12,6 +12,7 @@ import {
     IconListCheck,
     IconPackageExport,
     IconPackageImport,
+    IconPhoto,
     IconReceipt,
     IconReportAnalytics,
     IconRulerMeasure,
@@ -94,6 +95,13 @@ export default function Menu() {
                             href: '/apps/master-data/barcodes',
                             icon: <IconFileBarcode size={20} strokeWidth={1.5} />,
                             active: url.startsWith('/apps/master-data/barcodes'),
+                            permissions: true,
+                        },
+                        {
+                            title: 'Picture',
+                            href: '/apps/master-data/pictures',
+                            icon: <IconPhoto size={20} strokeWidth={1.5} />,
+                            active: url.startsWith('/apps/master-data/pictures'),
                             permissions: true,
                         },
                         {
