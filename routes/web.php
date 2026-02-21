@@ -11,6 +11,7 @@ use App\Http\Controllers\Apps\MasterData\WarehouseController;
 use App\Http\Controllers\Apps\MasterData\ItemBarcodeController;
 use App\Http\Controllers\Apps\MasterData\ItemUomConversionController;
 use App\Http\Controllers\Apps\MasterData\MinStockController;
+use App\Http\Controllers\Apps\MasterData\ItemPictureController;
 use App\Http\Controllers\Apps\Reports\InventoryReportPageController;
 use App\Http\Controllers\Apps\Inbound\ReceivingEntryController;
 use App\Http\Controllers\Apps\Outbound\InternalUsageController;
@@ -60,6 +61,10 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::resource('/conversions', ItemUomConversionController::class)->parameters(['conversions' => 'conversion']);
         Route::resource('/barcodes', ItemBarcodeController::class)->parameters(['barcodes' => 'barcode']);
         Route::resource('/min-stocks', MinStockController::class)->parameters(['min-stocks' => 'min_stock']);
+        Route::get('/pictures', [ItemPictureController::class, 'index'])->name('pictures.index');
+        Route::post('/items/{item}/pictures', [ItemPictureController::class, 'store'])->name('pictures.store');
+        Route::patch('/items/{item}/pictures/default', [ItemPictureController::class, 'setDefault'])->name('pictures.default');
+        Route::delete('/items/{item}/pictures/{picture}', [ItemPictureController::class, 'destroy'])->name('pictures.destroy');
     });
 
     // inventory report page

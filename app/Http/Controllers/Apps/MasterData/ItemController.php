@@ -7,19 +7,25 @@ use App\Http\Requests\MasterData\ItemRequest;
 use App\Models\Inventory\Category;
 use App\Models\Inventory\Item;
 use App\Models\Inventory\ItemBarcode;
+use App\Models\Inventory\ItemPicture;
 use App\Models\Inventory\Uom;
 use App\Models\Inventory\Warehouse;
 use App\Models\Inventory\WarehouseItemSetting;
-use Illuminate\Http\Request;
+use App\Services\Inventory\ItemPictureService;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Database\Query\Builder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ItemController extends Controller implements HasMiddleware
 {
+    public function __construct(private readonly ItemPictureService $itemPictureService)
+    {
+    }
+
     public static function middleware(): array
     {
         return [
@@ -78,7 +84,7 @@ class ItemController extends Controller implements HasMiddleware
 
         return response()->streamDownload(function () use ($rows): void {
             $output = fopen('php://output', 'w');
-            fputcsv($output, ['SKU', 'Nama', 'Kategori', 'Base UOM', 'Minimum Stok', 'Status']);
+            fputcsv($output, ['SKU', 'Nama', 'Kategori', 'Base UOM', 'Minimum Stok', 'Jumlah Foto', 'Status']);
 
             foreach ($rows as $item) {
                 fputcsv($output, [
@@ -87,6 +93,7 @@ class ItemController extends Controller implements HasMiddleware
                     $item->category?->name ?? '-',
                     $item->baseUom?->code ?? '-',
                     (float) ($item->minimum_stock_base ?? 0),
+                    (int) ($item->pictures_count ?? 0),
                     $item->is_active ? 'Aktif' : 'Nonaktif',
                 ]);
             }
@@ -110,11 +117,12 @@ class ItemController extends Controller implements HasMiddleware
     {
         $validated = $request->validated();
 
-        DB::transaction(function () use ($validated) {
-            $item = Item::query()->create(collect($validated)->except(['warehouse_id', 'min_stock_base'])->all());
+        DB::transaction(function () use ($request, $validated): void {
+            $item = Item::query()->create(collect($validated)->except(['warehouse_id', 'min_stock_base', 'pictures', 'default_new_picture_index', 'default_picture_id'])->all());
 
             $this->syncDefaultBarcode($item, $validated['default_barcode'] ?? null);
             $this->syncMinimumStock($item, $validated['warehouse_id'] ?? null, $validated['min_stock_base'] ?? null);
+            $this->itemPictureService->upload($item, $request->file('pictures', []), $validated['default_new_picture_index'] ?? null);
         });
 
         return to_route('apps.master-data.items.index');
@@ -122,7 +130,10 @@ class ItemController extends Controller implements HasMiddleware
 
     public function edit(Item $item)
     {
-        $item->load(['warehouseItemSettings' => fn ($query) => $query->latest()->limit(1)]);
+        $item->load([
+            'warehouseItemSettings' => fn ($query) => $query->latest()->limit(1),
+            'pictures:id,item_id,path,disk,file_name,mime_type,size,is_default,created_at',
+        ]);
 
         return inertia('Apps/MasterData/Items/Edit', [
             'item' => $item,
@@ -137,11 +148,23 @@ class ItemController extends Controller implements HasMiddleware
     {
         $validated = $request->validated();
 
-        DB::transaction(function () use ($item, $validated) {
-            $item->update(collect($validated)->except(['warehouse_id', 'min_stock_base'])->all());
+        DB::transaction(function () use ($request, $item, $validated): void {
+            $item->update(collect($validated)->except(['warehouse_id', 'min_stock_base', 'pictures', 'default_new_picture_index', 'default_picture_id'])->all());
 
             $this->syncDefaultBarcode($item, $validated['default_barcode'] ?? null);
             $this->syncMinimumStock($item, $validated['warehouse_id'] ?? null, $validated['min_stock_base'] ?? null);
+            $this->itemPictureService->upload($item, $request->file('pictures', []), $validated['default_new_picture_index'] ?? null);
+
+            if (! empty($validated['default_picture_id'])) {
+                $picture = ItemPicture::query()
+                    ->where('item_id', $item->id)
+                    ->whereKey($validated['default_picture_id'])
+                    ->first();
+
+                if ($picture) {
+                    $this->itemPictureService->setDefault($picture);
+                }
+            }
         });
 
         return to_route('apps.master-data.items.index');
@@ -194,14 +217,15 @@ class ItemController extends Controller implements HasMiddleware
 
         return Item::query()
             ->leftJoin('categories', 'items.category_id', '=', 'categories.id')
-            ->leftJoinSub($minimumStockSubquery, 'warehouse_minimum_stocks', function (Builder $join) {
+            ->leftJoinSub($minimumStockSubquery, 'warehouse_minimum_stocks', function (Builder $join): void {
                 $join->on('warehouse_minimum_stocks.item_id', '=', 'items.id');
             })
-            ->with(['baseUom:id,code,name', 'category:id,name'])
+            ->with(['baseUom:id,code,name', 'category:id,name', 'defaultPicture:id,item_id,path,disk,file_name,is_default'])
+            ->withCount('pictures')
             ->select('items.*')
             ->selectRaw('COALESCE(warehouse_minimum_stocks.minimum_stock_base, 0) as minimum_stock_base')
-            ->when($filters['search_item'] !== '', function ($query) use ($filters) {
-                $query->where(function ($innerQuery) use ($filters) {
+            ->when($filters['search_item'] !== '', function ($query) use ($filters): void {
+                $query->where(function ($innerQuery) use ($filters): void {
                     $innerQuery
                         ->where('items.name', 'like', '%'.$filters['search_item'].'%')
                         ->orWhere('items.sku', 'like', '%'.$filters['search_item'].'%');

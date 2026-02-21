@@ -124,6 +124,7 @@ export default function Index() {
                             <Table.Th><button type="button" onClick={() => toggleSort('category_name')} className="inline-flex items-center gap-1">Kategori {sortIcon('category_name')}</button></Table.Th>
                             <Table.Th>Base UOM</Table.Th>
                             <Table.Th>Min. Stok</Table.Th>
+                            <Table.Th>Foto</Table.Th>
                             <Table.Th>Status</Table.Th>
                             <Table.Th className="w-24"></Table.Th>
                         </tr>
@@ -137,6 +138,12 @@ export default function Index() {
                                 <Table.Td>{item.category?.name ?? '-'}</Table.Td>
                                 <Table.Td>{item.base_uom?.code ?? '-'}</Table.Td>
                                 <Table.Td>{Number(item.minimum_stock_base ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 6 })}</Table.Td>
+                                <Table.Td>
+                                    <div className="flex items-center gap-2">
+                                        {item.default_picture?.image_url ? <img src={item.default_picture.image_url} alt={item.name} className="h-10 w-10 rounded object-cover" /> : <span className="text-xs text-gray-500">-</span>}
+                                        <span className="text-xs">{item.pictures_count ?? 0}/6</span>
+                                    </div>
+                                </Table.Td>
                                 <Table.Td>{item.is_active ? 'Aktif' : 'Nonaktif'}</Table.Td>
                                 <Table.Td>
                                     <div className="flex gap-2">
@@ -145,7 +152,7 @@ export default function Index() {
                                     </div>
                                 </Table.Td>
                             </tr>
-                        )) : <Table.Empty colSpan={8} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto text-gray-500 dark:text-white mb-2'/><span className='text-gray-500'>Data item tidak ditemukan.</span></>} />}
+                        )) : <Table.Empty colSpan={9} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto text-gray-500 dark:text-white mb-2'/><span className='text-gray-500'>Data item tidak ditemukan.</span></>} />}
                     </Table.Tbody>
                 </Table>
             </Table.Card>

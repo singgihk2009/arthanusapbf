@@ -8,8 +8,10 @@ import React from 'react';
 
 export default function Create() {
     const { categories, uoms, warehouses } = usePage().props;
-    const { data, setData, post, errors } = useForm({
+    const { data, setData, post, errors, processing } = useForm({
         sku: '', name: '', category_id: '', base_uom_id: '', default_barcode: '', warehouse_id: '', min_stock_base: '', track_expired: false, is_active: true,
+        pictures: [],
+        default_new_picture_index: '',
     });
 
     const submit = (e) => {
@@ -20,7 +22,7 @@ export default function Create() {
     return (
         <>
             <Head title="Tambah Item" />
-            <Card title="Tambah Item" icon={<IconBox size={20} strokeWidth={1.5} />} form={submit} footer={<Button type="submit" label="Simpan" icon={<IconPencilPlus size={20} strokeWidth={1.5} />} variant="gray" />}>
+            <Card title="Tambah Item" icon={<IconBox size={20} strokeWidth={1.5} />} form={submit} footer={<Button type="submit" label="Simpan" disabled={processing} icon={<IconPencilPlus size={20} strokeWidth={1.5} />} variant="gray" />}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input label="SKU" type="text" value={data.sku} onChange={(e) => setData('sku', e.target.value)} errors={errors.sku} />
                     <Input label="Nama" type="text" value={data.name} onChange={(e) => setData('name', e.target.value)} errors={errors.name} />
@@ -50,6 +52,15 @@ export default function Create() {
                         {errors.warehouse_id && <small className='text-xs text-red-500'>{errors.warehouse_id}</small>}
                     </div>
                     <Input label="Minimum Stok" type="number" min="0" step="0.000001" value={data.min_stock_base} onChange={(e) => setData('min_stock_base', e.target.value)} errors={errors.min_stock_base} className="md:col-span-2" />
+                    <div className="md:col-span-2 flex flex-col gap-2">
+                        <label className="text-gray-600 text-sm">Foto Produk (max 6 foto)</label>
+                        <input type="file" multiple accept="image/*" onChange={(e) => setData('pictures', Array.from(e.target.files).slice(0, 6))} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm dark:border-gray-800 dark:bg-gray-900" />
+                        {errors.pictures && <small className='text-xs text-red-500'>{errors.pictures}</small>}
+                        <select value={data.default_new_picture_index} onChange={(e) => setData('default_new_picture_index', e.target.value)} className='w-full px-3 py-1.5 border text-sm rounded-md bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'>
+                            <option value=''>Default foto: otomatis foto pertama</option>
+                            {data.pictures.map((_, index) => <option key={index} value={index}>Foto upload #{index + 1} jadi default</option>)}
+                        </select>
+                    </div>
                 </div>
                 <div className="mt-4 flex gap-6">
                     <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={data.track_expired} onChange={(e) => setData('track_expired', e.target.checked)} /> Track Expired</label>

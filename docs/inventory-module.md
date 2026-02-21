@@ -192,3 +192,46 @@ Implikasi terhadap status dokumen/transaksi:
 - **Dokumen posted yang dihapus**: pada flow saat ini umumnya diblokir (`Dokumen POSTED tidak dapat dihapus`), jadi mutasi yang sudah posted tetap menjadi basis snapshot.
 
 Jika ada koreksi, mekanisme normalnya adalah membuat transaksi pembalik/adjustment baru, bukan menghapus ledger historis.
+
+## 13. Fitur Picture Produk (ditambahkan)
+
+### Ringkasan
+- Satu produk bisa punya maksimal **6 foto**.
+- Harus ada maksimal **1 foto default** (cover utama).
+- Foto bisa dikelola dari:
+  - menu khusus **Master → Picture** (`/apps/master-data/pictures`),
+  - form **Tambah Item** dan **Edit Item**.
+
+### Struktur data
+- Tabel baru: `item_pictures`
+  - kolom: `item_id`, `disk`, `path`, `file_name`, `mime_type`, `size`, `is_default`.
+
+### Endpoint khusus pengelolaan foto
+Semua endpoint ada di group auth `/apps/master-data`:
+- `GET /apps/master-data/pictures` → halaman manajemen foto.
+- `POST /apps/master-data/items/{item}/pictures` → upload foto item.
+- `PATCH /apps/master-data/items/{item}/pictures/default` → set foto default.
+- `DELETE /apps/master-data/items/{item}/pictures/{picture}` → hapus foto.
+
+Desain endpoint ini dibuat terpisah dari CRUD item agar mudah dipindahkan ke integrasi object storage seperti S3 di masa depan.
+
+### Batasan upload
+- Maksimal total **6 foto per item**.
+- Tipe file: `jpg`, `jpeg`, `png`, `webp`.
+- Ukuran file maksimal **4MB/foto**.
+
+### Konfigurasi server (lokal/VPS)
+1. Set disk untuk foto item (default: `public`):
+   ```env
+   INVENTORY_PICTURES_DISK=public
+   ```
+2. Untuk disk `public`, pastikan symbolic link tersedia:
+   ```bash
+   php artisan storage:link
+   ```
+3. Pastikan `APP_URL` benar agar URL gambar valid di UI.
+
+### Persiapan integrasi S3 (future)
+- Ubah `INVENTORY_PICTURES_DISK=s3`.
+- Lengkapi env bawaan Laravel (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `AWS_BUCKET`, dst).
+- Karena upload/hapus/default sudah melalui endpoint terpisah + service `ItemPictureService`, migrasi ke S3 cukup di level konfigurasi disk dan kebijakan URL tanpa ubah besar di UI.
