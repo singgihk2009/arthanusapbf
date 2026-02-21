@@ -41,7 +41,7 @@ export default function Sidebar({ sidebarOpen }) {
                         {menuNavigation.map((item, index) => (
                             <div key={index}>
                                 {item.permissions &&
-                                    <div className="text-gray-500 text-xs py-3 px-4 font-bold uppercase">
+                                    <div className="text-gray-600 dark:text-gray-400 text-xs py-3 px-4 font-bold uppercase">
                                         {item.title}
                                     </div>
                                 }
