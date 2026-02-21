@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Query\Builder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ItemController extends Controller implements HasMiddleware
@@ -186,11 +187,19 @@ class ItemController extends Controller implements HasMiddleware
 
     private function baseItemQuery(array $filters)
     {
+        $minimumStockSubquery = WarehouseItemSetting::query()
+            ->select('item_id')
+            ->selectRaw('COALESCE(SUM(min_stock_base), 0) as minimum_stock_base')
+            ->groupBy('item_id');
+
         return Item::query()
             ->leftJoin('categories', 'items.category_id', '=', 'categories.id')
+            ->leftJoinSub($minimumStockSubquery, 'warehouse_minimum_stocks', function (Builder $join) {
+                $join->on('warehouse_minimum_stocks.item_id', '=', 'items.id');
+            })
             ->with(['baseUom:id,code,name', 'category:id,name'])
-            ->withSum('warehouseItemSettings as minimum_stock_base', 'min_stock_base')
             ->select('items.*')
+            ->selectRaw('COALESCE(warehouse_minimum_stocks.minimum_stock_base, 0) as minimum_stock_base')
             ->when($filters['search_item'] !== '', function ($query) use ($filters) {
                 $query->where(function ($innerQuery) use ($filters) {
                     $innerQuery
