@@ -69,6 +69,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
 
     // inventory report page
     Route::get('/reports/inventory', InventoryReportPageController::class)->name('reports.inventory.index');
+    Route::get('/reports/inventory/export/excel', [InventoryReportPageController::class, 'exportStockBalanceExcel'])->name('reports.inventory.export.excel');
 
     // inventory posting actions
     Route::post('/inventory/posting/grn/{goodsReceipt}', [InventoryPostingController::class, 'postGoodsReceipt'])->name('inventory.posting.grn');
