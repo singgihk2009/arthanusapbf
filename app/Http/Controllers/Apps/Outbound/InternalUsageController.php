@@ -37,7 +37,7 @@ class InternalUsageController extends Controller
     public function create(): Response
     {
         return Inertia::render('Apps/Outbound/InternalUsage/Create', [
-            'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
+            'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
             'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
@@ -95,7 +95,7 @@ class InternalUsageController extends Controller
                 'status' => (string) $entry->status,
             ],
             'lines' => $lines,
-            'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
+            'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
             'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),

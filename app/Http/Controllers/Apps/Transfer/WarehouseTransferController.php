@@ -33,7 +33,7 @@ class WarehouseTransferController extends Controller
     public function create(): Response
     {
         return Inertia::render('Apps/Transfer/WarehouseTransfer/Create', [
-            'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
+            'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
         ]);
@@ -86,7 +86,7 @@ class WarehouseTransferController extends Controller
                 'status' => (string) $entry->status,
             ],
             'lines' => $lines,
-            'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
+            'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
         ]);

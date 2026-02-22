@@ -30,6 +30,8 @@ export default function Create() {
     const [message, setMessage] = useState(null);
     const [loading, setLoading] = useState(false);
 
+    const defaultUomByItemId = useMemo(() => new Map(items.map((item) => [String(item.id), String(item.base_uom_id ?? '')])), [items]);
+
     const totalValue = useMemo(
         () => form.lines.reduce((sum, line) => sum + ((Number(line.qty) || 0) * (Number(line.price) || 0)), 0),
         [form.lines],
@@ -42,7 +44,14 @@ export default function Create() {
     const updateLine = (index, field, value) => {
         setForm((prev) => {
             const lines = [...prev.lines];
-            lines[index] = { ...lines[index], [field]: value };
+            const updatedLine = { ...lines[index], [field]: value };
+
+            if (field === 'item_id') {
+                updatedLine.uom_id = defaultUomByItemId.get(String(value)) ?? '';
+            }
+
+            lines[index] = updatedLine;
+
             return { ...prev, lines };
         });
     };
