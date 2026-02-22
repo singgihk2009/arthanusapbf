@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Apps\Outbound;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\InternalUsageRequest;
+use App\Services\Inventory\UomConversionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -11,6 +12,10 @@ use Inertia\Response;
 
 class InternalUsageController extends Controller
 {
+    public function __construct(private readonly UomConversionService $uomConversionService)
+    {
+    }
+
     public function index(): Response
     {
         $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
@@ -35,6 +40,7 @@ class InternalUsageController extends Controller
             'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
+            'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
         ]);
     }
 
@@ -72,6 +78,7 @@ class InternalUsageController extends Controller
             ->get()
             ->map(fn (object $line): array => [
                 'item_id' => (string) $line->item_id,
+                'batch_id' => $line->batch_id ? (string) $line->batch_id : '',
                 'qty_used' => (string) $line->qty_used,
                 'uom_id' => (string) $line->uom_id,
                 'notes' => (string) ($line->notes ?? ''),
@@ -91,6 +98,7 @@ class InternalUsageController extends Controller
             'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
+            'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
         ]);
     }
 
@@ -142,13 +150,15 @@ class InternalUsageController extends Controller
 
         foreach ($lines as $line) {
             $qty = (float) $line['qty_used'];
+            $qtyBase = $this->uomConversionService->toBase((int) $line['item_id'], (int) $line['uom_id'], $qty);
 
             DB::table('internal_usage_lines')->insert([
                 'internal_usage_id' => $entryId,
                 'item_id' => $line['item_id'],
+                'batch_id' => ! empty($line['batch_id']) ? (int) $line['batch_id'] : null,
                 'qty_used' => $qty,
                 'uom_id' => $line['uom_id'],
-                'qty_base' => $qty,
+                'qty_base' => $qtyBase,
                 'notes' => $line['notes'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),

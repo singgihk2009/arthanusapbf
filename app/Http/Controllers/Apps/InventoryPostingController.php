@@ -379,6 +379,20 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
         foreach ($lines as $line) {
             $qtyBase = $this->resolveQtyBase((int) $line->item_id, (int) $line->uom_id, (float) $line->qty_used, (float) $line->qty_base);
+            $batchId = isset($line->batch_id) && $line->batch_id ? (int) $line->batch_id : null;
+
+            if ($batchId) {
+                $isValidBatch = DB::table('item_batches')
+                    ->where('id', $batchId)
+                    ->where('item_id', $line->item_id)
+                    ->exists();
+
+                abort_if(! $isValidBatch, 422, 'Batch number tidak valid untuk item ini.');
+            }
+
+            $unitCost = $batchId
+                ? $this->resolveBatchCost((int) $header->warehouse_id, (int) $line->item_id, $batchId)
+                : $this->resolveAverageCost((int) $header->warehouse_id, (int) $line->item_id);
 
             $this->stockService->postMutation([
                 'trx_type' => 'USAGE_OUT',
@@ -386,9 +400,11 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'trx_line_id' => $line->id,
                 'warehouse_id' => $header->warehouse_id,
                 'item_id' => $line->item_id,
+                'batch_id' => $batchId,
                 'qty_base' => -1 * $qtyBase,
                 'uom_id' => $line->uom_id,
                 'qty_input' => $line->qty_used,
+                'unit_cost' => $unitCost,
                 'created_by' => $request->user()?->id,
             ]);
         }
@@ -471,7 +487,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
         $lines = DB::table('internal_usage_lines as l')
             ->join('items as i', 'i.id', '=', 'l.item_id')
             ->where('l.internal_usage_id', $usageId)
-            ->select('l.id', 'l.item_id', 'l.qty_used', 'l.uom_id', 'l.qty_base', 'l.notes', 'i.track_expired')
+            ->select('l.id', 'l.item_id', 'l.batch_id', 'l.qty_used', 'l.uom_id', 'l.qty_base', 'l.notes', 'i.track_expired')
             ->get();
 
         $this->persistIntegrationTransaction('internal_usages', $usageId, (string) $header->number, 'USAGE', (string) $header->document_date, (int) $header->warehouse_id, $lines, $userId);
@@ -512,9 +528,10 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 continue;
             }
 
-            $valuation = ((bool) $line->track_expired) ? 'BATCH' : 'AVG';
-            $unitCost = $valuation === 'BATCH'
-                ? $this->resolveBatchCost($warehouseId, (int) $line->item_id, $line->batch_id ? (int) $line->batch_id : null)
+            $batchId = $line->batch_id ? (int) $line->batch_id : null;
+            $valuation = $batchId ? 'BATCH' : 'AVG';
+            $unitCost = $batchId
+                ? $this->resolveBatchCost($warehouseId, (int) $line->item_id, $batchId)
                 : $this->resolveAverageCost($warehouseId, (int) $line->item_id);
 
             $amount = round($qty * $unitCost, 6);
