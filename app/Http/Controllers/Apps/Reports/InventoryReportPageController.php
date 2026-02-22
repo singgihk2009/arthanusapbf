@@ -35,35 +35,49 @@ class InventoryReportPageController extends Controller implements HasMiddleware
     public function exportStockBalanceExcel(Request $request): Response
     {
         $filters = $this->resolveFilters($request);
-        $rows = $this->baseLedgerQuery($filters)->limit(10000)->get();
+        $rows = $this->baseQuery($filters)->limit(10000)->get();
 
         $isIncoming = $filters['type'] === 'incoming-items';
         $tempPath = storage_path('app/'.$filters['type'].'-report-'.now()->format('YmdHis').'.xlsx');
 
-        $xlsxRows = [
-            [
-                'Warehouse',
-                'Tanggal',
-                'Referensi',
-                'Item',
-                'Kategori',
-                'SKU',
-                $isIncoming ? 'Qty Masuk' : 'Qty Pemakaian',
-                $isIncoming ? 'Value' : 'Valuation Rp',
-            ],
-        ];
+        $xlsxRows = [[
+            'Warehouse',
+            'Tanggal',
+            'Referensi',
+            'Item',
+            'Kategori',
+            'SKU',
+            'UoM',
+            'Unit Price',
+            $isIncoming ? 'Qty Masuk' : 'Qty Pemakaian',
+            $isIncoming ? 'Value' : 'Valuation Rp',
+        ]];
+
+        if ($isIncoming) {
+            $xlsxRows[0][] = 'Status';
+            $xlsxRows[0][] = 'Vendor';
+        }
 
         foreach ($rows as $row) {
-            $xlsxRows[] = [
+            $line = [
                 $row->warehouse_name,
                 $row->trx_datetime,
                 $row->reference,
                 $row->item_name,
                 $row->category_name,
                 $row->sku,
+                $row->uom_name,
+                (string) $row->unit_price,
                 (string) $row->qty,
                 (string) $row->value,
             ];
+
+            if ($isIncoming) {
+                $line[] = $row->status;
+                $line[] = $row->vendor_name;
+            }
+
+            $xlsxRows[] = $line;
         }
 
         $this->buildTemplateXlsx($tempPath, $xlsxRows);
@@ -84,7 +98,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         }
 
         $sortBy = $request->string('sort_by')->toString() ?: 'trx_datetime';
-        if (! in_array($sortBy, ['trx_datetime', 'warehouse', 'item', 'category', 'qty', 'value'], true)) {
+        if (! in_array($sortBy, ['trx_datetime', 'warehouse', 'item', 'category', 'qty', 'value', 'unit_price', 'status', 'vendor'], true)) {
             $sortBy = 'trx_datetime';
         }
 
@@ -106,12 +120,13 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             'sort_by' => $sortBy,
             'sort_dir' => $sortDir,
             'per_page' => $perPage,
+            'status' => strtolower($request->string('status')->toString() ?: 'all'),
         ];
     }
 
     private function resolveReportData(array $filters): array
     {
-        $rows = $this->baseLedgerQuery($filters)
+        $rows = $this->baseQuery($filters)
             ->paginate($filters['per_page'])
             ->withQueryString();
 
@@ -128,17 +143,89 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         ];
     }
 
-    private function baseLedgerQuery(array $filters)
+    private function baseQuery(array $filters)
     {
-        $isIncoming = $filters['type'] === 'incoming-items';
+        return $filters['type'] === 'incoming-items'
+            ? $this->incomingItemsQuery($filters)
+            : $this->itemUsageQuery($filters);
+    }
 
+    private function incomingItemsQuery(array $filters)
+    {
+        $sortable = [
+            'trx_datetime' => 'receiving_entries.transaction_date',
+            'warehouse' => 'warehouses.name',
+            'item' => 'items.name',
+            'category' => 'categories.name',
+            'qty' => 'receiving_entry_lines.qty',
+            'value' => 'receiving_entry_lines.value',
+            'unit_price' => 'receiving_entry_lines.price',
+            'status' => 'receiving_entries.status',
+            'vendor' => 'receiving_entries.vendor_name',
+        ];
+
+        $sortColumn = $sortable[$filters['sort_by']] ?? $sortable['trx_datetime'];
+        $status = in_array($filters['status'], ['posted', 'unposted', 'all'], true) ? $filters['status'] : 'all';
+
+        return DB::table('receiving_entry_lines')
+            ->join('receiving_entries', 'receiving_entries.id', '=', 'receiving_entry_lines.receiving_entry_id')
+            ->join('warehouses', 'warehouses.id', '=', 'receiving_entries.warehouse_id')
+            ->join('items', 'items.id', '=', 'receiving_entry_lines.item_id')
+            ->join('uoms', 'uoms.id', '=', 'receiving_entry_lines.uom_id')
+            ->leftJoin('categories', 'categories.id', '=', 'items.category_id')
+            ->when($status !== 'all', function ($query) use ($status) {
+                if ($status === 'posted') {
+                    $query->where('receiving_entries.status', 'POSTED');
+
+                    return;
+                }
+
+                $query->where('receiving_entries.status', '!=', 'POSTED');
+            })
+            ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('receiving_entries.warehouse_id', $warehouseId))
+            ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('items.category_id', $categoryId))
+            ->when($filters['search'] !== '', function ($query) use ($filters) {
+                $keyword = '%'.$filters['search'].'%';
+                $query->where(function ($subQuery) use ($keyword) {
+                    $subQuery->where('warehouses.name', 'like', $keyword)
+                        ->orWhere('items.name', 'like', $keyword)
+                        ->orWhere('items.sku', 'like', $keyword)
+                        ->orWhere('categories.name', 'like', $keyword)
+                        ->orWhere('receiving_entries.reference', 'like', $keyword)
+                        ->orWhere('receiving_entries.vendor_name', 'like', $keyword)
+                        ->orWhere('receiving_entries.number', 'like', $keyword)
+                        ->orWhere('uoms.name', 'like', $keyword)
+                        ->orWhere('uoms.code', 'like', $keyword);
+                });
+            })
+            ->select([
+                'warehouses.name as warehouse_name',
+                'items.name as item_name',
+                DB::raw('COALESCE(categories.name, \'-\') as category_name'),
+                'items.sku',
+                DB::raw("DATE_FORMAT(receiving_entries.transaction_date, '%Y-%m-%d') as trx_datetime"),
+                DB::raw("COALESCE(receiving_entries.reference, receiving_entries.number) as reference"),
+                DB::raw('COALESCE(uoms.code, uoms.name) as uom_name'),
+                DB::raw('COALESCE(receiving_entry_lines.price, 0) as unit_price'),
+                DB::raw('ABS(receiving_entry_lines.qty) as qty'),
+                DB::raw('ABS(receiving_entry_lines.qty * COALESCE(receiving_entry_lines.price, 0)) as value'),
+                DB::raw("COALESCE(receiving_entries.status, 'DRAFT') as status"),
+                DB::raw("COALESCE(receiving_entries.vendor_name, '-') as vendor_name"),
+            ])
+            ->orderBy($sortColumn, $filters['sort_dir'])
+            ->orderBy('receiving_entry_lines.id', 'desc');
+    }
+
+    private function itemUsageQuery(array $filters)
+    {
         $sortable = [
             'trx_datetime' => 'stock_ledgers.trx_datetime',
             'warehouse' => 'warehouses.name',
             'item' => 'items.name',
             'category' => 'categories.name',
-            'qty' => DB::raw('ABS(stock_ledgers.qty_base)'),
+            'qty' => DB::raw('ABS(stock_ledgers.qty_input)'),
             'value' => DB::raw('ABS(stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0))'),
+            'unit_price' => DB::raw('COALESCE(stock_ledgers.unit_cost, 0)'),
         ];
 
         $sortColumn = $sortable[$filters['sort_by']] ?? $sortable['trx_datetime'];
@@ -146,14 +233,10 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         return DB::table('stock_ledgers')
             ->join('warehouses', 'warehouses.id', '=', 'stock_ledgers.warehouse_id')
             ->join('items', 'items.id', '=', 'stock_ledgers.item_id')
+            ->leftJoin('uoms', 'uoms.id', '=', 'stock_ledgers.uom_id')
             ->leftJoin('categories', 'categories.id', '=', 'items.category_id')
-            ->when($isIncoming, function ($query) {
-                $query->whereIn('stock_ledgers.trx_type', ['PO_RECEIVE', 'RCV_IN', 'OPENING_BALANCE', 'TRANSFER_IN', 'ADJ', 'ADJ_OPNAME'])
-                    ->where('stock_ledgers.qty_base', '>', 0);
-            }, function ($query) {
-                $query->where('stock_ledgers.trx_type', 'USAGE_OUT')
-                    ->where('stock_ledgers.qty_base', '<', 0);
-            })
+            ->where('stock_ledgers.trx_type', 'USAGE_OUT')
+            ->where('stock_ledgers.qty_base', '<', 0)
             ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_ledgers.warehouse_id', $warehouseId))
             ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('items.category_id', $categoryId))
             ->when($filters['search'] !== '', function ($query) use ($filters) {
@@ -172,10 +255,14 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'items.name as item_name',
                 DB::raw('COALESCE(categories.name, \'-\') as category_name'),
                 'items.sku',
+                DB::raw("COALESCE(uoms.code, uoms.name) as uom_name"),
                 DB::raw("DATE_FORMAT(stock_ledgers.trx_datetime, '%Y-%m-%d %H:%i:%s') as trx_datetime"),
                 DB::raw("CONCAT(stock_ledgers.trx_type, '-', stock_ledgers.trx_id) as reference"),
-                DB::raw('ABS(stock_ledgers.qty_base) as qty'),
-                DB::raw('ABS(stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0)) as value'),
+                DB::raw('COALESCE(stock_ledgers.unit_cost, 0) as unit_price'),
+                DB::raw('ABS(stock_ledgers.qty_input) as qty'),
+                DB::raw('ABS(stock_ledgers.qty_input * COALESCE(stock_ledgers.unit_cost, 0)) as value'),
+                DB::raw("'-' as status"),
+                DB::raw("'-' as vendor_name"),
             ])
             ->orderBy($sortColumn, $filters['sort_dir'])
             ->orderBy('stock_ledgers.id', 'desc');

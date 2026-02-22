@@ -11,6 +11,8 @@ export default function Index() {
         { value: 'item-usage', label: 'Laporan Pemakaian Barang (Qty & Valuation Rp)' },
     ];
 
+    const isIncomingReport = filters.type === 'incoming-items';
+
     const columns = [
         { key: 'number', label: 'No' },
         { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
@@ -19,16 +21,24 @@ export default function Index() {
         { key: 'item_name', label: 'Item', sortKey: 'item' },
         { key: 'category_name', label: 'Kategori', sortKey: 'category' },
         { key: 'sku', label: 'SKU' },
+        { key: 'uom_name', label: 'UoM' },
+        { key: 'unit_price', label: 'Unit Price', sortKey: 'unit_price' },
         {
             key: 'qty',
-            label: filters.type === 'incoming-items' ? 'Qty Masuk' : 'Qty Pemakaian',
+            label: isIncomingReport ? 'Qty Masuk' : 'Qty Pemakaian',
             sortKey: 'qty',
         },
         {
             key: 'value',
-            label: filters.type === 'incoming-items' ? 'Value' : 'Valuation Rp',
+            label: isIncomingReport ? 'Value' : 'Valuation Rp',
             sortKey: 'value',
         },
+        ...(isIncomingReport
+            ? [
+                { key: 'status', label: 'Status', sortKey: 'status' },
+                { key: 'vendor_name', label: 'Vendor', sortKey: 'vendor' },
+            ]
+            : []),
     ];
 
     const updateFilters = (nextFilters) => {
@@ -61,7 +71,7 @@ export default function Index() {
                 <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-900 dark:bg-gray-950">
                     <h2 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-200">Filter Report</h2>
 
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-6">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-7">
                         <select
                             value={filters.type}
                             onChange={(e) => updateFilters({ type: e.target.value, page: 1 })}
@@ -94,6 +104,18 @@ export default function Index() {
                             ))}
                         </select>
 
+                        {isIncomingReport && (
+                            <select
+                                value={filters.status ?? 'all'}
+                                onChange={(e) => updateFilters({ status: e.target.value, page: 1 })}
+                                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
+                            >
+                                <option value="all">Semua Status</option>
+                                <option value="posted">Posted</option>
+                                <option value="unposted">Belum Posted</option>
+                            </select>
+                        )}
+
                         <input
                             type="text"
                             value={filters.search ?? ''}
@@ -121,7 +143,7 @@ export default function Index() {
                     </div>
                 </div>
 
-                <Table.Card title={filters.type === 'incoming-items' ? 'Laporan Barang Masuk' : 'Laporan Pemakaian Barang'}>
+                <Table.Card title={isIncomingReport ? 'Laporan Barang Masuk' : 'Laporan Pemakaian Barang'}>
                     <Table>
                         <Table.Thead>
                             <tr>
@@ -151,11 +173,19 @@ export default function Index() {
                                     <Table.Td>{row.item_name}</Table.Td>
                                     <Table.Td>{row.category_name}</Table.Td>
                                     <Table.Td>{row.sku}</Table.Td>
+                                    <Table.Td>{row.uom_name}</Table.Td>
+                                    <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
                                     <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
                                     <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
+                                    {isIncomingReport && (
+                                        <>
+                                            <Table.Td>{row.status}</Table.Td>
+                                            <Table.Td>{row.vendor_name}</Table.Td>
+                                        </>
+                                    )}
                                 </tr>
                             )) : (
-                                <Table.Empty colSpan={9} message={<span className="text-gray-500">Tidak ada data report.</span>} />
+                                <Table.Empty colSpan={columns.length} message={<span className="text-gray-500">Tidak ada data report.</span>} />
                             )}
                         </Table.Tbody>
                     </Table>
