@@ -21,6 +21,7 @@ class InternalUsageRequest extends FormRequest
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            'lines.*.batch_id' => ['nullable', 'integer', 'exists:item_batches,id'],
             'lines.*.qty_used' => ['required', 'numeric', 'gt:0'],
             'lines.*.uom_id' => ['required', 'integer', 'exists:uoms,id'],
             'lines.*.notes' => ['nullable', 'string'],
