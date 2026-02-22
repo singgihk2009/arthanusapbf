@@ -103,6 +103,8 @@ class StockAdjustmentController extends Controller
             $entry = DB::table('stock_adjustments')->where('id', $stockAdjustment)->first();
             abort_if(! $entry, 404);
             abort_if($entry->status === 'POSTED', 422, 'Dokumen POSTED tidak dapat diubah.');
+            $linked = DB::table('inv_transactions')->where('source_table', 'stock_adjustments')->where('source_id', $entry->id)->exists();
+            abort_if($linked, 422, 'Dokumen sudah terikat GL, gunakan reversal/adjustment.');
 
             DB::table('stock_adjustments')->where('id', $stockAdjustment)->update([
                 'warehouse_id' => $validated['warehouse_id'],
@@ -124,6 +126,8 @@ class StockAdjustmentController extends Controller
             $entry = DB::table('stock_adjustments')->where('id', $stockAdjustment)->first();
             abort_if(! $entry, 404);
             abort_if($entry->status === 'POSTED', 422, 'Dokumen POSTED tidak dapat dihapus.');
+            $linked = DB::table('inv_transactions')->where('source_table', 'stock_adjustments')->where('source_id', $entry->id)->exists();
+            abort_if($linked, 422, 'Dokumen sudah terikat GL, gunakan reversal/adjustment.');
 
             DB::table('stock_adjustment_lines')->where('stock_adjustment_id', $stockAdjustment)->delete();
             DB::table('stock_adjustments')->where('id', $stockAdjustment)->delete();

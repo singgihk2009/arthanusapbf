@@ -400,6 +400,8 @@ class InventoryPostingController extends Controller implements HasMiddleware
             'updated_at' => now(),
         ]);
 
+        $this->createIntegrationSnapshotForInternalUsage($usageId, $request->user()?->id);
+
         return response()->json(['message' => 'Internal usage posted', 'id' => $usageId]);
     }
 
@@ -435,6 +437,8 @@ class InventoryPostingController extends Controller implements HasMiddleware
             'updated_at' => now(),
         ]);
 
+        $this->createIntegrationSnapshotForStockAdjustment($adjustmentId, $request->user()?->id);
+
         return response()->json(['message' => 'Stock adjustment posted', 'id' => $adjustmentId]);
     }
 
@@ -455,6 +459,217 @@ class InventoryPostingController extends Controller implements HasMiddleware
             'trx_datetime' => $validated['trx_datetime'] ?? now(),
             'created_by' => $userId,
         ]);
+    }
+
+    private function createIntegrationSnapshotForInternalUsage(int $usageId, ?int $userId): void
+    {
+        $header = DB::table('internal_usages')->where('id', $usageId)->first();
+        if (! $header) {
+            return;
+        }
+
+        $lines = DB::table('internal_usage_lines as l')
+            ->join('items as i', 'i.id', '=', 'l.item_id')
+            ->where('l.internal_usage_id', $usageId)
+            ->select('l.id', 'l.item_id', 'l.qty_used', 'l.uom_id', 'l.qty_base', 'l.notes', 'i.track_expired')
+            ->get();
+
+        $this->persistIntegrationTransaction('internal_usages', $usageId, (string) $header->number, 'USAGE', (string) $header->document_date, (int) $header->warehouse_id, $lines, $userId);
+    }
+
+    private function createIntegrationSnapshotForStockAdjustment(int $adjustmentId, ?int $userId): void
+    {
+        $header = DB::table('stock_adjustments')->where('id', $adjustmentId)->first();
+        if (! $header) {
+            return;
+        }
+
+        $lines = DB::table('stock_adjustment_lines as l')
+            ->join('items as i', 'i.id', '=', 'l.item_id')
+            ->leftJoin('item_batches as b', 'b.id', '=', 'l.batch_id')
+            ->where('l.stock_adjustment_id', $adjustmentId)
+            ->select('l.id', 'l.item_id', 'l.batch_id', 'l.qty_adjusted as qty_used', 'l.uom_id', 'l.qty_base', 'l.notes', 'i.track_expired', 'b.batch_no', 'b.expired_date')
+            ->get();
+
+        $this->persistIntegrationTransaction('stock_adjustments', $adjustmentId, (string) $header->number, 'ADJUSTMENT', (string) $header->document_date, (int) $header->warehouse_id, $lines, $userId);
+    }
+
+    private function persistIntegrationTransaction(string $sourceTable, int $sourceId, string $trxNo, string $trxType, string $trxDate, int $warehouseId, Collection $lines, ?int $userId): void
+    {
+        $lockDate = DB::table('inventory_period_locks')->where('company_id', 1)->value('lock_date');
+        if ($lockDate && $trxDate <= $lockDate) {
+            abort(422, 'Tanggal transaksi sudah dikunci periode inventory.');
+        }
+
+        $totalQty = 0;
+        $totalAmount = 0;
+        $methods = [];
+        $itemsPayload = [];
+
+        foreach ($lines as $line) {
+            $qty = abs((float) $line->qty_base);
+            if ($qty <= 0) {
+                continue;
+            }
+
+            $valuation = ((bool) $line->track_expired) ? 'BATCH' : 'AVG';
+            $unitCost = $valuation === 'BATCH'
+                ? $this->resolveBatchCost($warehouseId, (int) $line->item_id, $line->batch_id ? (int) $line->batch_id : null)
+                : $this->resolveAverageCost($warehouseId, (int) $line->item_id);
+
+            $amount = round($qty * $unitCost, 6);
+            $totalQty += $qty;
+            $totalAmount += $amount;
+            $methods[$valuation] = true;
+
+            $batch = null;
+            if ($line->batch_id ?? null) {
+                $batch = DB::table('item_batches')->where('id', $line->batch_id)->first();
+            }
+
+            $itemsPayload[] = [
+                'product_id' => (int) $line->item_id,
+                'warehouse_id' => $warehouseId,
+                'uom_id' => (int) $line->uom_id,
+                'qty' => $qty,
+                'batch_id' => $line->batch_id ?? null,
+                'batch_no' => $batch?->batch_no,
+                'expired_date' => $batch?->expired_date,
+                'valuation_method' => $valuation,
+                'unit_cost_snapshot' => $unitCost,
+                'amount_snapshot' => $amount,
+                'cost_source' => $valuation === 'BATCH' ? 'BATCH_LAYER' : 'AVG_RATE',
+                'note' => $line->notes,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        $valuationMethod = count($methods) > 1 ? 'MIXED' : (array_key_first($methods) ?? 'AVG');
+
+        DB::transaction(function () use ($sourceTable, $sourceId, $trxNo, $trxType, $trxDate, $totalQty, $totalAmount, $valuationMethod, $itemsPayload, $userId, $warehouseId): void {
+            DB::table('inv_transactions')->updateOrInsert(
+                ['source_table' => $sourceTable, 'source_id' => $sourceId],
+                [
+                    'trx_no' => $trxNo,
+                    'trx_type' => $trxType,
+                    'trx_date' => $trxDate,
+                    'status' => 'final',
+                    'gl_status' => 'pending',
+                    'valuation_method' => $valuationMethod,
+                    'total_qty' => $totalQty,
+                    'total_amount' => $totalAmount,
+                    'posted_at' => now(),
+                    'posted_by' => $userId,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+
+            $transaction = DB::table('inv_transactions')->where('source_table', $sourceTable)->where('source_id', $sourceId)->first();
+            if (! $transaction) {
+                return;
+            }
+
+            DB::table('inv_transaction_items')->where('inv_transaction_id', $transaction->id)->delete();
+            foreach ($itemsPayload as $row) {
+                $row['inv_transaction_id'] = $transaction->id;
+                DB::table('inv_transaction_items')->insert($row);
+                $this->syncCostBalances((int) $row['product_id'], $warehouseId, (string) $row['valuation_method'], (float) $row['qty'], (float) $row['unit_cost_snapshot'], $row['batch_no'], $row['expired_date']);
+            }
+
+            $payload = [
+                'idempotency_key' => "INV:TX:{$transaction->id}:v{$transaction->version}",
+                'source_app' => 'inventory',
+                'source_type' => 'inv_transaction',
+                'source_id' => $transaction->id,
+                'trx_no' => $transaction->trx_no,
+                'trx_type' => $transaction->trx_type,
+                'trx_date' => $transaction->trx_date,
+                'warehouse_id' => $warehouseId,
+                'posted_at' => $transaction->posted_at,
+                'posted_by' => $transaction->posted_by,
+                'totals' => ['total_qty' => (float) $transaction->total_qty, 'total_amount' => (float) $transaction->total_amount],
+                'items' => DB::table('inv_transaction_items')->where('inv_transaction_id', $transaction->id)->get(['product_id', 'qty', 'uom_id', 'valuation_method', 'unit_cost_snapshot as unit_cost', 'amount_snapshot as amount', 'batch_id', 'batch_no', 'expired_date']),
+            ];
+
+            $encoded = json_encode($payload);
+            $hash = hash('sha256', (string) $encoded);
+            DB::table('inv_transactions')->where('id', $transaction->id)->update(['source_hash' => $hash, 'updated_at' => now()]);
+
+            DB::table('integration_outbox')->updateOrInsert(
+                ['idempotency_key' => $payload['idempotency_key']],
+                [
+                    'event_type' => 'INV_TX_FINAL',
+                    'aggregate_type' => 'inv_transaction',
+                    'aggregate_id' => $transaction->id,
+                    'payload_json' => $encoded,
+                    'payload_hash' => $hash,
+                    'status' => 'ready',
+                    'available_at' => now(),
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        });
+    }
+
+    private function resolveAverageCost(int $warehouseId, int $itemId): float
+    {
+        $balance = DB::table('inv_balances')->where('company_id', 1)->where('warehouse_id', $warehouseId)->where('product_id', $itemId)->first();
+        if ($balance && (float) $balance->avg_cost > 0) {
+            return (float) $balance->avg_cost;
+        }
+
+        $fallback = DB::table('stock_ledgers')->where('warehouse_id', $warehouseId)->where('item_id', $itemId)->whereNotNull('unit_cost')->orderByDesc('id')->value('unit_cost');
+
+        return (float) ($fallback ?? 0);
+    }
+
+    private function resolveBatchCost(int $warehouseId, int $itemId, ?int $batchId): float
+    {
+        if (! $batchId) {
+            return $this->resolveAverageCost($warehouseId, $itemId);
+        }
+
+        $batchNo = DB::table('item_batches')->where('id', $batchId)->value('batch_no');
+        $invBatch = DB::table('inv_batches')->where('company_id', 1)->where('warehouse_id', $warehouseId)->where('product_id', $itemId)->where('batch_no', $batchNo)->first();
+        if ($invBatch && (float) $invBatch->unit_cost > 0) {
+            return (float) $invBatch->unit_cost;
+        }
+
+        $fallback = DB::table('stock_ledgers')->where('warehouse_id', $warehouseId)->where('item_id', $itemId)->where('batch_id', $batchId)->whereNotNull('unit_cost')->orderByDesc('id')->value('unit_cost');
+
+        return (float) ($fallback ?? 0);
+    }
+
+    private function syncCostBalances(int $itemId, int $warehouseId, string $valuationMethod, float $qty, float $unitCost, ?string $batchNo, ?string $expiredDate): void
+    {
+        $balance = DB::table('inv_balances')->where('company_id', 1)->where('warehouse_id', $warehouseId)->where('product_id', $itemId)->first();
+        $onHand = (float) ($balance->on_hand_qty ?? 0);
+        $stockValue = (float) ($balance->stock_value ?? 0);
+
+        $newOnHand = max(0, $onHand - $qty);
+        $newStockValue = max(0, $stockValue - ($qty * $unitCost));
+        $avg = $newOnHand > 0 ? ($newStockValue / $newOnHand) : 0;
+
+        DB::table('inv_balances')->updateOrInsert(
+            ['company_id' => 1, 'warehouse_id' => $warehouseId, 'product_id' => $itemId],
+            ['on_hand_qty' => $newOnHand, 'avg_cost' => $avg, 'stock_value' => $newStockValue, 'updated_at' => now(), 'created_at' => now()]
+        );
+
+        if ($valuationMethod !== 'BATCH' || ! $batchNo) {
+            return;
+        }
+
+        $batch = DB::table('inv_batches')->where('company_id', 1)->where('warehouse_id', $warehouseId)->where('product_id', $itemId)->where('batch_no', $batchNo)->first();
+        $qtyOnHand = max(0, ((float) ($batch->qty_on_hand ?? 0)) - $qty);
+        $value = max(0, ((float) ($batch->stock_value ?? 0)) - ($qty * $unitCost));
+
+        DB::table('inv_batches')->updateOrInsert(
+            ['company_id' => 1, 'warehouse_id' => $warehouseId, 'product_id' => $itemId, 'batch_no' => $batchNo],
+            ['expired_date' => $expiredDate, 'unit_cost' => $unitCost, 'qty_on_hand' => $qtyOnHand, 'stock_value' => $value, 'status' => $qtyOnHand > 0 ? 'active' : 'depleted', 'updated_at' => now(), 'created_at' => now()]
+        );
     }
 
     private function parseImportRows(UploadedFile $file): Collection

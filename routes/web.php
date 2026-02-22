@@ -20,6 +20,7 @@ use App\Http\Controllers\Apps\Outbound\StockOpnameController;
 use App\Http\Controllers\Apps\Transfer\WarehouseTransferController;
 use App\Http\Controllers\Apps\InventoryPostingController;
 use App\Http\Controllers\Apps\Reports\InventoryReportController;
+use App\Http\Controllers\Apps\Integration\IntegrationController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -130,6 +131,11 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     Route::get('/transfer/warehouse/{warehouseTransfer}/edit', [WarehouseTransferController::class, 'edit'])->name('transfer.warehouse.edit');
     Route::put('/transfer/warehouse/{warehouseTransfer}', [WarehouseTransferController::class, 'update'])->name('transfer.warehouse.update');
     Route::delete('/transfer/warehouse/{warehouseTransfer}', [WarehouseTransferController::class, 'destroy'])->name('transfer.warehouse.destroy');
+
+
+    // integration finance hub
+    Route::get('/integration', [IntegrationController::class, 'index'])->name('integration.index');
+    Route::post('/integration/{transactionId}/retry', [IntegrationController::class, 'retry'])->name('integration.retry');
 
     // inventory reports api
     Route::prefix('reports/inventory')->name('reports.inventory.')->group(function () {

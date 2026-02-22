@@ -12,6 +12,7 @@ import {
     IconListCheck,
     IconPackageExport,
     IconPackageImport,
+    IconPlugConnected,
     IconPhoto,
     IconReceipt,
     IconReportAnalytics,
@@ -189,6 +190,21 @@ export default function Menu() {
                     active: url.startsWith('/apps/inventory/opening-balance'),
                     icon: <IconClipboardCheck size={20} strokeWidth={1.5} />,
                     permissions: true,
+                },
+
+                {
+                    title: 'Integration',
+                    icon: <IconPlugConnected size={20} strokeWidth={1.5} />,
+                    permissions: true,
+                    subdetails: [
+                        {
+                            title: 'Finance Hub Posting',
+                            href: '/apps/integration',
+                            icon: <IconReceipt size={20} strokeWidth={1.5} />,
+                            active: url.startsWith('/apps/integration'),
+                            permissions: true,
+                        },
+                    ],
                 },
                 {
                     title: 'Reports',
