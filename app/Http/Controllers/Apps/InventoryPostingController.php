@@ -177,6 +177,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
         foreach ($lines as $line) {
             $qtyBase = $this->resolveQtyBase((int) $line->item_id, (int) $line->uom_id, (float) $line->qty_received, (float) $line->qty_base);
+            $unitCostBase = $this->resolveUnitCostPerBase((float) $line->unit_price, (float) $line->qty_received, $qtyBase);
 
             $this->stockService->postMutation([
                 'trx_type' => 'PO_RECEIVE',
@@ -188,7 +189,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'qty_base' => $qtyBase,
                 'uom_id' => $line->uom_id,
                 'qty_input' => $line->qty_received,
-                'unit_cost' => $line->unit_price,
+                'unit_cost' => $unitCostBase,
                 'created_by' => $request->user()?->id,
             ]);
         }
@@ -220,6 +221,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
         foreach ($lines as $line) {
             $qtyBase = $this->resolveQtyBase((int) $line->item_id, (int) $line->uom_id, (float) $line->qty, 0);
+            $unitCostBase = $this->resolveUnitCostPerBase((float) $line->price, (float) $line->qty, $qtyBase);
             $batchId = null;
             $batchNumber = $line->{$batchColumn} ?? null;
 
@@ -251,7 +253,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'qty_base' => $qtyBase,
                 'uom_id' => $line->uom_id,
                 'qty_input' => $line->qty,
-                'unit_cost' => $line->price,
+                'unit_cost' => $unitCostBase,
                 'created_by' => $request->user()?->id,
             ]);
         }
@@ -841,6 +843,21 @@ class InventoryPostingController extends Controller implements HasMiddleware
         }
 
         return $this->uomConversionService->toBase($itemId, $uomId, $qtyInput);
+    }
+
+    private function resolveUnitCostPerBase(float $unitCostInput, float $qtyInput, float $qtyBase): float
+    {
+        if ($qtyInput == 0.0) {
+            return $unitCostInput;
+        }
+
+        $conversionFactor = abs($qtyBase / $qtyInput);
+
+        if ($conversionFactor <= 0.0) {
+            return $unitCostInput;
+        }
+
+        return $unitCostInput / $conversionFactor;
     }
 
     private function resolveWarehouseId(object $header): int

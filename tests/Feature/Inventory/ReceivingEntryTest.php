@@ -194,3 +194,51 @@ it('posts receiving entry and increases stock balance', function () {
         && (int) $row['item_id'] === $this->itemId
         && (float) $row['on_hand_base'] === 5.0))->toBeTrue();
 });
+
+it('normalizes receiving unit cost to base uom when posting with converted uom', function () {
+    $boxUomId = DB::table('uoms')->insertGetId([
+        'code' => 'BOX',
+        'name' => 'Box',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('item_uom_conversions')->insert([
+        'item_id' => $this->itemId,
+        'uom_id' => $boxUomId,
+        'factor' => 100,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    post(route('apps.inbound.receiving.store'), [
+        'warehouse_id' => $this->warehouseId,
+        'transaction_date' => now()->format('Y-m-d'),
+        'transaction_code' => 'PEMBELIAN',
+        'reference' => 'PO-UOM-001',
+        'vendor_name' => 'Vendor UOM',
+        'lines' => [
+            [
+                'item_id' => $this->itemId,
+                'qty' => 5,
+                'uom_id' => $boxUomId,
+                'price' => 100000,
+            ],
+        ],
+    ])->assertRedirect();
+
+    $entryId = DB::table('receiving_entries')->value('id');
+
+    postJson(route('apps.inventory.posting.receiving', $entryId))
+        ->assertOk();
+
+    $ledger = DB::table('stock_ledgers')
+        ->where('trx_type', 'RCV_IN')
+        ->where('trx_id', $entryId)
+        ->first();
+
+    expect($ledger)->not->toBeNull()
+        ->and((float) $ledger->qty_base)->toBe(500.0)
+        ->and((float) $ledger->qty_input)->toBe(5.0)
+        ->and((float) $ledger->unit_cost)->toBe(1000.0);
+});
