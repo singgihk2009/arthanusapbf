@@ -286,23 +286,33 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             ->join('items', 'items.id', '=', 'stock_balances.item_id')
             ->join('warehouses', 'warehouses.id', '=', 'stock_balances.warehouse_id')
             ->where('stock_balances.on_hand_base', '>', 0)
-            ->whereBetween('item_batches.expired_date', [$today, $limit])
+            ->where('items.track_expired', true)
+            ->whereNotNull('item_batches.expired_date')
+            ->whereDate('item_batches.expired_date', '<=', $limit)
             ->when($filters['warehouse_id'], fn ($q, $v) => $q->where('stock_balances.warehouse_id', $v))
-            ->select([
-                'warehouses.code as warehouse_code',
-                'items.sku',
-                'items.name as item_name',
-                'item_batches.batch_no',
-                'item_batches.expired_date',
-                'stock_balances.on_hand_base',
-            ])
+            ->selectRaw('warehouses.code as warehouse_code, items.sku, items.name as item_name, item_batches.batch_no, item_batches.expired_date, stock_balances.on_hand_base, DATEDIFF(item_batches.expired_date, CURDATE()) as days_left')
             ->orderBy('item_batches.expired_date')
             ->limit(300)
-            ->get();
+            ->get()
+            ->map(fn ($row) => [
+                'warehouse_code' => $row->warehouse_code,
+                'sku' => $row->sku,
+                'item_name' => $row->item_name,
+                'batch_no' => $row->batch_no,
+                'expired_date' => $row->expired_date,
+                'on_hand_base' => (float) $row->on_hand_base,
+                'days_left' => (int) $row->days_left,
+                'status' => (int) $row->days_left < 0 ? 'EXPIRED' : ((int) $row->days_left <= 7 ? 'KRITIS' : 'PERINGATAN'),
+            ]);
 
         return [
-            'title' => 'Expired Soon',
+            'title' => 'Expired Tracking & Alert',
             'rows' => $rows,
+            'meta' => [
+                'window_days' => $days,
+                'window_start' => $today,
+                'window_end' => $limit,
+            ],
         ];
     }
 

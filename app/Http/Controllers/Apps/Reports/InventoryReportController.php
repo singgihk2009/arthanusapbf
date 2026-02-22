@@ -48,7 +48,6 @@ class InventoryReportController extends Controller implements HasMiddleware
             ->orderBy('items.sku')
             ->paginate(50)
             ->withQueryString();
-
         return response()->json($data);
     }
 
@@ -116,21 +115,21 @@ class InventoryReportController extends Controller implements HasMiddleware
             ->join('items', 'items.id', '=', 'stock_balances.item_id')
             ->join('warehouses', 'warehouses.id', '=', 'stock_balances.warehouse_id')
             ->where('stock_balances.on_hand_base', '>', 0)
+            ->where('items.track_expired', true)
             ->whereNotNull('item_batches.expired_date')
-            ->whereBetween('item_batches.expired_date', [$today->toDateString(), $limitDate->toDateString()])
+            ->whereDate('item_batches.expired_date', '<=', $limitDate->toDateString())
             ->when($request->integer('warehouse_id'), fn ($q, $v) => $q->where('stock_balances.warehouse_id', $v))
-            ->select([
-                'warehouses.code as warehouse_code',
-                'warehouses.name as warehouse_name',
-                'items.sku',
-                'items.name as item_name',
-                'item_batches.batch_no',
-                'item_batches.expired_date',
-                'stock_balances.on_hand_base',
-            ])
+            ->selectRaw('warehouses.code as warehouse_code, warehouses.name as warehouse_name, items.sku, items.name as item_name, item_batches.batch_no, item_batches.expired_date, stock_balances.on_hand_base, DATEDIFF(item_batches.expired_date, CURDATE()) as days_left')
             ->orderBy('item_batches.expired_date')
             ->paginate(50)
             ->withQueryString();
+
+        $data->setCollection($data->getCollection()->map(function ($row) {
+            $daysLeft = (int) $row->days_left;
+            $row->status = $daysLeft < 0 ? 'EXPIRED' : ($daysLeft <= 7 ? 'KRITIS' : 'PERINGATAN');
+
+            return $row;
+        }));
 
         return response()->json($data);
     }
