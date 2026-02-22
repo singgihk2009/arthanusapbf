@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Apps\Reports;
 
 use App\Http\Controllers\Controller;
-use App\Models\Inventory\StockLedger;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -24,13 +22,11 @@ class InventoryReportPageController extends Controller implements HasMiddleware
     public function __invoke(Request $request)
     {
         $filters = $this->resolveFilters($request);
-
         $reportData = $this->resolveReportData($filters);
 
         return inertia('Apps/Reports/Inventory/Index', [
             'filters' => $filters,
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('code')->get(),
-            'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('sku')->limit(300)->get(),
             'categories' => DB::table('categories')->select('id', 'name')->orderBy('name')->get(),
             'reportData' => $reportData,
         ]);
@@ -39,52 +35,87 @@ class InventoryReportPageController extends Controller implements HasMiddleware
     public function exportStockBalanceExcel(Request $request): Response
     {
         $filters = $this->resolveFilters($request);
-        $rows = $this->stockBalanceBaseQuery($filters)
-            ->limit(5000)
-            ->get();
+        $rows = $this->baseLedgerQuery($filters)->limit(10000)->get();
 
-        $tempPath = storage_path('app/stock-balance-report-'.now()->format('YmdHis').'.xlsx');
+        $isIncoming = $filters['type'] === 'incoming-items';
+        $tempPath = storage_path('app/'.$filters['type'].'-report-'.now()->format('YmdHis').'.xlsx');
 
         $xlsxRows = [
-            ['Warehouse', 'Item', 'Kategori', 'SKU', 'On Hand Base', 'Reserved Base', 'Batch', 'Expired Date'],
+            [
+                'Warehouse',
+                'Tanggal',
+                'Referensi',
+                'Item',
+                'Kategori',
+                'SKU',
+                $isIncoming ? 'Qty Masuk' : 'Qty Pemakaian',
+                $isIncoming ? 'Value' : 'Valuation Rp',
+            ],
         ];
 
         foreach ($rows as $row) {
             $xlsxRows[] = [
                 $row->warehouse_name,
+                $row->trx_datetime,
+                $row->reference,
                 $row->item_name,
                 $row->category_name,
                 $row->sku,
-                (string) $row->on_hand_base,
-                (string) $row->reserved_base,
-                $row->batch_no,
-                $row->expired_date,
+                (string) $row->qty,
+                (string) $row->value,
             ];
         }
 
         $this->buildTemplateXlsx($tempPath, $xlsxRows);
 
-        return response()->download($tempPath, 'stock-balance-report-'.now()->format('Ymd-His').'.xlsx')->deleteFileAfterSend(true);
+        return response()->download(
+            $tempPath,
+            $filters['type'].'-report-'.now()->format('Ymd-His').'.xlsx'
+        )->deleteFileAfterSend(true);
+    }
+
+    private function resolveFilters(Request $request): array
+    {
+        $type = $request->string('type')->toString() ?: 'incoming-items';
+        $allowed = ['incoming-items', 'item-usage'];
+
+        if (! in_array($type, $allowed, true)) {
+            $type = 'incoming-items';
+        }
+
+        $sortBy = $request->string('sort_by')->toString() ?: 'trx_datetime';
+        if (! in_array($sortBy, ['trx_datetime', 'warehouse', 'item', 'category', 'qty', 'value'], true)) {
+            $sortBy = 'trx_datetime';
+        }
+
+        $sortDir = strtolower($request->string('sort_dir')->toString() ?: 'desc');
+        if (! in_array($sortDir, ['asc', 'desc'], true)) {
+            $sortDir = 'desc';
+        }
+
+        $perPage = $request->integer('per_page', 15);
+        if (! in_array($perPage, [15, 50, 100], true)) {
+            $perPage = 15;
+        }
+
+        return [
+            'type' => $type,
+            'warehouse_id' => $request->integer('warehouse_id') ?: null,
+            'category_id' => $request->integer('category_id') ?: null,
+            'search' => trim((string) $request->string('search')->toString()),
+            'sort_by' => $sortBy,
+            'sort_dir' => $sortDir,
+            'per_page' => $perPage,
+        ];
     }
 
     private function resolveReportData(array $filters): array
     {
-        return match ($filters['type']) {
-            'stock-card' => $this->stockCardData($filters),
-            'expired-soon' => $this->expiredSoonData($filters),
-            'minimum-stock-alerts' => $this->minimumStockData($filters),
-            default => $this->stockBalanceData($filters),
-        };
-    }
-
-    private function stockBalanceData(array $filters): array
-    {
-        $rows = $this->stockBalanceBaseQuery($filters)
+        $rows = $this->baseLedgerQuery($filters)
             ->paginate($filters['per_page'])
             ->withQueryString();
 
         return [
-            'title' => 'Stock Balance',
             'rows' => $rows->items(),
             'pagination' => [
                 'current_page' => $rows->currentPage(),
@@ -97,33 +128,43 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         ];
     }
 
-    private function stockBalanceBaseQuery(array $filters)
+    private function baseLedgerQuery(array $filters)
     {
+        $isIncoming = $filters['type'] === 'incoming-items';
+
         $sortable = [
+            'trx_datetime' => 'stock_ledgers.trx_datetime',
             'warehouse' => 'warehouses.name',
             'item' => 'items.name',
             'category' => 'categories.name',
-            'sku' => 'items.sku',
-            'on_hand_base' => 'stock_balances.on_hand_base',
+            'qty' => DB::raw('ABS(stock_ledgers.qty_base)'),
+            'value' => DB::raw('ABS(stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0))'),
         ];
-        $sortColumn = $sortable[$filters['sort_by']] ?? $sortable['warehouse'];
 
-        return DB::table('stock_balances')
-            ->join('warehouses', 'warehouses.id', '=', 'stock_balances.warehouse_id')
-            ->join('items', 'items.id', '=', 'stock_balances.item_id')
+        $sortColumn = $sortable[$filters['sort_by']] ?? $sortable['trx_datetime'];
+
+        return DB::table('stock_ledgers')
+            ->join('warehouses', 'warehouses.id', '=', 'stock_ledgers.warehouse_id')
+            ->join('items', 'items.id', '=', 'stock_ledgers.item_id')
             ->leftJoin('categories', 'categories.id', '=', 'items.category_id')
-            ->leftJoin('item_batches', 'item_batches.id', '=', 'stock_balances.batch_id')
-            ->when($filters['warehouse_id'], fn ($q, $v) => $q->where('stock_balances.warehouse_id', $v))
-            ->when($filters['item_id'], fn ($q, $v) => $q->where('stock_balances.item_id', $v))
-            ->when($filters['category_id'], fn ($q, $v) => $q->where('items.category_id', $v))
-            ->when($filters['search'] !== '', function ($q) use ($filters) {
+            ->when($isIncoming, function ($query) {
+                $query->whereIn('stock_ledgers.trx_type', ['PO_RECEIVE', 'RCV_IN', 'OPENING_BALANCE', 'TRANSFER_IN', 'ADJ', 'ADJ_OPNAME'])
+                    ->where('stock_ledgers.qty_base', '>', 0);
+            }, function ($query) {
+                $query->where('stock_ledgers.trx_type', 'USAGE_OUT')
+                    ->where('stock_ledgers.qty_base', '<', 0);
+            })
+            ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_ledgers.warehouse_id', $warehouseId))
+            ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('items.category_id', $categoryId))
+            ->when($filters['search'] !== '', function ($query) use ($filters) {
                 $keyword = '%'.$filters['search'].'%';
-
-                $q->where(function ($query) use ($keyword) {
-                    $query->where('warehouses.name', 'like', $keyword)
+                $query->where(function ($subQuery) use ($keyword) {
+                    $subQuery->where('warehouses.name', 'like', $keyword)
                         ->orWhere('items.name', 'like', $keyword)
                         ->orWhere('items.sku', 'like', $keyword)
-                        ->orWhere('categories.name', 'like', $keyword);
+                        ->orWhere('categories.name', 'like', $keyword)
+                        ->orWhere('stock_ledgers.trx_type', 'like', $keyword)
+                        ->orWhereRaw('CAST(stock_ledgers.trx_id AS CHAR) like ?', [$keyword]);
                 });
             })
             ->select([
@@ -131,52 +172,13 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'items.name as item_name',
                 DB::raw('COALESCE(categories.name, \'-\') as category_name'),
                 'items.sku',
-                'item_batches.batch_no',
-                'item_batches.expired_date',
-                'stock_balances.on_hand_base',
-                'stock_balances.reserved_base',
+                DB::raw("DATE_FORMAT(stock_ledgers.trx_datetime, '%Y-%m-%d %H:%i:%s') as trx_datetime"),
+                DB::raw("CONCAT(stock_ledgers.trx_type, '-', stock_ledgers.trx_id) as reference"),
+                DB::raw('ABS(stock_ledgers.qty_base) as qty'),
+                DB::raw('ABS(stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0)) as value'),
             ])
             ->orderBy($sortColumn, $filters['sort_dir'])
-            ->orderBy('items.sku');
-    }
-
-    private function resolveFilters(Request $request): array
-    {
-        $type = $request->string('type')->toString() ?: 'stock-balance';
-        $allowed = ['stock-balance', 'stock-card', 'expired-soon', 'minimum-stock-alerts'];
-
-        if (! in_array($type, $allowed, true)) {
-            $type = 'stock-balance';
-        }
-
-        $sortBy = $request->string('sort_by')->toString() ?: 'warehouse';
-        if (! in_array($sortBy, ['warehouse', 'item', 'category', 'sku', 'on_hand_base'], true)) {
-            $sortBy = 'warehouse';
-        }
-
-        $sortDir = strtolower($request->string('sort_dir')->toString() ?: 'asc');
-        if (! in_array($sortDir, ['asc', 'desc'], true)) {
-            $sortDir = 'asc';
-        }
-
-        $perPage = $request->integer('per_page', 10);
-        if (! in_array($perPage, [10, 25, 50, 100], true)) {
-            $perPage = 10;
-        }
-
-        return [
-            'type' => $type,
-            'warehouse_id' => $request->integer('warehouse_id') ?: null,
-            'item_id' => $request->integer('item_id') ?: null,
-            'category_id' => $request->integer('category_id') ?: null,
-            'search' => trim((string) $request->string('search')->toString()),
-            'sort_by' => $sortBy,
-            'sort_dir' => $sortDir,
-            'per_page' => $perPage,
-            'start_date' => $request->string('start_date')->toString() ?: now()->startOfMonth()->toDateString(),
-            'end_date' => $request->string('end_date')->toString() ?: now()->toDateString(),
-            'days' => $request->integer('days', 30),
-        ];
+            ->orderBy('stock_ledgers.id', 'desc');
     }
 
     private function buildTemplateXlsx(string $path, array $rows): void
@@ -217,126 +219,5 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         }
 
         return $label;
-    }
-
-    private function stockCardData(array $filters): array
-    {
-        if (! $filters['item_id']) {
-            return [
-                'title' => 'Stock Card',
-                'opening_balance' => 0,
-                'closing_balance' => 0,
-                'rows' => [],
-            ];
-        }
-
-        $start = Carbon::parse($filters['start_date'])->startOfDay();
-        $end = Carbon::parse($filters['end_date'])->endOfDay();
-
-        $opening = (float) StockLedger::query()
-            ->where('item_id', $filters['item_id'])
-            ->when($filters['warehouse_id'], fn ($q, $warehouseId) => $q->where('warehouse_id', $warehouseId))
-            ->where('trx_datetime', '<', $start)
-            ->sum('qty_base');
-
-        $movements = StockLedger::query()
-            ->join('warehouses', 'warehouses.id', '=', 'stock_ledgers.warehouse_id')
-            ->where('item_id', $filters['item_id'])
-            ->when($filters['warehouse_id'], fn ($q, $warehouseId) => $q->where('stock_ledgers.warehouse_id', $warehouseId))
-            ->whereBetween('trx_datetime', [$start, $end])
-            ->orderBy('stock_ledgers.trx_datetime')
-            ->orderBy('stock_ledgers.id')
-            ->limit(500)
-            ->get([
-                'stock_ledgers.*',
-                'warehouses.code as warehouse_code',
-                'warehouses.name as warehouse_name',
-            ]);
-
-        $running = $opening;
-        $rows = $movements->map(function (StockLedger $ledger) use (&$running) {
-            $running += (float) $ledger->qty_base;
-
-            return [
-                'trx_datetime' => optional($ledger->trx_datetime)->format('Y-m-d H:i:s'),
-                'warehouse_code' => $ledger->warehouse_code,
-                'warehouse_name' => $ledger->warehouse_name,
-                'trx_type' => $ledger->trx_type,
-                'qty_base' => (float) $ledger->qty_base,
-                'running_balance' => $running,
-            ];
-        });
-
-        return [
-            'title' => 'Stock Card',
-            'opening_balance' => $opening,
-            'closing_balance' => $running,
-            'rows' => $rows,
-        ];
-    }
-
-    private function expiredSoonData(array $filters): array
-    {
-        $days = max(1, (int) $filters['days']);
-        $today = now()->toDateString();
-        $limit = now()->addDays($days)->toDateString();
-
-        $rows = DB::table('stock_balances')
-            ->join('item_batches', 'item_batches.id', '=', 'stock_balances.batch_id')
-            ->join('items', 'items.id', '=', 'stock_balances.item_id')
-            ->join('warehouses', 'warehouses.id', '=', 'stock_balances.warehouse_id')
-            ->where('stock_balances.on_hand_base', '>', 0)
-            ->where('items.track_expired', true)
-            ->whereNotNull('item_batches.expired_date')
-            ->whereDate('item_batches.expired_date', '<=', $limit)
-            ->when($filters['warehouse_id'], fn ($q, $v) => $q->where('stock_balances.warehouse_id', $v))
-            ->selectRaw('warehouses.code as warehouse_code, items.sku, items.name as item_name, item_batches.batch_no, item_batches.expired_date, stock_balances.on_hand_base, DATEDIFF(item_batches.expired_date, CURDATE()) as days_left')
-            ->orderBy('item_batches.expired_date')
-            ->limit(300)
-            ->get()
-            ->map(fn ($row) => [
-                'warehouse_code' => $row->warehouse_code,
-                'sku' => $row->sku,
-                'item_name' => $row->item_name,
-                'batch_no' => $row->batch_no,
-                'expired_date' => $row->expired_date,
-                'on_hand_base' => (float) $row->on_hand_base,
-                'days_left' => (int) $row->days_left,
-                'status' => (int) $row->days_left < 0 ? 'EXPIRED' : ((int) $row->days_left <= 7 ? 'KRITIS' : 'PERINGATAN'),
-            ]);
-
-        return [
-            'title' => 'Expired Tracking & Alert',
-            'rows' => $rows,
-            'meta' => [
-                'window_days' => $days,
-                'window_start' => $today,
-                'window_end' => $limit,
-            ],
-        ];
-    }
-
-    private function minimumStockData(array $filters): array
-    {
-        $rows = DB::table('warehouse_item_settings as wis')
-            ->join('warehouses as w', 'w.id', '=', 'wis.warehouse_id')
-            ->join('items as i', 'i.id', '=', 'wis.item_id')
-            ->leftJoin('stock_balances as sb', function ($join) {
-                $join->on('sb.warehouse_id', '=', 'wis.warehouse_id')
-                    ->on('sb.item_id', '=', 'wis.item_id');
-            })
-            ->when($filters['warehouse_id'], fn ($q, $v) => $q->where('wis.warehouse_id', $v))
-            ->groupBy('w.code', 'i.sku', 'i.name', 'wis.min_stock_base')
-            ->havingRaw('COALESCE(SUM(sb.on_hand_base), 0) <= wis.min_stock_base')
-            ->selectRaw('w.code as warehouse_code, i.sku, i.name as item_name, wis.min_stock_base, COALESCE(SUM(sb.on_hand_base), 0) as on_hand_base')
-            ->orderBy('w.code')
-            ->orderBy('i.sku')
-            ->limit(300)
-            ->get();
-
-        return [
-            'title' => 'Minimum Stock Alerts',
-            'rows' => $rows,
-        ];
     }
 }
