@@ -4,42 +4,77 @@ import { Head, router, usePage } from '@inertiajs/react';
 import React, { useMemo } from 'react';
 
 export default function Index() {
-    const { filters, warehouses, categories, reportData } = usePage().props;
+    const { filters, warehouses, categories, items, reportData } = usePage().props;
 
     const reportTypes = [
         { value: 'incoming-items', label: 'Laporan Barang Masuk (Qty & Value)' },
-        { value: 'item-usage', label: 'Laporan Pemakaian Barang (Qty & Valuation Rp)' },
+        { value: 'item-usage', label: 'Laporan Barang Keluar (Qty & Valuation Rp)' },
+        { value: 'stock-position', label: 'Laporan Posisi Stok' },
+        { value: 'stock-card-movement', label: 'Laporan Kartu Stok Movement per Item' },
     ];
 
     const isIncomingReport = filters.type === 'incoming-items';
+    const isUsageReport = filters.type === 'item-usage';
+    const isStockPositionReport = filters.type === 'stock-position';
+    const isStockCardReport = filters.type === 'stock-card-movement';
 
-    const columns = [
-        { key: 'number', label: 'No' },
-        { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
-        { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
-        { key: 'reference', label: 'Referensi' },
-        { key: 'item_name', label: 'Item', sortKey: 'item' },
-        { key: 'category_name', label: 'Kategori', sortKey: 'category' },
-        { key: 'sku', label: 'SKU' },
-        { key: 'uom_name', label: 'UoM' },
-        { key: 'unit_price', label: 'Unit Price', sortKey: 'unit_price' },
-        {
-            key: 'qty',
-            label: isIncomingReport ? 'Qty Masuk' : 'Qty Pemakaian',
-            sortKey: 'qty',
-        },
-        {
-            key: 'value',
-            label: isIncomingReport ? 'Value' : 'Valuation Rp',
-            sortKey: 'value',
-        },
-        ...(isIncomingReport
-            ? [
-                { key: 'status', label: 'Status', sortKey: 'status' },
-                { key: 'vendor_name', label: 'Vendor', sortKey: 'vendor' },
-            ]
-            : []),
-    ];
+    const columns = useMemo(() => {
+        if (isStockPositionReport) {
+            return [
+                { key: 'number', label: 'No' },
+                { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
+                { key: 'item_name', label: 'Item', sortKey: 'item' },
+                { key: 'category_name', label: 'Kategori', sortKey: 'category' },
+                { key: 'sku', label: 'SKU' },
+                { key: 'on_hand', label: 'On Hand', sortKey: 'on_hand' },
+                { key: 'reserved', label: 'Reserved', sortKey: 'reserved' },
+                { key: 'available', label: 'Available', sortKey: 'available' },
+            ];
+        }
+
+        if (isStockCardReport) {
+            return [
+                { key: 'number', label: 'No' },
+                { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
+                { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
+                { key: 'reference', label: 'Referensi' },
+                { key: 'item_name', label: 'Item', sortKey: 'item' },
+                { key: 'sku', label: 'SKU' },
+                { key: 'qty', label: 'Qty Movement', sortKey: 'qty' },
+                { key: 'running_balance', label: 'Saldo Berjalan', sortKey: 'running_balance' },
+                { key: 'unit_price', label: 'Unit Cost', sortKey: 'unit_price' },
+                { key: 'value', label: 'Value Movement', sortKey: 'value' },
+            ];
+        }
+
+        return [
+            { key: 'number', label: 'No' },
+            { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
+            { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
+            { key: 'reference', label: 'Referensi' },
+            { key: 'item_name', label: 'Item', sortKey: 'item' },
+            { key: 'category_name', label: 'Kategori', sortKey: 'category' },
+            { key: 'sku', label: 'SKU' },
+            { key: 'uom_name', label: 'UoM' },
+            { key: 'unit_price', label: 'Unit Price', sortKey: 'unit_price' },
+            {
+                key: 'qty',
+                label: isIncomingReport ? 'Qty Masuk' : 'Qty Keluar',
+                sortKey: 'qty',
+            },
+            {
+                key: 'value',
+                label: isIncomingReport ? 'Value' : 'Valuation Rp',
+                sortKey: 'value',
+            },
+            ...(isIncomingReport
+                ? [
+                    { key: 'status', label: 'Status', sortKey: 'status' },
+                    { key: 'vendor_name', label: 'Vendor', sortKey: 'vendor' },
+                ]
+                : []),
+        ];
+    }, [isIncomingReport, isStockCardReport, isStockPositionReport]);
 
     const updateFilters = (nextFilters) => {
         router.get(route('apps.reports.inventory.index'), {
@@ -62,6 +97,14 @@ export default function Index() {
     }), [filters]);
 
     const pagination = reportData.pagination;
+
+    const reportTitle = isIncomingReport
+        ? 'Laporan Barang Masuk'
+        : isUsageReport
+            ? 'Laporan Barang Keluar'
+            : isStockPositionReport
+                ? 'Laporan Posisi Stok'
+                : 'Laporan Kartu Stok Movement per Item';
 
     return (
         <>
@@ -93,16 +136,31 @@ export default function Index() {
                             ))}
                         </select>
 
-                        <select
-                            value={filters.category_id ?? ''}
-                            onChange={(e) => updateFilters({ category_id: e.target.value || null, page: 1 })}
-                            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
-                        >
-                            <option value="">Semua Kategori</option>
-                            {categories.map((category) => (
-                                <option key={category.id} value={category.id}>{category.name}</option>
-                            ))}
-                        </select>
+                        {!isStockCardReport && (
+                            <select
+                                value={filters.category_id ?? ''}
+                                onChange={(e) => updateFilters({ category_id: e.target.value || null, page: 1 })}
+                                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
+                            >
+                                <option value="">Semua Kategori</option>
+                                {categories.map((category) => (
+                                    <option key={category.id} value={category.id}>{category.name}</option>
+                                ))}
+                            </select>
+                        )}
+
+                        {(isStockPositionReport || isStockCardReport) && (
+                            <select
+                                value={filters.item_id ?? ''}
+                                onChange={(e) => updateFilters({ item_id: e.target.value || null, page: 1 })}
+                                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
+                            >
+                                <option value="">{isStockCardReport ? 'Pilih Item (Wajib)' : 'Semua Item'}</option>
+                                {items.map((item) => (
+                                    <option key={item.id} value={item.id}>{item.sku} - {item.name}</option>
+                                ))}
+                            </select>
+                        )}
 
                         {isIncomingReport && (
                             <select
@@ -116,16 +174,33 @@ export default function Index() {
                             </select>
                         )}
 
+                        {isStockCardReport && (
+                            <>
+                                <input
+                                    type="date"
+                                    value={filters.start_date ?? ''}
+                                    onChange={(e) => updateFilters({ start_date: e.target.value, page: 1 })}
+                                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
+                                />
+                                <input
+                                    type="date"
+                                    value={filters.end_date ?? ''}
+                                    onChange={(e) => updateFilters({ end_date: e.target.value, page: 1 })}
+                                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
+                                />
+                            </>
+                        )}
+
                         <input
                             type="text"
                             value={filters.search ?? ''}
                             onChange={(e) => updateFilters({ search: e.target.value, page: 1 })}
                             className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
-                            placeholder="Global search warehouse/item/sku/ref"
+                            placeholder="Cari warehouse/item/sku"
                         />
 
                         <select
-                            value={filters.per_page}
+                            value={filters.per_page ?? 15}
                             onChange={(e) => updateFilters({ per_page: Number(e.target.value), page: 1 })}
                             className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
                         >
@@ -143,7 +218,7 @@ export default function Index() {
                     </div>
                 </div>
 
-                <Table.Card title={isIncomingReport ? 'Laporan Barang Masuk' : 'Laporan Pemakaian Barang'}>
+                <Table.Card title={reportTitle}>
                     <Table>
                         <Table.Thead>
                             <tr>
@@ -165,22 +240,46 @@ export default function Index() {
                         </Table.Thead>
                         <Table.Tbody>
                             {reportData.rows?.length ? reportData.rows.map((row, index) => (
-                                <tr key={`${row.reference}-${index}`} className="hover:bg-gray-100 dark:hover:bg-gray-900">
+                                <tr key={`${row.reference ?? row.sku}-${index}`} className="hover:bg-gray-100 dark:hover:bg-gray-900">
                                     <Table.Td>{(pagination?.from ?? 1) + index}</Table.Td>
                                     <Table.Td>{row.warehouse_name}</Table.Td>
-                                    <Table.Td>{row.trx_datetime}</Table.Td>
-                                    <Table.Td>{row.reference}</Table.Td>
-                                    <Table.Td>{row.item_name}</Table.Td>
-                                    <Table.Td>{row.category_name}</Table.Td>
-                                    <Table.Td>{row.sku}</Table.Td>
-                                    <Table.Td>{row.uom_name}</Table.Td>
-                                    <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
-                                    <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
-                                    <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
-                                    {isIncomingReport && (
+                                    {isStockPositionReport ? (
                                         <>
-                                            <Table.Td>{row.status}</Table.Td>
-                                            <Table.Td>{row.vendor_name}</Table.Td>
+                                            <Table.Td>{row.item_name}</Table.Td>
+                                            <Table.Td>{row.category_name}</Table.Td>
+                                            <Table.Td>{row.sku}</Table.Td>
+                                            <Table.Td>{Number(row.on_hand).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
+                                            <Table.Td>{Number(row.reserved).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
+                                            <Table.Td>{Number(row.available).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
+                                        </>
+                                    ) : isStockCardReport ? (
+                                        <>
+                                            <Table.Td>{row.trx_datetime}</Table.Td>
+                                            <Table.Td>{row.reference}</Table.Td>
+                                            <Table.Td>{row.item_name}</Table.Td>
+                                            <Table.Td>{row.sku}</Table.Td>
+                                            <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
+                                            <Table.Td>{Number(row.running_balance).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
+                                            <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
+                                            <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Table.Td>{row.trx_datetime}</Table.Td>
+                                            <Table.Td>{row.reference}</Table.Td>
+                                            <Table.Td>{row.item_name}</Table.Td>
+                                            <Table.Td>{row.category_name}</Table.Td>
+                                            <Table.Td>{row.sku}</Table.Td>
+                                            <Table.Td>{row.uom_name}</Table.Td>
+                                            <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
+                                            <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
+                                            <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
+                                            {isIncomingReport && (
+                                                <>
+                                                    <Table.Td>{row.status}</Table.Td>
+                                                    <Table.Td>{row.vendor_name}</Table.Td>
+                                                </>
+                                            )}
                                         </>
                                     )}
                                 </tr>

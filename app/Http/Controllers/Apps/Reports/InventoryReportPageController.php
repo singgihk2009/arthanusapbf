@@ -28,6 +28,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             'filters' => $filters,
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('code')->get(),
             'categories' => DB::table('categories')->select('id', 'name')->orderBy('name')->get(),
+            'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
             'reportData' => $reportData,
         ]);
     }
@@ -38,43 +39,93 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         $rows = $this->baseQuery($filters)->limit(10000)->get();
 
         $isIncoming = $filters['type'] === 'incoming-items';
+        $isStockPosition = $filters['type'] === 'stock-position';
+        $isStockCard = $filters['type'] === 'stock-card-movement';
         $tempPath = storage_path('app/'.$filters['type'].'-report-'.now()->format('YmdHis').'.xlsx');
 
-        $xlsxRows = [[
-            'Warehouse',
-            'Tanggal',
-            'Referensi',
-            'Item',
-            'Kategori',
-            'SKU',
-            'UoM',
-            'Unit Price',
-            $isIncoming ? 'Qty Masuk' : 'Qty Pemakaian',
-            $isIncoming ? 'Value' : 'Valuation Rp',
-        ]];
+        if ($isStockPosition) {
+            $xlsxRows = [[
+                'Warehouse',
+                'Item',
+                'Kategori',
+                'SKU',
+                'On Hand',
+                'Reserved',
+                'Available',
+            ]];
+        } elseif ($isStockCard) {
+            $xlsxRows = [[
+                'Warehouse',
+                'Tanggal',
+                'Referensi',
+                'Item',
+                'SKU',
+                'Qty Movement',
+                'Saldo Berjalan',
+                'Unit Cost',
+                'Value Movement',
+            ]];
+        } else {
+            $xlsxRows = [[
+                'Warehouse',
+                'Tanggal',
+                'Referensi',
+                'Item',
+                'Kategori',
+                'SKU',
+                'UoM',
+                'Unit Price',
+                $isIncoming ? 'Qty Masuk' : 'Qty Keluar',
+                $isIncoming ? 'Value' : 'Valuation Rp',
+            ]];
 
-        if ($isIncoming) {
-            $xlsxRows[0][] = 'Status';
-            $xlsxRows[0][] = 'Vendor';
+            if ($isIncoming) {
+                $xlsxRows[0][] = 'Status';
+                $xlsxRows[0][] = 'Vendor';
+            }
         }
 
         foreach ($rows as $row) {
-            $line = [
-                $row->warehouse_name,
-                $row->trx_datetime,
-                $row->reference,
-                $row->item_name,
-                $row->category_name,
-                $row->sku,
-                $row->uom_name,
-                (string) $row->unit_price,
-                (string) $row->qty,
-                (string) $row->value,
-            ];
+            if ($isStockPosition) {
+                $line = [
+                    $row->warehouse_name,
+                    $row->item_name,
+                    $row->category_name,
+                    $row->sku,
+                    (string) $row->on_hand,
+                    (string) $row->reserved,
+                    (string) $row->available,
+                ];
+            } elseif ($isStockCard) {
+                $line = [
+                    $row->warehouse_name,
+                    $row->trx_datetime,
+                    $row->reference,
+                    $row->item_name,
+                    $row->sku,
+                    (string) $row->qty,
+                    (string) $row->running_balance,
+                    (string) $row->unit_price,
+                    (string) $row->value,
+                ];
+            } else {
+                $line = [
+                    $row->warehouse_name,
+                    $row->trx_datetime,
+                    $row->reference,
+                    $row->item_name,
+                    $row->category_name,
+                    $row->sku,
+                    $row->uom_name,
+                    (string) $row->unit_price,
+                    (string) $row->qty,
+                    (string) $row->value,
+                ];
 
-            if ($isIncoming) {
-                $line[] = $row->status;
-                $line[] = $row->vendor_name;
+                if ($isIncoming) {
+                    $line[] = $row->status;
+                    $line[] = $row->vendor_name;
+                }
             }
 
             $xlsxRows[] = $line;
@@ -91,14 +142,14 @@ class InventoryReportPageController extends Controller implements HasMiddleware
     private function resolveFilters(Request $request): array
     {
         $type = $request->string('type')->toString() ?: 'incoming-items';
-        $allowed = ['incoming-items', 'item-usage'];
+        $allowed = ['incoming-items', 'item-usage', 'stock-position', 'stock-card-movement'];
 
         if (! in_array($type, $allowed, true)) {
             $type = 'incoming-items';
         }
 
         $sortBy = $request->string('sort_by')->toString() ?: 'trx_datetime';
-        if (! in_array($sortBy, ['trx_datetime', 'warehouse', 'item', 'category', 'qty', 'value', 'unit_price', 'status', 'vendor'], true)) {
+        if (! in_array($sortBy, ['trx_datetime', 'warehouse', 'item', 'category', 'qty', 'value', 'unit_price', 'status', 'vendor', 'on_hand', 'reserved', 'available', 'running_balance'], true)) {
             $sortBy = 'trx_datetime';
         }
 
@@ -116,11 +167,14 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             'type' => $type,
             'warehouse_id' => $request->integer('warehouse_id') ?: null,
             'category_id' => $request->integer('category_id') ?: null,
+            'item_id' => $request->integer('item_id') ?: null,
             'search' => trim((string) $request->string('search')->toString()),
             'sort_by' => $sortBy,
             'sort_dir' => $sortDir,
             'per_page' => $perPage,
             'status' => strtolower($request->string('status')->toString() ?: 'all'),
+            'start_date' => $request->date('start_date')?->toDateString() ?? now()->subDays(30)->toDateString(),
+            'end_date' => $request->date('end_date')?->toDateString() ?? now()->toDateString(),
         ];
     }
 
@@ -145,9 +199,101 @@ class InventoryReportPageController extends Controller implements HasMiddleware
 
     private function baseQuery(array $filters)
     {
-        return $filters['type'] === 'incoming-items'
-            ? $this->incomingItemsQuery($filters)
-            : $this->itemUsageQuery($filters);
+        return match ($filters['type']) {
+            'incoming-items' => $this->incomingItemsQuery($filters),
+            'item-usage' => $this->itemUsageQuery($filters),
+            'stock-position' => $this->stockPositionQuery($filters),
+            'stock-card-movement' => $this->stockCardMovementQuery($filters),
+            default => $this->incomingItemsQuery($filters),
+        };
+    }
+
+    private function stockPositionQuery(array $filters)
+    {
+        $sortable = [
+            'warehouse' => 'warehouses.name',
+            'item' => 'items.name',
+            'category' => 'categories.name',
+            'on_hand' => DB::raw('SUM(stock_balances.on_hand_base)'),
+            'reserved' => DB::raw('SUM(stock_balances.reserved_base)'),
+            'available' => DB::raw('SUM(stock_balances.on_hand_base - stock_balances.reserved_base)'),
+        ];
+
+        $sortColumn = $sortable[$filters['sort_by']] ?? $sortable['warehouse'];
+
+        return DB::table('stock_balances')
+            ->join('warehouses', 'warehouses.id', '=', 'stock_balances.warehouse_id')
+            ->join('items', 'items.id', '=', 'stock_balances.item_id')
+            ->leftJoin('categories', 'categories.id', '=', 'items.category_id')
+            ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_balances.warehouse_id', $warehouseId))
+            ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('items.category_id', $categoryId))
+            ->when($filters['item_id'], fn ($query, $itemId) => $query->where('stock_balances.item_id', $itemId))
+            ->when($filters['search'] !== '', function ($query) use ($filters) {
+                $keyword = '%'.$filters['search'].'%';
+                $query->where(function ($subQuery) use ($keyword) {
+                    $subQuery->where('warehouses.name', 'like', $keyword)
+                        ->orWhere('items.name', 'like', $keyword)
+                        ->orWhere('items.sku', 'like', $keyword)
+                        ->orWhere('categories.name', 'like', $keyword);
+                });
+            })
+            ->groupBy('stock_balances.warehouse_id', 'stock_balances.item_id', 'warehouses.name', 'items.name', 'items.sku', 'categories.name')
+            ->select([
+                'warehouses.name as warehouse_name',
+                'items.name as item_name',
+                DB::raw('COALESCE(categories.name, \'-\') as category_name'),
+                'items.sku',
+                DB::raw('SUM(stock_balances.on_hand_base) as on_hand'),
+                DB::raw('SUM(stock_balances.reserved_base) as reserved'),
+                DB::raw('SUM(stock_balances.on_hand_base - stock_balances.reserved_base) as available'),
+            ])
+            ->orderBy($sortColumn, $filters['sort_dir']);
+    }
+
+    private function stockCardMovementQuery(array $filters)
+    {
+        if (! $filters['item_id']) {
+            return DB::table('stock_ledgers')->whereRaw('1 = 0');
+        }
+
+        $startDate = $filters['start_date'].' 00:00:00';
+        $endDate = $filters['end_date'].' 23:59:59';
+
+        $openingBalance = DB::table('stock_ledgers')
+            ->where('item_id', $filters['item_id'])
+            ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('warehouse_id', $warehouseId))
+            ->where('trx_datetime', '<', $startDate)
+            ->sum('qty_base');
+
+        return DB::table('stock_ledgers')
+            ->join('warehouses', 'warehouses.id', '=', 'stock_ledgers.warehouse_id')
+            ->join('items', 'items.id', '=', 'stock_ledgers.item_id')
+            ->where('stock_ledgers.item_id', $filters['item_id'])
+            ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_ledgers.warehouse_id', $warehouseId))
+            ->whereBetween('stock_ledgers.trx_datetime', [$startDate, $endDate])
+            ->when($filters['search'] !== '', function ($query) use ($filters) {
+                $keyword = '%'.$filters['search'].'%';
+                $query->where(function ($subQuery) use ($keyword) {
+                    $subQuery->where('warehouses.name', 'like', $keyword)
+                        ->orWhere('items.name', 'like', $keyword)
+                        ->orWhere('items.sku', 'like', $keyword)
+                        ->orWhere('stock_ledgers.trx_type', 'like', $keyword)
+                        ->orWhereRaw('CAST(stock_ledgers.trx_id AS CHAR) like ?', [$keyword]);
+                });
+            })
+            ->select([
+                'warehouses.name as warehouse_name',
+                'items.name as item_name',
+                'items.sku',
+                DB::raw("DATE_FORMAT(stock_ledgers.trx_datetime, '%Y-%m-%d %H:%i:%s') as trx_datetime"),
+                DB::raw("CONCAT(stock_ledgers.trx_type, '-', stock_ledgers.trx_id) as reference"),
+                DB::raw('stock_ledgers.qty_base as qty'),
+                DB::raw('COALESCE(stock_ledgers.unit_cost, 0) as unit_price'),
+                DB::raw('stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0) as value'),
+                DB::raw('('.(float) $openingBalance.' + SUM(stock_ledgers.qty_base) OVER (ORDER BY stock_ledgers.trx_datetime, stock_ledgers.id)) as running_balance'),
+            ])
+            ->orderBy('stock_ledgers.trx_datetime')
+            ->orderBy('stock_ledgers.id');
     }
 
     private function incomingItemsQuery(array $filters)
