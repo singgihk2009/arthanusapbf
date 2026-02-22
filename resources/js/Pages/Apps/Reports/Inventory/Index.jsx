@@ -239,6 +239,13 @@ export default function Index() {
                         <div>Closing Balance: <strong>{reportData.closing_balance ?? 0}</strong></div>
                     </div>
                 )}
+
+                {filters.type === 'expired-soon' && (
+                    <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-200">
+                        Menampilkan batch item tracked-expired dengan stok &gt; 0 yang sudah expired atau akan expired dalam <strong>{filters.days}</strong> hari.
+                        Prioritas: <strong>EXPIRED</strong> (sudah lewat), <strong>KRITIS</strong> (≤ 7 hari), dan <strong>PERINGATAN</strong> (&gt; 7 hari).
+                    </div>
+                )}
             </div>
         </>
     );

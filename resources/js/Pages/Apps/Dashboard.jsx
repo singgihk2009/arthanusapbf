@@ -29,7 +29,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 const numberFormatter = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
 
-export default function Dashboard({ kpi, stock_by_warehouse, low_stock_items, movement_trend }) {
+export default function Dashboard({ kpi, stock_by_warehouse, low_stock_items, expired_alerts, movement_trend }) {
     const chartData = {
         labels: movement_trend.map((row) => row.label),
         datasets: [
@@ -51,6 +51,12 @@ export default function Dashboard({ kpi, stock_by_warehouse, low_stock_items, mo
             label: 'Lihat Alert Minimum Stock',
             description: 'Pantau item yang sudah mencapai batas minimum.',
             href: route('apps.reports.inventory.index', { type: 'minimum-stock-alerts' }),
+            icon: IconAlertTriangle,
+        },
+        {
+            label: 'Pantau Expired Tracking',
+            description: 'Lihat batch yang sudah expired / akan expired.',
+            href: route('apps.reports.inventory.index', { type: 'expired-soon' }),
             icon: IconAlertTriangle,
         },
         {
@@ -86,7 +92,7 @@ export default function Dashboard({ kpi, stock_by_warehouse, low_stock_items, mo
                     <p className="mt-2 text-xs text-gray-400">Sinkronisasi data terakhir: {kpi.last_sync_at}</p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <Widget
                         title="Total Gudang"
                         subtitle="Gudang aktif terdaftar"
@@ -109,6 +115,13 @@ export default function Dashboard({ kpi, stock_by_warehouse, low_stock_items, mo
                         total={numberFormatter.format(kpi.on_hand_qty)}
                     />
                     <Widget
+                        title="Alert Minimum Stock"
+                        subtitle="Item perlu restock"
+                        color="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
+                        icon={<IconAlertTriangle size="20" strokeWidth="1.5" />}
+                        total={numberFormatter.format(kpi.low_stock_count)}
+                    />
+                    <Widget
                         title="Inbound Hari Ini"
                         subtitle="Barang masuk"
                         color="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-200"
@@ -123,11 +136,18 @@ export default function Dashboard({ kpi, stock_by_warehouse, low_stock_items, mo
                         total={numberFormatter.format(kpi.outbound_today)}
                     />
                     <Widget
-                        title="Alert Minimum Stock"
-                        subtitle="Item perlu restock"
-                        color="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
+                        title="Batch Sudah Expired"
+                        subtitle="Butuh tindakan segera"
+                        color="bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200"
                         icon={<IconAlertTriangle size="20" strokeWidth="1.5" />}
-                        total={numberFormatter.format(kpi.low_stock_count)}
+                        total={numberFormatter.format(kpi.expired_batch_count)}
+                    />
+                    <Widget
+                        title="Batch Expired ≤ 30 Hari"
+                        subtitle="Pengingat preventif"
+                        color="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-200"
+                        icon={<IconAlertTriangle size="20" strokeWidth="1.5" />}
+                        total={numberFormatter.format(kpi.expired_soon_count)}
                     />
                 </div>
 
@@ -208,6 +228,39 @@ export default function Dashboard({ kpi, stock_by_warehouse, low_stock_items, mo
                                     </tr>
                                 )) : (
                                     <Table.Empty colSpan={4} message="Belum ada item yang menyentuh batas minimum stok." />
+                                )}
+                            </Table.Tbody>
+                        </Table>
+                    </Table.Card>
+
+                    <Table.Card title="Expired Tracking & Alert (≤ 30 Hari)">
+                        <Table>
+                            <Table.Thead>
+                                <tr>
+                                    <Table.Th>Gudang</Table.Th>
+                                    <Table.Th>Item</Table.Th>
+                                    <Table.Th>Batch</Table.Th>
+                                    <Table.Th>Tanggal Expired</Table.Th>
+                                    <Table.Th className="text-right">On Hand</Table.Th>
+                                    <Table.Th>Status</Table.Th>
+                                </tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                                {expired_alerts.length ? expired_alerts.map((row, index) => (
+                                    <tr key={`${row.warehouse}-${index}`} className="hover:bg-gray-100 dark:hover:bg-gray-900">
+                                        <Table.Td>{row.warehouse}</Table.Td>
+                                        <Table.Td>{row.item}</Table.Td>
+                                        <Table.Td>{row.batch_no}</Table.Td>
+                                        <Table.Td>{row.expired_date}</Table.Td>
+                                        <Table.Td className="text-right">{numberFormatter.format(row.on_hand_qty)}</Table.Td>
+                                        <Table.Td>
+                                            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${row.status === 'EXPIRED' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200' : row.status === 'KRITIS' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-200' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200'}`}>
+                                                {row.status} ({row.days_left} hari)
+                                            </span>
+                                        </Table.Td>
+                                    </tr>
+                                )) : (
+                                    <Table.Empty colSpan={6} message="Tidak ada batch expired / mendekati expired." />
                                 )}
                             </Table.Tbody>
                         </Table>

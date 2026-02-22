@@ -126,3 +126,39 @@ it('returns minimum stock alerts', function () {
         ->assertOk()
         ->assertJsonStructure(['data', 'links', 'meta']);
 });
+
+it('returns expired tracking alerts with severity status', function () {
+    DB::table('items')->where('id', $this->itemId)->update([
+        'track_expired' => true,
+        'updated_at' => now(),
+    ]);
+
+    $batchId = DB::table('item_batches')->insertGetId([
+        'item_id' => $this->itemId,
+        'batch_no' => 'BATCH-EXP-01',
+        'expired_date' => now()->subDay()->toDateString(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('stock_balances')->where([
+        'warehouse_id' => $this->warehouseId,
+        'item_id' => $this->itemId,
+        'batch_id' => null,
+    ])->delete();
+
+    DB::table('stock_balances')->insert([
+        'warehouse_id' => $this->warehouseId,
+        'item_id' => $this->itemId,
+        'batch_id' => $batchId,
+        'on_hand_base' => 6,
+        'reserved_base' => 0,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    getJson(route('apps.reports.inventory.expired-soon', ['days' => 30]))
+        ->assertOk()
+        ->assertJsonPath('data.0.batch_no', 'BATCH-EXP-01')
+        ->assertJsonPath('data.0.status', 'EXPIRED');
+});

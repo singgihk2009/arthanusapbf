@@ -42,6 +42,22 @@ class DashboardController extends Controller implements HasMiddleware
                 ->havingRaw('COALESCE(SUM(sb.on_hand_base), 0) <= wis.min_stock_base')
                 ->get()
                 ->count(),
+            'expired_batch_count' => DB::table('stock_balances as sb')
+                ->join('item_batches as b', 'b.id', '=', 'sb.batch_id')
+                ->join('items as i', 'i.id', '=', 'sb.item_id')
+                ->where('sb.on_hand_base', '>', 0)
+                ->where('i.track_expired', true)
+                ->whereNotNull('b.expired_date')
+                ->whereDate('b.expired_date', '<', $today)
+                ->count(),
+            'expired_soon_count' => DB::table('stock_balances as sb')
+                ->join('item_batches as b', 'b.id', '=', 'sb.batch_id')
+                ->join('items as i', 'i.id', '=', 'sb.item_id')
+                ->where('sb.on_hand_base', '>', 0)
+                ->where('i.track_expired', true)
+                ->whereNotNull('b.expired_date')
+                ->whereBetween('b.expired_date', [$today, now()->addDays(30)->toDateString()])
+                ->count(),
         ];
 
         $inboundToday = (float) DB::table('stock_ledgers')
@@ -89,6 +105,29 @@ class DashboardController extends Controller implements HasMiddleware
             ])
             ->values();
 
+        $expiredAlerts = DB::table('stock_balances as sb')
+            ->join('item_batches as b', 'b.id', '=', 'sb.batch_id')
+            ->join('items as i', 'i.id', '=', 'sb.item_id')
+            ->join('warehouses as w', 'w.id', '=', 'sb.warehouse_id')
+            ->where('sb.on_hand_base', '>', 0)
+            ->where('i.track_expired', true)
+            ->whereNotNull('b.expired_date')
+            ->whereDate('b.expired_date', '<=', now()->addDays(30)->toDateString())
+            ->selectRaw('w.code as warehouse_code, i.sku, i.name as item_name, b.batch_no, b.expired_date, sb.on_hand_base, DATEDIFF(b.expired_date, CURDATE()) as days_left')
+            ->orderBy('b.expired_date')
+            ->limit(8)
+            ->get()
+            ->map(fn ($row) => [
+                'warehouse' => $row->warehouse_code,
+                'item' => $row->sku.' - '.$row->item_name,
+                'batch_no' => $row->batch_no,
+                'expired_date' => $row->expired_date,
+                'on_hand_qty' => (float) $row->on_hand_base,
+                'days_left' => (int) $row->days_left,
+                'status' => (int) $row->days_left < 0 ? 'EXPIRED' : ((int) $row->days_left <= 7 ? 'KRITIS' : 'PERINGATAN'),
+            ])
+            ->values();
+
         $movementTrend = collect(range(5, 0))
             ->map(function (int $monthsAgo) {
                 $start = Carbon::now()->subMonths($monthsAgo)->startOfMonth();
@@ -126,6 +165,7 @@ class DashboardController extends Controller implements HasMiddleware
             ],
             'stock_by_warehouse' => $stockByWarehouse,
             'low_stock_items' => $lowStockItems,
+            'expired_alerts' => $expiredAlerts,
             'movement_trend' => $movementTrend,
         ]);
     }
