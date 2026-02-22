@@ -208,7 +208,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw('COALESCE(uoms.code, uoms.name) as uom_name'),
                 DB::raw('COALESCE(receiving_entry_lines.price, 0) as unit_price'),
                 DB::raw('ABS(receiving_entry_lines.qty) as qty'),
-                DB::raw('ABS(receiving_entry_lines.qty * COALESCE(receiving_entry_lines.price, 0)) as value'),
+                DB::raw('ABS(COALESCE(receiving_entry_lines.value, receiving_entry_lines.qty * COALESCE(receiving_entry_lines.price, 0))) as value'),
                 DB::raw("COALESCE(receiving_entries.status, 'DRAFT') as status"),
                 DB::raw("COALESCE(receiving_entries.vendor_name, '-') as vendor_name"),
             ])
