@@ -36,7 +36,7 @@ class ReceivingEntryController extends Controller
     public function create(): Response
     {
         return Inertia::render('Apps/Inbound/Receiving/Create', [
-            'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
+            'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
             'transactionCodes' => ['PEMBELIAN', 'RETUR', 'ADJUSTMENT'],
@@ -93,7 +93,7 @@ class ReceivingEntryController extends Controller
                 'notes' => (string) ($entry->notes ?? ''),
             ],
             'lines' => $lines,
-            'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
+            'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
             'transactionCodes' => ['PEMBELIAN', 'RETUR', 'ADJUSTMENT'],

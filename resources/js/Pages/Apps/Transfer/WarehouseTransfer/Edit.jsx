@@ -1,6 +1,6 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head, usePage } from '@inertiajs/react';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 const emptyLine = { item_id: '', qty_requested: '', uom_id: '' };
 const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
@@ -19,11 +19,19 @@ export default function Edit() {
     const [message, setMessage] = useState(null);
     const [loading, setLoading] = useState(false);
 
+    const defaultUomByItemId = useMemo(() => new Map(items.map((item) => [String(item.id), String(item.base_uom_id ?? '')])), [items]);
+
     const updateHeader = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
     const addLine = () => setForm((prev) => ({ ...prev, lines: [...prev.lines, { ...emptyLine }] }));
     const updateLine = (index, field, value) => setForm((prev) => {
         const updatedLines = [...prev.lines];
-        updatedLines[index] = { ...updatedLines[index], [field]: value };
+        const updatedLine = { ...updatedLines[index], [field]: value };
+
+        if (field === 'item_id') {
+            updatedLine.uom_id = defaultUomByItemId.get(String(value)) ?? '';
+        }
+
+        updatedLines[index] = updatedLine;
 
         return { ...prev, lines: updatedLines };
     });
