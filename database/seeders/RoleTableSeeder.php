@@ -20,6 +20,7 @@ class RoleTableSeeder extends Seeder
             'inventory-master-access' => 'master-%',
             'inventory-reports-access' => 'report-%',
             'inventory-posting-access' => 'inventory-posting-%',
+            'integration-access' => 'integration-%',
         ];
 
         foreach ($groups as $roleName => $likePattern) {

@@ -70,6 +70,11 @@ class PermissionTableSeeder extends Seeder
             'inventory-posting-usage',
             'inventory-posting-adjustment',
             'inventory-posting-opening-balance',
+
+            // integration permissions
+            'integration-access',
+            'integration-outbox-read',
+            'integration-outbox-retry',
         ];
 
         foreach ($permissions as $permission) {

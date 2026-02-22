@@ -102,6 +102,8 @@ class InternalUsageController extends Controller
             $entry = DB::table('internal_usages')->where('id', $internalUsage)->first();
             abort_if(! $entry, 404);
             abort_if($entry->status === 'POSTED', 422, 'Dokumen POSTED tidak dapat diubah.');
+            $linked = DB::table('inv_transactions')->where('source_table', 'internal_usages')->where('source_id', $entry->id)->exists();
+            abort_if($linked, 422, 'Dokumen sudah terikat GL, gunakan reversal/adjustment.');
 
             DB::table('internal_usages')->where('id', $internalUsage)->update([
                 'warehouse_id' => $validated['warehouse_id'],
@@ -124,6 +126,8 @@ class InternalUsageController extends Controller
             $entry = DB::table('internal_usages')->where('id', $internalUsage)->first();
             abort_if(! $entry, 404);
             abort_if($entry->status === 'POSTED', 422, 'Dokumen POSTED tidak dapat dihapus.');
+            $linked = DB::table('inv_transactions')->where('source_table', 'internal_usages')->where('source_id', $entry->id)->exists();
+            abort_if($linked, 422, 'Dokumen sudah terikat GL, gunakan reversal/adjustment.');
 
             DB::table('internal_usage_lines')->where('internal_usage_id', $internalUsage)->delete();
             DB::table('internal_usages')->where('id', $internalUsage)->delete();
