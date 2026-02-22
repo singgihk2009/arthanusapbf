@@ -212,17 +212,17 @@ export default function Menu() {
                     permissions: true,
                     subdetails: [
                         {
-                            title: 'Stock Balance',
-                            href: '/apps/reports/inventory?type=stock-balance',
+                            title: 'Barang Masuk',
+                            href: '/apps/reports/inventory?type=incoming-items',
                             icon: <IconStack2 size={20} strokeWidth={1.5} />,
-                            active: url.startsWith('/apps/reports/inventory') && url.includes('stock-balance'),
+                            active: url.startsWith('/apps/reports/inventory') && url.includes('incoming-items'),
                             permissions: true,
                         },
                         {
-                            title: 'Kartu Stok',
-                            href: '/apps/reports/inventory?type=stock-card',
+                            title: 'Pemakaian Barang',
+                            href: '/apps/reports/inventory?type=item-usage',
                             icon: <IconArrowsExchange size={20} strokeWidth={1.5} />,
-                            active: url.startsWith('/apps/reports/inventory') && url.includes('stock-card'),
+                            active: url.startsWith('/apps/reports/inventory') && url.includes('item-usage'),
                             permissions: true,
                         },
                     ],
