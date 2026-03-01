@@ -639,6 +639,11 @@ class InventoryPostingController extends Controller implements HasMiddleware
             return (float) $balance->avg_cost;
         }
 
+        $replayed = $this->replayAverageCostFromLedgers($warehouseId, $itemId);
+        if ($replayed > 0) {
+            return $replayed;
+        }
+
         $fallback = DB::table('stock_ledgers')->where('warehouse_id', $warehouseId)->where('item_id', $itemId)->whereNotNull('unit_cost')->orderByDesc('id')->value('unit_cost');
 
         return (float) ($fallback ?? 0);
@@ -656,9 +661,55 @@ class InventoryPostingController extends Controller implements HasMiddleware
             return (float) $invBatch->unit_cost;
         }
 
+        $replayed = $this->replayAverageCostFromLedgers($warehouseId, $itemId, $batchId);
+        if ($replayed > 0) {
+            return $replayed;
+        }
+
         $fallback = DB::table('stock_ledgers')->where('warehouse_id', $warehouseId)->where('item_id', $itemId)->where('batch_id', $batchId)->whereNotNull('unit_cost')->orderByDesc('id')->value('unit_cost');
 
         return (float) ($fallback ?? 0);
+    }
+
+    private function replayAverageCostFromLedgers(int $warehouseId, int $itemId, ?int $batchId = null): float
+    {
+        $ledgers = DB::table('stock_ledgers')
+            ->where('warehouse_id', $warehouseId)
+            ->where('item_id', $itemId)
+            ->when($batchId, fn ($query, $value) => $query->where('batch_id', $value))
+            ->orderBy('trx_datetime')
+            ->orderBy('id')
+            ->get(['qty_base', 'unit_cost']);
+
+        if ($ledgers->isEmpty()) {
+            return 0;
+        }
+
+        $onHand = 0.0;
+        $stockValue = 0.0;
+
+        foreach ($ledgers as $row) {
+            $qtyDelta = (float) $row->qty_base;
+            $inputCost = (float) ($row->unit_cost ?? 0);
+            $runningAvg = $onHand > 0 ? ($stockValue / $onHand) : 0.0;
+
+            if ($qtyDelta > 0) {
+                $effectiveCost = $inputCost > 0 ? $inputCost : $runningAvg;
+                $onHand += $qtyDelta;
+                $stockValue += ($qtyDelta * $effectiveCost);
+
+                continue;
+            }
+
+            if ($qtyDelta < 0) {
+                $issuedQty = abs($qtyDelta);
+                $effectiveCost = $inputCost > 0 ? $inputCost : $runningAvg;
+                $onHand = max(0, $onHand - $issuedQty);
+                $stockValue = max(0, $stockValue - ($issuedQty * $effectiveCost));
+            }
+        }
+
+        return $onHand > 0 ? ($stockValue / $onHand) : 0;
     }
 
     private function parseImportRows(UploadedFile $file): Collection
