@@ -364,14 +364,17 @@ class InventoryReportPageController extends Controller implements HasMiddleware
 
     private function itemUsageQuery(array $filters)
     {
+        $unitPriceSortExpression = DB::raw('ABS(COALESCE(stock_ledgers.unit_cost, 0) * (stock_ledgers.qty_base / NULLIF(stock_ledgers.qty_input, 0)))');
+        $valueSortExpression = DB::raw('ABS(stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0))');
+
         $sortable = [
             'trx_datetime' => 'stock_ledgers.trx_datetime',
             'warehouse' => 'warehouses.name',
             'item' => 'items.name',
             'category' => 'categories.name',
             'qty' => DB::raw('ABS(stock_ledgers.qty_input)'),
-            'value' => DB::raw('ABS(stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0))'),
-            'unit_price' => DB::raw('COALESCE(stock_ledgers.unit_cost, 0)'),
+            'value' => $valueSortExpression,
+            'unit_price' => $unitPriceSortExpression,
         ];
 
         $sortColumn = $sortable[$filters['sort_by']] ?? $sortable['trx_datetime'];
@@ -404,9 +407,9 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw("COALESCE(uoms.code, uoms.name) as uom_name"),
                 DB::raw("DATE_FORMAT(stock_ledgers.trx_datetime, '%Y-%m-%d %H:%i:%s') as trx_datetime"),
                 DB::raw("CONCAT(stock_ledgers.trx_type, '-', stock_ledgers.trx_id) as reference"),
-                DB::raw('COALESCE(stock_ledgers.unit_cost, 0) as unit_price'),
+                DB::raw('ABS(COALESCE(stock_ledgers.unit_cost, 0) * (stock_ledgers.qty_base / NULLIF(stock_ledgers.qty_input, 0))) as unit_price'),
                 DB::raw('ABS(stock_ledgers.qty_input) as qty'),
-                DB::raw('ABS(stock_ledgers.qty_input * COALESCE(stock_ledgers.unit_cost, 0)) as value'),
+                DB::raw('ABS(stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0)) as value'),
                 DB::raw("'-' as status"),
                 DB::raw("'-' as vendor_name"),
             ])
