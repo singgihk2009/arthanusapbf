@@ -16,6 +16,7 @@ class InternalUsageRequest extends FormRequest
         return [
             'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
             'document_date' => ['required', 'date'],
+            'transaction_code' => ['required', 'string', 'in:PENJUALAN,RETUR,DAMAGED,SAMPLE,INTERNAL_USE'],
             'department' => ['nullable', 'string', 'max:100'],
             'cost_center' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],

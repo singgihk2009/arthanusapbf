@@ -7,7 +7,7 @@ export default function Index() {
     const [processingId, setProcessingId] = useState(null);
 
     const handleDelete = async (id) => {
-        if (!window.confirm('Yakin hapus internal usage ini?')) {
+        if (!window.confirm('Yakin hapus dispatch ini?')) {
             return;
         }
 
@@ -50,7 +50,7 @@ export default function Index() {
 
     return (
         <>
-            <Head title="Internal Usage" />
+            <Head title="Dispatch" />
 
             <div className="space-y-4">
                 {flash?.success && <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">{flash.success}</div>}
@@ -58,10 +58,10 @@ export default function Index() {
                 <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-900 dark:bg-gray-950">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                         <div>
-                            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Internal Usage</h2>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">List dokumen pemakaian inventory keluar untuk kebutuhan internal.</p>
+                            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Dispatch</h2>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">List dokumen pengeluaran inventory untuk kebutuhan dispatch.</p>
                         </div>
-                        <Link href={route('apps.outbound.internal-usage.create')} className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white dark:bg-gray-100 dark:text-gray-900">Add Internal Usage</Link>
+                        <Link href={route('apps.outbound.internal-usage.create')} className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white dark:bg-gray-100 dark:text-gray-900">Add Dispatch</Link>
                     </div>
 
                     <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
@@ -79,7 +79,7 @@ export default function Index() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                {entries.data.length === 0 && <tr><td colSpan={8} className="px-3 py-4 text-center text-gray-500">Belum ada data internal usage.</td></tr>}
+                                {entries.data.length === 0 && <tr><td colSpan={8} className="px-3 py-4 text-center text-gray-500">Belum ada data dispatch.</td></tr>}
                                 {entries.data.map((entry, idx) => (
                                     <tr key={entry.id} className="text-gray-800 dark:text-gray-100">
                                         <td className="px-3 py-2">{entries.from ? entries.from + idx : idx + 1}</td>

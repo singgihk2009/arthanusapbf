@@ -7,7 +7,7 @@ const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 p
 const lineInputClassName = 'rounded border border-gray-300 bg-white px-2 py-1 text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 
 export default function Edit() {
-    const { entry, lines, items, uoms, warehouses, batches } = usePage().props;
+    const { entry, lines, items, uoms, warehouses, batches, transactionCodes } = usePage().props;
     const [form, setForm] = useState({ ...entry, lines: lines.length ? lines : [{ ...emptyLine }] });
     const [errors, setErrors] = useState({});
     const [message, setMessage] = useState(null);
@@ -44,13 +44,13 @@ export default function Edit() {
 
         try {
             await window.axios.put(route('apps.outbound.internal-usage.update', entry.id), form);
-            setMessage({ type: 'success', text: 'Internal usage berhasil diperbarui.' });
+            setMessage({ type: 'success', text: 'Dispatch berhasil diperbarui.' });
         } catch (error) {
             if (error.response?.status === 422) {
                 setErrors(error.response.data.errors ?? {});
                 setMessage({ type: 'error', text: error.response?.data?.message ?? 'Validasi gagal. Cek field yang ditandai.' });
             } else {
-                setMessage({ type: 'error', text: 'Gagal memperbarui internal usage.' });
+                setMessage({ type: 'error', text: 'Gagal memperbarui dispatch.' });
             }
         } finally {
             setLoading(false);
@@ -59,17 +59,18 @@ export default function Edit() {
 
     return (
         <>
-            <Head title="Edit Internal Usage" />
+            <Head title="Edit Dispatch" />
 
             <div className="space-y-4">
                 <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-900 dark:bg-gray-950">
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Edit Internal Usage ({entry.status})</h2>
-                    <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Perbarui pemakaian inventory internal.</p>
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Form Dispatch ({entry.status})</h2>
+                    <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Perbarui dokumen dispatch inventory.</p>
 
                     <form onSubmit={submit} className="space-y-4">
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Warehouse</label><select value={form.warehouse_id} onChange={(e) => updateHeader('warehouse_id', e.target.value)} className={inputClassName}><option value="">Pilih Warehouse</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} - {warehouse.name}</option>)}</select></div>
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Tanggal Dokumen</label><input type="date" value={form.document_date} onChange={(e) => updateHeader('document_date', e.target.value)} className={inputClassName} /></div>
+                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Kode Transaksi</label><select value={form.transaction_code} onChange={(e) => updateHeader('transaction_code', e.target.value)} className={inputClassName}><option value="">Pilih Kode Transaksi</option>{transactionCodes.map((transactionCode) => <option key={transactionCode.value} value={transactionCode.value}>{transactionCode.label}</option>)}</select>{errors.transaction_code && <p className="mt-1 text-xs text-red-500">{errors.transaction_code[0]}</p>}</div>
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Department</label><input value={form.department} onChange={(e) => updateHeader('department', e.target.value)} className={inputClassName} /></div>
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Cost Center</label><input value={form.cost_center} onChange={(e) => updateHeader('cost_center', e.target.value)} className={inputClassName} /></div>
                             <div className="md:col-span-2"><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Keterangan</label><input value={form.notes} onChange={(e) => updateHeader('notes', e.target.value)} className={inputClassName} /></div>
@@ -97,7 +98,7 @@ export default function Edit() {
                             <button type="button" onClick={addLine} className="rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:text-gray-100">+ Tambah Line</button>
                         </div>
 
-                        <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">{loading ? 'Menyimpan...' : 'Update Internal Usage'}</button>
+                        <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">{loading ? 'Menyimpan...' : 'Update Dispatch'}</button>
                     </form>
                 </div>
 
