@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 
 use function Pest\Laravel\actingAs;
+use function Pest\Laravel\delete;
 use function Pest\Laravel\get;
 use function Pest\Laravel\post;
 use function Pest\Laravel\postJson;
@@ -193,6 +194,38 @@ it('posts receiving entry and increases stock balance', function () {
     expect(collect($rows)->contains(fn (array $row) => (int) $row['warehouse_id'] === $this->warehouseId
         && (int) $row['item_id'] === $this->itemId
         && (float) $row['on_hand_base'] === 5.0))->toBeTrue();
+});
+
+it('removes stock ledger history after receiving is unposted then deleted', function () {
+    post(route('apps.inbound.receiving.store'), [
+        'warehouse_id' => $this->warehouseId,
+        'transaction_date' => now()->format('Y-m-d'),
+        'transaction_code' => 'PEMBELIAN',
+        'reference' => 'PO-DEL-01',
+        'vendor_name' => 'Vendor Delete',
+        'lines' => [[
+            'item_id' => $this->itemId,
+            'qty' => 4,
+            'uom_id' => $this->uomId,
+            'price' => 5000,
+        ]],
+    ])->assertRedirect();
+
+    $entryId = DB::table('receiving_entries')->value('id');
+
+    postJson(route('apps.inventory.posting.receiving', $entryId))->assertOk();
+    postJson(route('apps.inventory.unposting.receiving', $entryId))->assertOk();
+
+    expect(DB::table('stock_ledgers')->where('trx_type', 'RCV_IN')->where('trx_id', $entryId)->count())
+        ->toBeGreaterThan(0);
+
+    delete(route('apps.inbound.receiving.destroy', $entryId))
+        ->assertRedirect();
+
+    expect(DB::table('stock_ledgers')->where('trx_type', 'RCV_IN')->where('trx_id', $entryId)->count())
+        ->toBe(0)
+        ->and(DB::table('receiving_entries')->where('id', $entryId)->exists())
+        ->toBeFalse();
 });
 
 it('normalizes receiving unit cost to base uom when posting with converted uom', function () {
