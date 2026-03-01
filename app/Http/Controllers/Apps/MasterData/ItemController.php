@@ -128,6 +128,14 @@ class ItemController extends Controller implements HasMiddleware
         ]);
 
         $rows = $this->parseImportRows($request->file('file'));
+        $requiredHeaders = ['sku', 'name', 'base_uom_code'];
+
+        if ($rows->isNotEmpty() && ! $this->hasRequiredHeaders($rows->first(), $requiredHeaders)) {
+            return response()->json([
+                'message' => 'Format header file import tidak valid. Gunakan template agar kolom sesuai: '.implode(', ', $requiredHeaders).'.',
+            ], 422);
+        }
+
         $errors = [];
         $inserted = 0;
         $updated = 0;
@@ -490,6 +498,22 @@ class ItemController extends Controller implements HasMiddleware
     {
         foreach ($row as $value) {
             if (trim((string) $value) !== '') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function hasRequiredHeaders(array $row, array $requiredHeaders): bool
+    {
+        $headers = array_map(
+            fn ($header) => strtolower(trim((string) $header)),
+            array_keys($row)
+        );
+
+        foreach ($requiredHeaders as $requiredHeader) {
+            if (! in_array(strtolower($requiredHeader), $headers, true)) {
                 return false;
             }
         }
