@@ -77,9 +77,12 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     // inventory posting actions
     Route::post('/inventory/posting/grn/{goodsReceipt}', [InventoryPostingController::class, 'postGoodsReceipt'])->name('inventory.posting.grn');
     Route::post('/inventory/posting/receiving/{receivingEntry}', [InventoryPostingController::class, 'postReceivingEntry'])->name('inventory.posting.receiving');
+    Route::post('/inventory/unposting/receiving/{receivingEntry}', [InventoryPostingController::class, 'unpostReceivingEntry'])->name('inventory.unposting.receiving');
     Route::post('/inventory/posting/transfer/{transferId}', [InventoryPostingController::class, 'postTransfer'])->name('inventory.posting.transfer');
+    Route::post('/inventory/unposting/transfer/{transferId}', [InventoryPostingController::class, 'unpostTransfer'])->name('inventory.unposting.transfer');
     Route::post('/inventory/posting/sale/{saleId}', [InventoryPostingController::class, 'postSale'])->name('inventory.posting.sale');
     Route::post('/inventory/posting/usage/{usageId}', [InventoryPostingController::class, 'postInternalUsage'])->name('inventory.posting.usage');
+    Route::post('/inventory/unposting/usage/{usageId}', [InventoryPostingController::class, 'unpostInternalUsage'])->name('inventory.unposting.usage');
     Route::post('/inventory/posting/adjustment/{adjustmentId}', [InventoryPostingController::class, 'postStockAdjustment'])->name('inventory.posting.adjustment');
     Route::post('/inventory/posting/opname/{stockOpname}', [StockOpnameController::class, 'post'])->name('inventory.posting.opname');
     Route::post('/inventory/posting/opening-balance', [InventoryPostingController::class, 'postOpeningBalance'])->name('inventory.posting.opening-balance');

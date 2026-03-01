@@ -34,6 +34,20 @@ export default function Index() {
         }
     };
 
+    const handleUnpost = async (id) => {
+        if (!window.confirm('Batalkan posting dokumen ini? Stok akan dikembalikan.')) {
+            return;
+        }
+
+        setProcessingId(id);
+        try {
+            await window.axios.post(route('apps.inventory.unposting.transfer', id));
+            window.location.reload();
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
     return (
         <>
             <Head title="Transfer Antar Gudang" />
@@ -77,6 +91,7 @@ export default function Index() {
                                             <div className="flex justify-center gap-2">
                                                 <Link href={route('apps.transfer.warehouse.edit', entry.id)} className="rounded border border-gray-300 px-2 py-1 text-xs">Edit</Link>
                                                 {entry.status !== 'RECEIVED' && <button type="button" onClick={() => handlePost(entry.id)} disabled={processingId === entry.id} className="rounded border border-blue-300 px-2 py-1 text-xs text-blue-700 disabled:opacity-50">Post</button>}
+                                                {entry.status === 'RECEIVED' && <button type="button" onClick={() => handleUnpost(entry.id)} disabled={processingId === entry.id} className="rounded border border-amber-300 px-2 py-1 text-xs text-amber-700 disabled:opacity-50">Unpost</button>}
                                                 <button type="button" onClick={() => handleDelete(entry.id)} disabled={processingId === entry.id} className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 disabled:opacity-50">Hapus</button>
                                             </div>
                                         </td>

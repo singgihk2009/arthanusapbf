@@ -32,10 +32,10 @@ class InventoryPostingController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:inventory-posting-grn', only: ['postGoodsReceipt', 'postReceivingEntry']),
-            new Middleware('permission:inventory-posting-transfer', only: ['postTransfer']),
+            new Middleware('permission:inventory-posting-grn', only: ['postGoodsReceipt', 'postReceivingEntry', 'unpostReceivingEntry']),
+            new Middleware('permission:inventory-posting-transfer', only: ['postTransfer', 'unpostTransfer']),
             new Middleware('permission:inventory-posting-sale', only: ['postSale']),
-            new Middleware('permission:inventory-posting-usage', only: ['postInternalUsage']),
+            new Middleware('permission:inventory-posting-usage', only: ['postInternalUsage', 'unpostInternalUsage']),
             new Middleware('permission:inventory-posting-adjustment', only: ['postStockAdjustment']),
             new Middleware('permission:inventory-posting-opening-balance', only: ['openingBalancePage', 'postOpeningBalance', 'importOpeningBalance', 'downloadOpeningBalanceTemplateCsv', 'downloadOpeningBalanceTemplateExcel']),
         ];
@@ -268,6 +268,24 @@ class InventoryPostingController extends Controller implements HasMiddleware
         return response()->json(['message' => 'Receiving entry posted', 'id' => $receivingEntry]);
     }
 
+    public function unpostReceivingEntry(Request $request, int $receivingEntry): JsonResponse
+    {
+        $header = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
+        abort_unless($header, 404, 'Receiving entry not found');
+        abort_if(($header->status ?? null) !== 'POSTED', 422, 'Receiving entry belum diposting');
+
+        $this->createReversalStockLedgers(['RCV_IN'], $receivingEntry, $request->user()?->id);
+
+        DB::table('receiving_entries')->where('id', $receivingEntry)->update($this->filterColumns('receiving_entries', [
+            'status' => 'DRAFT',
+            'posted_at' => null,
+            'posted_by' => null,
+            'updated_at' => now(),
+        ]));
+
+        return response()->json(['message' => 'Receiving entry unposted', 'id' => $receivingEntry]);
+    }
+
     public function postTransfer(Request $request, int $transferId): JsonResponse
     {
         $header = DB::table('warehouse_transfers')->where('id', $transferId)->first();
@@ -319,6 +337,23 @@ class InventoryPostingController extends Controller implements HasMiddleware
         ]);
 
         return response()->json(['message' => 'Transfer posted', 'id' => $transferId]);
+    }
+
+    public function unpostTransfer(Request $request, int $transferId): JsonResponse
+    {
+        $header = DB::table('warehouse_transfers')->where('id', $transferId)->first();
+        abort_unless($header, 404, 'Transfer not found');
+        abort_if($header->status !== 'RECEIVED', 422, 'Transfer belum diposting');
+
+        $this->createReversalStockLedgers(['TRANSFER_OUT', 'TRANSFER_IN'], $transferId, $request->user()?->id);
+
+        DB::table('warehouse_transfers')->where('id', $transferId)->update($this->filterColumns('warehouse_transfers', [
+            'status' => 'DRAFT',
+            'received_at' => null,
+            'updated_at' => now(),
+        ]));
+
+        return response()->json(['message' => 'Transfer unposted', 'id' => $transferId]);
     }
 
     public function postSale(Request $request, int $saleId): JsonResponse
@@ -427,6 +462,40 @@ class InventoryPostingController extends Controller implements HasMiddleware
         $this->createIntegrationSnapshotForInternalUsage($usageId, $request->user()?->id);
 
         return response()->json(['message' => 'Internal usage posted', 'id' => $usageId]);
+    }
+
+    public function unpostInternalUsage(Request $request, int $usageId): JsonResponse
+    {
+        $header = DB::table('internal_usages')->where('id', $usageId)->first();
+        abort_unless($header, 404, 'Internal usage not found');
+        abort_if($header->status !== 'POSTED', 422, 'Internal usage belum diposting');
+
+        $integrationTransaction = DB::table('inv_transactions')
+            ->where('source_table', 'internal_usages')
+            ->where('source_id', $usageId)
+            ->first();
+
+        if ($integrationTransaction) {
+            abort_if($integrationTransaction->gl_status === 'posted', 422, 'Dokumen sudah diposting ke Finance Hub, gunakan reversal.');
+
+            DB::table('integration_outbox')
+                ->where('aggregate_type', 'inv_transaction')
+                ->where('aggregate_id', $integrationTransaction->id)
+                ->delete();
+
+            DB::table('inv_transactions')->where('id', $integrationTransaction->id)->delete();
+        }
+
+        $this->createReversalStockLedgers(['USAGE_OUT'], $usageId, $request->user()?->id);
+
+        DB::table('internal_usages')->where('id', $usageId)->update($this->filterColumns('internal_usages', [
+            'status' => 'DRAFT',
+            'posted_at' => null,
+            'posted_by' => null,
+            'updated_at' => now(),
+        ]));
+
+        return response()->json(['message' => 'Internal usage unposted', 'id' => $usageId]);
     }
 
     public function postStockAdjustment(Request $request, int $adjustmentId): JsonResponse
@@ -924,5 +993,32 @@ class InventoryPostingController extends Controller implements HasMiddleware
             fn (string $column): bool => isset($validColumns[$column]),
             ARRAY_FILTER_USE_KEY,
         );
+    }
+
+    private function createReversalStockLedgers(array $trxTypes, int $trxId, ?int $userId): void
+    {
+        $ledgers = DB::table('stock_ledgers')
+            ->whereIn('trx_type', $trxTypes)
+            ->where('trx_id', $trxId)
+            ->orderBy('id')
+            ->get();
+
+        abort_if($ledgers->isEmpty(), 422, 'Data stock ledger tidak ditemukan untuk unpost.');
+
+        foreach ($ledgers as $ledger) {
+            $this->stockService->postMutation([
+                'trx_type' => (string) $ledger->trx_type,
+                'trx_id' => (int) $ledger->trx_id,
+                'trx_line_id' => $ledger->trx_line_id,
+                'warehouse_id' => (int) $ledger->warehouse_id,
+                'item_id' => (int) $ledger->item_id,
+                'batch_id' => $ledger->batch_id ? (int) $ledger->batch_id : null,
+                'qty_base' => -1 * (float) $ledger->qty_base,
+                'uom_id' => (int) $ledger->uom_id,
+                'qty_input' => (float) $ledger->qty_input,
+                'unit_cost' => $ledger->unit_cost !== null ? (float) $ledger->unit_cost : null,
+                'created_by' => $userId,
+            ]);
+        }
     }
 }
