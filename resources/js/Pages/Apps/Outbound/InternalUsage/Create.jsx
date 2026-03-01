@@ -11,7 +11,7 @@ export default function Create() {
     const [form, setForm] = useState({
         warehouse_id: '',
         document_date: new Date().toISOString().slice(0, 10),
-        transaction_code: '',
+        transaction_code: 'PENJUALAN',
         department: '',
         cost_center: '',
         notes: '',
@@ -51,13 +51,21 @@ export default function Create() {
         setErrors({});
         setMessage(null);
 
+        if (!form.transaction_code) {
+            setErrors((prev) => ({ ...prev, transaction_code: ['Kode transaksi wajib dipilih.'] }));
+            setMessage({ type: 'error', text: 'Kode transaksi tidak boleh kosong.' });
+            setLoading(false);
+
+            return;
+        }
+
         try {
             await window.axios.post(route('apps.outbound.internal-usage.store'), form);
             setMessage({ type: 'success', text: 'Dispatch berhasil disimpan.' });
             setForm((prev) => ({
                 ...prev,
                 warehouse_id: '',
-                transaction_code: '',
+                transaction_code: 'PENJUALAN',
                 department: '',
                 cost_center: '',
                 notes: '',
