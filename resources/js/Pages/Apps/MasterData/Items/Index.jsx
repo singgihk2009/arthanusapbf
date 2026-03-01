@@ -4,7 +4,7 @@ import Pagination from '@/Components/Pagination';
 import Table from '@/Components/Table';
 import hasAnyPermission from '@/Utils/Permissions';
 import { Head, router, usePage } from '@inertiajs/react';
-import { IconArrowsSort, IconCirclePlus, IconDatabaseOff, IconDownload, IconPencilCog, IconRefresh, IconTrash } from '@tabler/icons-react';
+import { IconArrowsSort, IconCirclePlus, IconDatabaseOff, IconFileImport, IconPencilCog, IconRefresh, IconTrash } from '@tabler/icons-react';
 import React, { useMemo, useState } from 'react';
 
 const defaultFilters = {
@@ -17,6 +17,9 @@ const defaultFilters = {
 export default function Index() {
     const { items, filters } = usePage().props;
     const [form, setForm] = useState({ ...defaultFilters, ...(filters ?? {}) });
+    const [importFile, setImportFile] = useState(null);
+    const [importing, setImporting] = useState(false);
+    const [importResult, setImportResult] = useState(null);
 
     const queryParams = useMemo(() => {
         const params = {
@@ -78,6 +81,36 @@ export default function Index() {
         return <span className="text-xs font-semibold text-indigo-600">{form.sort_dir === 'asc' ? '▲' : '▼'}</span>;
     };
 
+    const handleImport = async () => {
+        if (!importFile || importing) {
+            return;
+        }
+
+        setImporting(true);
+        setImportResult(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', importFile);
+
+            const response = await window.axios.post(route('apps.master-data.items.import.excel'), formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+
+            setImportResult({ type: 'success', message: response.data?.message ?? 'Import item berhasil.' });
+            setImportFile(null);
+            router.reload({ only: ['items'] });
+        } catch (error) {
+            const data = error?.response?.data;
+            const errorLines = Array.isArray(data?.errors) ? data.errors.map((line) => `Baris ${line.row}: ${line.message}`).join(' | ') : '';
+            setImportResult({ type: 'error', message: data?.message ? `${data.message}${errorLines ? ` (${errorLines})` : ''}` : 'Import gagal.' });
+        } finally {
+            setImporting(false);
+        }
+    };
+
     return (
         <>
             <Head title="Master Item" />
@@ -106,9 +139,26 @@ export default function Index() {
                 <div className="flex items-end gap-2 md:col-span-4">
                     <button type="submit" className="rounded-lg border border-indigo-500 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30">Terapkan</button>
                     <button type="button" onClick={resetFilter} className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900"><IconRefresh size={16} strokeWidth={1.5} />Refresh Filter</button>
-                    <a href={`${route('apps.master-data.items.export.excel')}?${new URLSearchParams(queryParams).toString()}`} className="inline-flex items-center gap-1 rounded-lg border border-emerald-500 px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"><IconDownload size={16} strokeWidth={1.5} />Export Excel</a>
+                    <a href={`${route('apps.master-data.items.export.excel')}?${new URLSearchParams(queryParams).toString()}`} className="inline-flex items-center gap-1 rounded-lg border border-emerald-500 px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"><IconFileImport size={16} strokeWidth={1.5} />Export Excel</a>
                 </div>
             </form>
+
+            <div className="mb-5 grid gap-3 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-900 dark:bg-gray-950 md:grid-cols-12">
+                <div className="md:col-span-4">
+                    <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">Import File (XLSX/CSV)</label>
+                    <input
+                        type="file"
+                        accept=".xlsx,.csv,.txt"
+                        onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                        className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none dark:border-gray-900 dark:bg-gray-950 dark:text-gray-100"
+                    />
+                </div>
+                <div className="flex items-end gap-2 md:col-span-8">
+                    <a href={route('apps.master-data.items.template.excel')} className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">Download Template</a>
+                    <button type="button" onClick={handleImport} disabled={!importFile || importing} className="inline-flex items-center gap-1 rounded-lg border border-indigo-500 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-indigo-950/30"><IconFileImport size={16} strokeWidth={1.5} />{importing ? 'Importing...' : 'Import Item'}</button>
+                    {importResult && <span className={`text-xs ${importResult.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>{importResult.message}</span>}
+                </div>
+            </div>
 
             <div className="mb-5 flex justify-end gap-2">
                 {hasAnyPermission(['master-item-create']) && <Button type="link" href={route('apps.master-data.items.create')} icon={<IconCirclePlus size={20} strokeWidth={1.5} />} variant="gray" label="Tambah" />}

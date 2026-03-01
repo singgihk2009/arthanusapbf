@@ -58,6 +58,8 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::resource('/categories', CategoryController::class);
         Route::resource('/uoms', UomController::class);
         Route::get('/items/export/excel', [ItemController::class, 'exportExcel'])->name('items.export.excel');
+        Route::get('/items/template/excel', [ItemController::class, 'downloadTemplateExcel'])->name('items.template.excel');
+        Route::post('/items/import/excel', [ItemController::class, 'importExcel'])->name('items.import.excel');
         Route::resource('/items', ItemController::class);
         Route::resource('/conversions', ItemUomConversionController::class)->parameters(['conversions' => 'conversion']);
         Route::resource('/barcodes', ItemBarcodeController::class)->parameters(['barcodes' => 'barcode']);
