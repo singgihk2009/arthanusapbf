@@ -594,7 +594,6 @@ class InventoryPostingController extends Controller implements HasMiddleware
             foreach ($itemsPayload as $row) {
                 $row['inv_transaction_id'] = $transaction->id;
                 DB::table('inv_transaction_items')->insert($row);
-                $this->syncCostBalances((int) $row['product_id'], $warehouseId, (string) $row['valuation_method'], (float) $row['qty'], (float) $row['unit_cost_snapshot'], $row['batch_no'], $row['expired_date']);
             }
 
             $payload = [
@@ -660,35 +659,6 @@ class InventoryPostingController extends Controller implements HasMiddleware
         $fallback = DB::table('stock_ledgers')->where('warehouse_id', $warehouseId)->where('item_id', $itemId)->where('batch_id', $batchId)->whereNotNull('unit_cost')->orderByDesc('id')->value('unit_cost');
 
         return (float) ($fallback ?? 0);
-    }
-
-    private function syncCostBalances(int $itemId, int $warehouseId, string $valuationMethod, float $qty, float $unitCost, ?string $batchNo, ?string $expiredDate): void
-    {
-        $balance = DB::table('inv_balances')->where('company_id', 1)->where('warehouse_id', $warehouseId)->where('product_id', $itemId)->first();
-        $onHand = (float) ($balance->on_hand_qty ?? 0);
-        $stockValue = (float) ($balance->stock_value ?? 0);
-
-        $newOnHand = max(0, $onHand - $qty);
-        $newStockValue = max(0, $stockValue - ($qty * $unitCost));
-        $avg = $newOnHand > 0 ? ($newStockValue / $newOnHand) : 0;
-
-        DB::table('inv_balances')->updateOrInsert(
-            ['company_id' => 1, 'warehouse_id' => $warehouseId, 'product_id' => $itemId],
-            ['on_hand_qty' => $newOnHand, 'avg_cost' => $avg, 'stock_value' => $newStockValue, 'updated_at' => now(), 'created_at' => now()]
-        );
-
-        if ($valuationMethod !== 'BATCH' || ! $batchNo) {
-            return;
-        }
-
-        $batch = DB::table('inv_batches')->where('company_id', 1)->where('warehouse_id', $warehouseId)->where('product_id', $itemId)->where('batch_no', $batchNo)->first();
-        $qtyOnHand = max(0, ((float) ($batch->qty_on_hand ?? 0)) - $qty);
-        $value = max(0, ((float) ($batch->stock_value ?? 0)) - ($qty * $unitCost));
-
-        DB::table('inv_batches')->updateOrInsert(
-            ['company_id' => 1, 'warehouse_id' => $warehouseId, 'product_id' => $itemId, 'batch_no' => $batchNo],
-            ['expired_date' => $expiredDate, 'unit_cost' => $unitCost, 'qty_on_hand' => $qtyOnHand, 'stock_value' => $value, 'status' => $qtyOnHand > 0 ? 'active' : 'depleted', 'updated_at' => now(), 'created_at' => now()]
-        );
     }
 
     private function parseImportRows(UploadedFile $file): Collection
