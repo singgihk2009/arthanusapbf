@@ -137,6 +137,11 @@ class InternalUsageController extends Controller
             $linked = DB::table('inv_transactions')->where('source_table', 'internal_usages')->where('source_id', $entry->id)->exists();
             abort_if($linked, 422, 'Dokumen sudah terikat GL, gunakan reversal/adjustment.');
 
+            DB::table('stock_ledgers')
+                ->where('trx_type', 'USAGE_OUT')
+                ->where('trx_id', $internalUsage)
+                ->delete();
+
             DB::table('internal_usage_lines')->where('internal_usage_id', $internalUsage)->delete();
             DB::table('internal_usages')->where('id', $internalUsage)->delete();
         });

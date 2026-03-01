@@ -145,6 +145,11 @@ class ReceivingEntryController extends Controller
             abort_if(! $entry, 404);
             abort_if(($entry->status ?? null) === 'POSTED', 422, 'Dokumen POSTED tidak dapat dihapus.');
 
+            DB::table('stock_ledgers')
+                ->where('trx_type', 'RCV_IN')
+                ->where('trx_id', $receivingEntry)
+                ->delete();
+
             $lineForeignKey = $this->resolveLineForeignKeyColumn();
             DB::table('receiving_entry_lines')->where($lineForeignKey, $receivingEntry)->delete();
             DB::table('receiving_entries')->where('id', $receivingEntry)->delete();

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 
 use function Pest\Laravel\actingAs;
+use function Pest\Laravel\delete;
 use function Pest\Laravel\post;
 use function Pest\Laravel\postJson;
 
@@ -144,4 +145,43 @@ it('posts usage with average valuation when batch number is empty', function () 
         ->and($ledger->batch_id)->toBeNull()
         ->and((float) $ledger->qty_base)->toBe(-30.0)
         ->and((float) $ledger->unit_cost)->toBe(12000.0);
+});
+
+it('removes stock ledger history after internal usage is unposted then deleted', function () {
+    DB::table('inv_balances')->insert([
+        'company_id' => 1,
+        'warehouse_id' => $this->warehouseId,
+        'product_id' => $this->itemId,
+        'avg_cost' => 12000,
+        'on_hand_qty' => 200,
+        'stock_value' => 2400000,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    post(route('apps.outbound.internal-usage.store'), [
+        'warehouse_id' => $this->warehouseId,
+        'document_date' => now()->toDateString(),
+        'lines' => [[
+            'item_id' => $this->itemId,
+            'qty_used' => 2,
+            'uom_id' => $this->uomBoxId,
+        ]],
+    ])->assertRedirect();
+
+    $usageId = DB::table('internal_usages')->value('id');
+
+    postJson(route('apps.inventory.posting.usage', $usageId))->assertOk();
+    postJson(route('apps.inventory.unposting.usage', $usageId))->assertOk();
+
+    expect(DB::table('stock_ledgers')->where('trx_type', 'USAGE_OUT')->where('trx_id', $usageId)->count())
+        ->toBeGreaterThan(0);
+
+    delete(route('apps.outbound.internal-usage.destroy', $usageId))
+        ->assertRedirect();
+
+    expect(DB::table('stock_ledgers')->where('trx_type', 'USAGE_OUT')->where('trx_id', $usageId)->count())
+        ->toBe(0)
+        ->and(DB::table('internal_usages')->where('id', $usageId)->exists())
+        ->toBeFalse();
 });
