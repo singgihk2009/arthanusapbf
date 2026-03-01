@@ -36,6 +36,7 @@ class WarehouseTransferController extends Controller
             'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
+            'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
         ]);
     }
 
@@ -72,6 +73,7 @@ class WarehouseTransferController extends Controller
             ->get()
             ->map(fn (object $line): array => [
                 'item_id' => (string) $line->item_id,
+                'batch_id' => $line->batch_id ? (string) $line->batch_id : '',
                 'qty_requested' => (string) $line->qty_requested,
                 'uom_id' => (string) $line->uom_id,
             ]);
@@ -89,6 +91,7 @@ class WarehouseTransferController extends Controller
             'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
+            'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
         ]);
     }
 
@@ -139,6 +142,7 @@ class WarehouseTransferController extends Controller
             DB::table('warehouse_transfer_lines')->insert([
                 'warehouse_transfer_id' => $entryId,
                 'item_id' => $line['item_id'],
+                'batch_id' => $line['batch_id'] ?? null,
                 'qty_requested' => $qty,
                 'uom_id' => $line['uom_id'],
                 'qty_base' => $qty,
