@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\Apps\Reports;
 
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use ZipArchive;
 
 class InventoryReportPageController extends Controller implements HasMiddleware
@@ -33,7 +34,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         ]);
     }
 
-    public function exportStockBalanceExcel(Request $request): Response
+    public function exportStockBalanceExcel(Request $request): BinaryFileResponse
     {
         $filters = $this->resolveFilters($request);
         $rows = $this->baseQuery($filters)->limit(10000)->get();
@@ -53,6 +54,9 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'Reserved',
                 'Available',
             ]];
+
+            $numberColumns = [4, 5, 6];
+            $dateColumns = [];
         } elseif ($isStockCard) {
             $xlsxRows = [[
                 'Warehouse',
@@ -65,6 +69,9 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'Unit Cost',
                 'Value Movement',
             ]];
+
+            $numberColumns = [5, 6, 7, 8];
+            $dateColumns = [1];
         } else {
             $xlsxRows = [[
                 'Warehouse',
@@ -80,6 +87,9 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 $isIncoming ? 'Value' : 'Valuation Rp',
             ]];
 
+            $numberColumns = [8, 9, 10];
+            $dateColumns = [1];
+
             if ($isIncoming) {
                 $xlsxRows[0][] = 'Status';
                 $xlsxRows[0][] = 'Vendor';
@@ -93,9 +103,9 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                     $row->item_name,
                     $row->category_name,
                     $row->sku,
-                    (string) $row->on_hand,
-                    (string) $row->reserved,
-                    (string) $row->available,
+                    (float) $row->on_hand,
+                    (float) $row->reserved,
+                    (float) $row->available,
                 ];
             } elseif ($isStockCard) {
                 $line = [
@@ -104,10 +114,10 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                     $row->reference,
                     $row->item_name,
                     $row->sku,
-                    (string) $row->qty,
-                    (string) $row->running_balance,
-                    (string) $row->unit_price,
-                    (string) $row->value,
+                    (float) $row->qty,
+                    (float) $row->running_balance,
+                    (float) $row->unit_price,
+                    (float) $row->value,
                 ];
             } else {
                 $line = [
@@ -119,9 +129,9 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                     $row->category_name,
                     $row->sku,
                     $row->uom_name,
-                    (string) $row->unit_price,
-                    (string) $row->qty,
-                    (string) $row->value,
+                    (float) $row->unit_price,
+                    (float) $row->qty,
+                    (float) $row->value,
                 ];
 
                 if ($isIncoming) {
@@ -133,7 +143,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             $xlsxRows[] = $line;
         }
 
-        $this->buildTemplateXlsx($tempPath, $xlsxRows);
+        $this->buildTemplateXlsx($tempPath, $xlsxRows, $numberColumns, $dateColumns);
 
         return response()->download(
             $tempPath,
@@ -425,7 +435,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             ->orderBy('stock_ledgers.id', 'desc');
     }
 
-    private function buildTemplateXlsx(string $path, array $rows): void
+    private function buildTemplateXlsx(string $path, array $rows, array $numberColumns = [], array $dateColumns = []): void
     {
         $zip = new ZipArchive();
         if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
@@ -437,18 +447,52 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             $cellXml = '';
             foreach ($row as $colIndex => $value) {
                 $column = $this->columnLabelFromIndex($colIndex);
+                $coordinate = "{$column}".($rowIndex + 1);
+
+                if ($rowIndex > 0 && in_array($colIndex, $dateColumns, true)) {
+                    $excelDate = $this->toExcelDateValue($value);
+
+                    if ($excelDate !== null) {
+                        $cellXml .= "<c r=\"{$coordinate}\" s=\"1\"><v>{$excelDate}</v></c>";
+
+                        continue;
+                    }
+                }
+
+                if ($rowIndex > 0 && in_array($colIndex, $numberColumns, true) && is_numeric($value)) {
+                    $cellXml .= "<c r=\"{$coordinate}\"><v>".(float) $value."</v></c>";
+
+                    continue;
+                }
+
                 $escaped = htmlspecialchars((string) $value, ENT_XML1);
-                $cellXml .= "<c r=\"{$column}".($rowIndex + 1)."\" t=\"inlineStr\"><is><t>{$escaped}</t></is></c>";
+                $cellXml .= "<c r=\"{$coordinate}\" t=\"inlineStr\"><is><t>{$escaped}</t></is></c>";
             }
             $sheetRows .= "<row r=\"".($rowIndex + 1)."\">{$cellXml}</row>";
         }
 
-        $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+        $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
         $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
         $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Report" sheetId="1" r:id="rId1"/></sheets></workbook>');
-        $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
+        $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+        $zip->addFromString('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd hh:mm:ss"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
         $zip->addFromString('xl/worksheets/sheet1.xml', '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'.$sheetRows.'</sheetData></worksheet>');
         $zip->close();
+    }
+
+    private function toExcelDateValue(mixed $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            $date = Carbon::parse((string) $value);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return ($date->getTimestamp() / 86400) + 25569;
     }
 
     private function columnLabelFromIndex(int $index): string
