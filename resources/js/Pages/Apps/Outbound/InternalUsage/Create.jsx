@@ -7,10 +7,11 @@ const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 p
 const lineInputClassName = 'rounded border border-gray-300 bg-white px-2 py-1 text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 
 export default function Create() {
-    const { items, uoms, warehouses, batches } = usePage().props;
+    const { items, uoms, warehouses, batches, transactionCodes } = usePage().props;
     const [form, setForm] = useState({
         warehouse_id: '',
         document_date: new Date().toISOString().slice(0, 10),
+        transaction_code: '',
         department: '',
         cost_center: '',
         notes: '',
@@ -52,10 +53,11 @@ export default function Create() {
 
         try {
             await window.axios.post(route('apps.outbound.internal-usage.store'), form);
-            setMessage({ type: 'success', text: 'Internal usage berhasil disimpan.' });
+            setMessage({ type: 'success', text: 'Dispatch berhasil disimpan.' });
             setForm((prev) => ({
                 ...prev,
                 warehouse_id: '',
+                transaction_code: '',
                 department: '',
                 cost_center: '',
                 notes: '',
@@ -66,7 +68,7 @@ export default function Create() {
                 setErrors(error.response.data.errors ?? {});
                 setMessage({ type: 'error', text: 'Validasi gagal. Cek field yang ditandai.' });
             } else {
-                setMessage({ type: 'error', text: 'Gagal menyimpan internal usage.' });
+                setMessage({ type: 'error', text: 'Gagal menyimpan dispatch.' });
             }
         } finally {
             setLoading(false);
@@ -75,17 +77,18 @@ export default function Create() {
 
     return (
         <>
-            <Head title="Internal Usage" />
+            <Head title="Dispatch" />
 
             <div className="space-y-4">
                 <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-900 dark:bg-gray-950">
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Internal Usage</h2>
-                    <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Catat pemakaian inventory keluar untuk kebutuhan internal.</p>
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Form Dispatch</h2>
+                    <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Catat pengeluaran inventory untuk kebutuhan dispatch.</p>
 
                     <form onSubmit={submit} className="space-y-4">
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Warehouse</label><select value={form.warehouse_id} onChange={(e) => updateHeader('warehouse_id', e.target.value)} className={inputClassName}><option value="">Pilih Warehouse</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} - {warehouse.name}</option>)}</select>{errors.warehouse_id && <p className="mt-1 text-xs text-red-500">{errors.warehouse_id[0]}</p>}</div>
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Tanggal Dokumen</label><input type="date" value={form.document_date} onChange={(e) => updateHeader('document_date', e.target.value)} className={inputClassName} />{errors.document_date && <p className="mt-1 text-xs text-red-500">{errors.document_date[0]}</p>}</div>
+                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Kode Transaksi</label><select value={form.transaction_code} onChange={(e) => updateHeader('transaction_code', e.target.value)} className={inputClassName}><option value="">Pilih Kode Transaksi</option>{transactionCodes.map((transactionCode) => <option key={transactionCode.value} value={transactionCode.value}>{transactionCode.label}</option>)}</select>{errors.transaction_code && <p className="mt-1 text-xs text-red-500">{errors.transaction_code[0]}</p>}</div>
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Department</label><input value={form.department} onChange={(e) => updateHeader('department', e.target.value)} className={inputClassName} /></div>
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Cost Center</label><input value={form.cost_center} onChange={(e) => updateHeader('cost_center', e.target.value)} className={inputClassName} /></div>
                             <div className="md:col-span-2"><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Keterangan</label><input value={form.notes} onChange={(e) => updateHeader('notes', e.target.value)} className={inputClassName} /></div>
@@ -113,7 +116,7 @@ export default function Create() {
                             <button type="button" onClick={addLine} className="rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:text-gray-100">+ Tambah Line</button>
                         </div>
 
-                        <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">{loading ? 'Menyimpan...' : 'Simpan Internal Usage'}</button>
+                        <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">{loading ? 'Menyimpan...' : 'Simpan Dispatch'}</button>
                     </form>
                 </div>
 

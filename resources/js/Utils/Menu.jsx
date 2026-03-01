@@ -148,7 +148,7 @@ export default function Menu() {
                             permissions: true,
                         },
                         {
-                            title: 'Internal Use',
+                            title: 'Dispatch',
                             href: '/apps/outbound/internal-usage',
                             icon: <IconBox size={20} strokeWidth={1.5} />,
                             active: url.startsWith('/apps/outbound/internal-usage'),

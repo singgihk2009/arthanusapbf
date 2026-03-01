@@ -12,6 +12,14 @@ use Inertia\Response;
 
 class InternalUsageController extends Controller
 {
+    private const TRANSACTION_CODE_OPTIONS = [
+        ['value' => 'PENJUALAN', 'label' => 'Penjualan'],
+        ['value' => 'RETUR', 'label' => 'Retur'],
+        ['value' => 'DAMAGED', 'label' => 'Damaged'],
+        ['value' => 'SAMPLE', 'label' => 'Sample'],
+        ['value' => 'INTERNAL_USE', 'label' => 'Internal Use'],
+    ];
+
     public function __construct(private readonly UomConversionService $uomConversionService)
     {
     }
@@ -41,6 +49,7 @@ class InternalUsageController extends Controller
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
             'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
+            'transactionCodes' => self::TRANSACTION_CODE_OPTIONS,
         ]);
     }
 
@@ -52,6 +61,7 @@ class InternalUsageController extends Controller
             $entryId = DB::table('internal_usages')->insertGetId([
                 'number' => $this->generateNumber(),
                 'warehouse_id' => $validated['warehouse_id'],
+                'transaction_code' => $validated['transaction_code'],
                 'department' => $validated['department'] ?? null,
                 'cost_center' => $validated['cost_center'] ?? null,
                 'document_date' => $validated['document_date'],
@@ -64,7 +74,7 @@ class InternalUsageController extends Controller
             $this->replaceLines($entryId, $validated['lines']);
         });
 
-        return to_route('apps.outbound.internal-usage.index')->with('success', 'Internal usage berhasil disimpan.');
+        return to_route('apps.outbound.internal-usage.index')->with('success', 'Dispatch berhasil disimpan.');
     }
 
     public function edit(int $internalUsage): Response
@@ -91,6 +101,7 @@ class InternalUsageController extends Controller
                 'document_date' => (string) $entry->document_date,
                 'department' => (string) ($entry->department ?? ''),
                 'cost_center' => (string) ($entry->cost_center ?? ''),
+                'transaction_code' => (string) ($entry->transaction_code ?? ''),
                 'notes' => (string) ($entry->notes ?? ''),
                 'status' => (string) $entry->status,
             ],
@@ -99,6 +110,7 @@ class InternalUsageController extends Controller
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
             'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
+            'transactionCodes' => self::TRANSACTION_CODE_OPTIONS,
         ]);
     }
 
@@ -115,6 +127,7 @@ class InternalUsageController extends Controller
 
             DB::table('internal_usages')->where('id', $internalUsage)->update([
                 'warehouse_id' => $validated['warehouse_id'],
+                'transaction_code' => $validated['transaction_code'],
                 'department' => $validated['department'] ?? null,
                 'cost_center' => $validated['cost_center'] ?? null,
                 'document_date' => $validated['document_date'],
@@ -125,7 +138,7 @@ class InternalUsageController extends Controller
             $this->replaceLines($internalUsage, $validated['lines']);
         });
 
-        return to_route('apps.outbound.internal-usage.index')->with('success', 'Internal usage berhasil diperbarui.');
+        return to_route('apps.outbound.internal-usage.index')->with('success', 'Dispatch berhasil diperbarui.');
     }
 
     public function destroy(int $internalUsage): RedirectResponse
@@ -146,7 +159,7 @@ class InternalUsageController extends Controller
             DB::table('internal_usages')->where('id', $internalUsage)->delete();
         });
 
-        return back()->with('success', 'Internal usage berhasil dihapus.');
+        return back()->with('success', 'Dispatch berhasil dihapus.');
     }
 
     private function replaceLines(int $entryId, array $lines): void
