@@ -21,6 +21,7 @@ use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use ZipArchive;
 
@@ -111,8 +112,8 @@ class ItemController extends Controller implements HasMiddleware
     public function downloadTemplateExcel()
     {
         $rows = [
-            ['sku', 'name', 'category_code', 'base_uom_code', 'default_barcode', 'track_expired', 'is_active', 'warehouse_code', 'min_stock_base'],
-            ['SKU-001', 'Contoh Item', 'CAT-UMUM', 'PCS', '8990011223344', '0', '1', 'WH-UTAMA', '10'],
+            ['sku', 'name', 'category_name', 'base_uom_code', 'default_barcode', 'track_expired', 'is_active', 'warehouse_code', 'min_stock_base'],
+            ['SKU-001', 'Contoh Item', 'MED-OTC', 'PCS', '8990011223344', '0', '1', 'WH-UTAMA', '10'],
         ];
 
         $tempPath = storage_path('app/master-item-template-'.now()->format('YmdHis').'.xlsx');
@@ -152,6 +153,8 @@ class ItemController extends Controller implements HasMiddleware
                     'sku' => ['required', 'string', 'max:100'],
                     'name' => ['required', 'string', 'max:255'],
                     'category_code' => ['nullable', 'string', 'max:100'],
+                    'category_name' => ['nullable', 'string', 'max:255'],
+                    'category' => ['nullable', 'string', 'max:255'],
                     'base_uom_code' => ['required', 'string', 'max:100'],
                     'default_barcode' => ['nullable', 'string', 'max:100'],
                     'track_expired' => ['nullable'],
@@ -160,13 +163,8 @@ class ItemController extends Controller implements HasMiddleware
                     'min_stock_base' => ['nullable', 'numeric', 'min:0'],
                 ])->validate();
 
-                $categoryId = null;
-                if (! empty($data['category_code'])) {
-                    $categoryId = Category::query()->where('code', $data['category_code'])->value('id');
-                    if (! $categoryId) {
-                        throw new \RuntimeException('Kategori tidak ditemukan: '.$data['category_code']);
-                    }
-                }
+                $categoryInput = $data['category_code'] ?? $data['category_name'] ?? $data['category'] ?? null;
+                $categoryId = $this->resolveCategoryId($categoryInput);
 
                 $baseUomId = Uom::query()->where('code', $data['base_uom_code'])->value('id');
                 if (! $baseUomId) {
@@ -363,6 +361,30 @@ class ItemController extends Controller implements HasMiddleware
             ->when($filters['sort_by'] === 'category_name', fn ($query) => $query->orderBy('categories.name', $filters['sort_dir']))
             ->when($filters['sort_by'] !== 'category_name', fn ($query) => $query->orderBy('items.'.$filters['sort_by'], $filters['sort_dir']))
             ->orderBy('items.id', 'desc');
+    }
+
+
+    private function resolveCategoryId(?string $categoryInput): ?int
+    {
+        if ($categoryInput === null || trim($categoryInput) === '') {
+            return null;
+        }
+
+        $categoryInput = trim($categoryInput);
+
+        if (Schema::hasColumn('categories', 'code')) {
+            $categoryId = Category::query()->where('code', $categoryInput)->value('id');
+            if ($categoryId) {
+                return (int) $categoryId;
+            }
+        }
+
+        $categoryId = Category::query()->where('name', $categoryInput)->value('id');
+        if ($categoryId) {
+            return (int) $categoryId;
+        }
+
+        throw new \RuntimeException('Kategori tidak ditemukan: '.$categoryInput);
     }
 
     private function parseImportRows(UploadedFile $file): Collection
