@@ -7,6 +7,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class IntegrationController extends Controller
 {
@@ -25,6 +26,67 @@ class IntegrationController extends Controller
         return Inertia::render('Apps/Integration/Index', [
             'stats' => $stats,
             'transactions' => $transactions,
+        ]);
+    }
+
+    public function exportCsv(): StreamedResponse
+    {
+        $fileName = sprintf('finance-hub-integration-%s.csv', now()->format('Ymd_His'));
+        $headers = [
+            'ID',
+            'Trx No',
+            'Trx Type',
+            'Trx Date',
+            'Warehouse ID',
+            'Status',
+            'GL Reference No',
+            'Error Message',
+            'Created At',
+            'Updated At',
+        ];
+
+        return response()->streamDownload(function () use ($headers): void {
+            $output = fopen('php://output', 'wb');
+            if ($output === false) {
+                return;
+            }
+
+            fputcsv($output, $headers);
+
+            DB::table('inv_transactions')
+                ->select([
+                    'id',
+                    'trx_no',
+                    'trx_type',
+                    'trx_date',
+                    'warehouse_id',
+                    'gl_status',
+                    'gl_reference_no',
+                    'gl_error_message',
+                    'created_at',
+                    'updated_at',
+                ])
+                ->orderByDesc('id')
+                ->chunk(500, function ($transactions) use ($output): void {
+                    foreach ($transactions as $trx) {
+                        fputcsv($output, [
+                            $trx->id,
+                            $trx->trx_no,
+                            $trx->trx_type,
+                            $trx->trx_date,
+                            $trx->warehouse_id,
+                            $trx->gl_status,
+                            $trx->gl_reference_no,
+                            $trx->gl_error_message,
+                            $trx->created_at,
+                            $trx->updated_at,
+                        ]);
+                    }
+                });
+
+            fclose($output);
+        }, $fileName, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 
