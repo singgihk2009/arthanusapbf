@@ -140,6 +140,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
 
     // integration finance hub
     Route::get('/integration', [IntegrationController::class, 'index'])->name('integration.index');
+    Route::get('/integration/export/csv', [IntegrationController::class, 'exportCsv'])->name('integration.export.csv');
     Route::post('/integration/{transactionId}/retry', [IntegrationController::class, 'retry'])->name('integration.retry');
 
     // inventory reports api

@@ -11,7 +11,23 @@ export default function IntegrationIndex({ stats, transactions }) {
         <>
             <Head title="Integration" />
             <div className="p-6 space-y-4">
-                <h1 className="text-xl font-semibold">Integration - Finance Hub</h1>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h1 className="text-xl font-semibold">Integration - Finance Hub</h1>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <a
+                            href={route('apps.integration.export.csv')}
+                            className="rounded-lg border border-emerald-600 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-950"
+                        >
+                            Export Data CSV
+                        </a>
+                        <a
+                            href={route('apps.dashboard')}
+                            className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900"
+                        >
+                            Kembali ke Menu Inventory
+                        </a>
+                    </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <Card title="Pending/Sent" value={stats.pending} />
                     <Card title="Error" value={stats.error} />
