@@ -69,6 +69,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             $xlsxRows = [[
                 'Warehouse',
                 'Tanggal',
+                'Kode Transaksi',
                 'Referensi',
                 'Item',
                 'Kategori',
@@ -112,6 +113,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 $line = [
                     $row->warehouse_name,
                     $row->trx_datetime,
+                    $row->transaction_code,
                     $row->reference,
                     $row->item_name,
                     $row->category_name,
@@ -350,6 +352,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw('COALESCE(categories.name, \'-\') as category_name'),
                 'items.sku',
                 DB::raw("DATE_FORMAT(receiving_entries.transaction_date, '%Y-%m-%d') as trx_datetime"),
+                DB::raw("COALESCE(receiving_entries.transaction_code, '-') as transaction_code"),
                 DB::raw("COALESCE(receiving_entries.reference, receiving_entries.number) as reference"),
                 DB::raw('COALESCE(uoms.code, uoms.name) as uom_name'),
                 DB::raw('COALESCE(receiving_entry_lines.price, 0) as unit_price'),
@@ -383,6 +386,10 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             ->join('warehouses', 'warehouses.id', '=', 'stock_ledgers.warehouse_id')
             ->join('items', 'items.id', '=', 'stock_ledgers.item_id')
             ->leftJoin('uoms', 'uoms.id', '=', 'stock_ledgers.uom_id')
+            ->leftJoin('internal_usages', function ($join) {
+                $join->on('internal_usages.id', '=', 'stock_ledgers.trx_id')
+                    ->where('stock_ledgers.trx_type', '=', 'USAGE_OUT');
+            })
             ->leftJoin('categories', 'categories.id', '=', 'items.category_id')
             ->where('stock_ledgers.trx_type', 'USAGE_OUT')
             ->where('stock_ledgers.qty_base', '<', 0)
@@ -406,6 +413,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'items.sku',
                 DB::raw("COALESCE(uoms.code, uoms.name) as uom_name"),
                 DB::raw("DATE_FORMAT(stock_ledgers.trx_datetime, '%Y-%m-%d %H:%i:%s') as trx_datetime"),
+                DB::raw("COALESCE(internal_usages.transaction_code, '-') as transaction_code"),
                 DB::raw("CONCAT(stock_ledgers.trx_type, '-', stock_ledgers.trx_id) as reference"),
                 DB::raw('ABS(COALESCE(stock_ledgers.unit_cost, 0) * (stock_ledgers.qty_base / NULLIF(stock_ledgers.qty_input, 0))) as unit_price'),
                 DB::raw('ABS(stock_ledgers.qty_input) as qty'),

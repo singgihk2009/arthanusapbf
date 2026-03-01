@@ -51,6 +51,7 @@ export default function Index() {
             { key: 'number', label: 'No' },
             { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
             { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
+            { key: 'transaction_code', label: 'Kode Transaksi' },
             { key: 'reference', label: 'Referensi' },
             { key: 'item_name', label: 'Item', sortKey: 'item' },
             { key: 'category_name', label: 'Kategori', sortKey: 'category' },
@@ -266,6 +267,7 @@ export default function Index() {
                                     ) : (
                                         <>
                                             <Table.Td>{row.trx_datetime}</Table.Td>
+                                            <Table.Td>{row.transaction_code}</Table.Td>
                                             <Table.Td>{row.reference}</Table.Td>
                                             <Table.Td>{row.item_name}</Table.Td>
                                             <Table.Td>{row.category_name}</Table.Td>
