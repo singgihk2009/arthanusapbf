@@ -22,10 +22,20 @@ class UomConversionService
             ->where('to_uom_id', $item->base_uom_id)
             ->first();
 
-        if (! $conversion) {
-            throw new InvalidArgumentException('UOM conversion to base is not configured for this item.');
+        if ($conversion) {
+            return $qty * (float) $conversion->factor;
         }
 
-        return $qty * (float) $conversion->factor;
+        $reverseConversion = ItemUomConversion::query()
+            ->where('item_id', $itemId)
+            ->where('from_uom_id', $item->base_uom_id)
+            ->where('to_uom_id', $uomId)
+            ->first();
+
+        if ($reverseConversion) {
+            return $qty / (float) $reverseConversion->factor;
+        }
+
+        throw new InvalidArgumentException('UOM conversion to base is not configured for this item.');
     }
 }
