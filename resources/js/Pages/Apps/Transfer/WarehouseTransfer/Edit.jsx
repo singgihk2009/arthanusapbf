@@ -2,12 +2,12 @@ import AppLayout from '@/Layouts/AppLayout';
 import { Head, usePage } from '@inertiajs/react';
 import React, { useMemo, useState } from 'react';
 
-const emptyLine = { item_id: '', qty_requested: '', uom_id: '' };
+const emptyLine = { item_id: '', batch_id: '', qty_requested: '', uom_id: '' };
 const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 const lineInputClassName = 'rounded border border-gray-300 bg-white px-2 py-1 text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 
 export default function Edit() {
-    const { entry, lines, items, uoms, warehouses } = usePage().props;
+    const { entry, lines, items, uoms, warehouses, batches } = usePage().props;
     const [form, setForm] = useState({
         from_warehouse_id: entry.from_warehouse_id,
         to_warehouse_id: entry.to_warehouse_id,
@@ -29,6 +29,7 @@ export default function Edit() {
 
         if (field === 'item_id') {
             updatedLine.uom_id = defaultUomByItemId.get(String(value)) ?? '';
+            updatedLine.batch_id = '';
         }
 
         updatedLines[index] = updatedLine;
@@ -81,11 +82,12 @@ export default function Edit() {
 
                         <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
                             <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-                                <thead className="bg-gray-50 dark:bg-gray-900"><tr><th className="px-2 py-2 text-left">Item</th><th className="px-2 py-2 text-left">Qty Transfer</th><th className="px-2 py-2 text-left">UOM</th><th className="px-2 py-2 text-left">Aksi</th></tr></thead>
+                                <thead className="bg-gray-50 dark:bg-gray-900"><tr><th className="px-2 py-2 text-left">Item</th><th className="px-2 py-2 text-left">Metode Valuasi</th><th className="px-2 py-2 text-left">Qty Transfer</th><th className="px-2 py-2 text-left">UOM</th><th className="px-2 py-2 text-left">Aksi</th></tr></thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                     {form.lines.map((line, index) => (
                                         <tr key={index}>
                                             <td className="p-2"><select value={line.item_id} onChange={(e) => updateLine(index, 'item_id', e.target.value)} className={`w-56 ${lineInputClassName}`}><option value="">Pilih Item</option>{items.map((item) => <option key={item.id} value={item.id}>{item.sku} - {item.name}</option>)}</select>{errors[`lines.${index}.item_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.item_id`][0]}</p>}</td>
+                                            <td className="p-2"><select value={line.batch_id} onChange={(e) => updateLine(index, 'batch_id', e.target.value)} className={`w-52 ${lineInputClassName}`} disabled={!line.item_id}><option value="">Tanpa batch (AVG)</option>{batches.filter((batch) => String(batch.item_id) === String(line.item_id)).map((batch) => <option key={batch.id} value={batch.id}>{batch.batch_no}{batch.expired_date ? ` (EXP ${batch.expired_date})` : ''}</option>)}</select>{errors[`lines.${index}.batch_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.batch_id`][0]}</p>}</td>
                                             <td className="p-2"><input type="number" min="0" step="0.000001" value={line.qty_requested} onChange={(e) => updateLine(index, 'qty_requested', e.target.value)} className={`w-28 ${lineInputClassName}`} />{errors[`lines.${index}.qty_requested`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.qty_requested`][0]}</p>}</td>
                                             <td className="p-2"><select value={line.uom_id} onChange={(e) => updateLine(index, 'uom_id', e.target.value)} className={`w-36 ${lineInputClassName}`}><option value="">UOM</option>{uoms.map((uom) => <option key={uom.id} value={uom.id}>{uom.code}</option>)}</select>{errors[`lines.${index}.uom_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.uom_id`][0]}</p>}</td>
                                             <td className="p-2"><button type="button" onClick={() => removeLine(index)} className="rounded border border-red-300 px-2 py-1 text-red-600">Hapus</button></td>

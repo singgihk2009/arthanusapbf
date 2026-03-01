@@ -278,6 +278,10 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
         foreach ($lines as $line) {
             $qtyBase = $this->resolveQtyBase((int) $line->item_id, (int) $line->uom_id, (float) $line->qty_requested, (float) $line->qty_base);
+            $batchId = isset($line->batch_id) && $line->batch_id ? (int) $line->batch_id : null;
+            $unitCost = $batchId
+                ? $this->resolveBatchCost((int) $header->from_warehouse_id, (int) $line->item_id, $batchId)
+                : $this->resolveAverageCost((int) $header->from_warehouse_id, (int) $line->item_id);
 
             $this->stockService->postMutation([
                 'trx_type' => 'TRANSFER_OUT',
@@ -285,10 +289,11 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'trx_line_id' => $line->id,
                 'warehouse_id' => $header->from_warehouse_id,
                 'item_id' => $line->item_id,
-                'batch_id' => $line->batch_id,
+                'batch_id' => $batchId,
                 'qty_base' => -1 * $qtyBase,
                 'uom_id' => $line->uom_id,
                 'qty_input' => $line->qty_requested,
+                'unit_cost' => $unitCost,
                 'created_by' => $request->user()?->id,
             ]);
 
@@ -298,10 +303,11 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'trx_line_id' => $line->id,
                 'warehouse_id' => $header->to_warehouse_id,
                 'item_id' => $line->item_id,
-                'batch_id' => $line->batch_id,
+                'batch_id' => $batchId,
                 'qty_base' => $qtyBase,
                 'uom_id' => $line->uom_id,
                 'qty_input' => $line->qty_requested,
+                'unit_cost' => $unitCost,
                 'created_by' => $request->user()?->id,
             ]);
         }
