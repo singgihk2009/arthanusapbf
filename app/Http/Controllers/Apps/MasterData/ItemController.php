@@ -13,12 +13,16 @@ use App\Models\Inventory\Warehouse;
 use App\Models\Inventory\WarehouseItemSetting;
 use App\Services\Inventory\ItemPictureService;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use ZipArchive;
 
 class ItemController extends Controller implements HasMiddleware
 {
@@ -29,8 +33,8 @@ class ItemController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:master-item-data', only: ['index', 'exportExcel']),
-            new Middleware('permission:master-item-create', only: ['create', 'store']),
+            new Middleware('permission:master-item-data', only: ['index', 'exportExcel', 'downloadTemplateExcel']),
+            new Middleware('permission:master-item-create', only: ['create', 'store', 'importExcel']),
             new Middleware('permission:master-item-update', only: ['edit', 'update']),
             new Middleware('permission:master-item-delete', only: ['destroy']),
         ];
@@ -101,6 +105,122 @@ class ItemController extends Controller implements HasMiddleware
             fclose($output);
         }, 'master-items-'.now()->format('Ymd-His').'.csv', [
             'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    public function downloadTemplateExcel()
+    {
+        $rows = [
+            ['sku', 'name', 'category_code', 'base_uom_code', 'default_barcode', 'track_expired', 'is_active', 'warehouse_code', 'min_stock_base'],
+            ['SKU-001', 'Contoh Item', 'CAT-UMUM', 'PCS', '8990011223344', '0', '1', 'WH-UTAMA', '10'],
+        ];
+
+        $tempPath = storage_path('app/master-item-template-'.now()->format('YmdHis').'.xlsx');
+        $this->buildTemplateXlsx($tempPath, $rows);
+
+        return response()->download($tempPath, 'master-item-template.xlsx')->deleteFileAfterSend(true);
+    }
+
+    public function importExcel(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,csv,txt'],
+        ]);
+
+        $rows = $this->parseImportRows($request->file('file'));
+        $errors = [];
+        $inserted = 0;
+        $updated = 0;
+
+        DB::beginTransaction();
+
+        foreach ($rows as $index => $row) {
+            if ($this->isRowEmpty($row)) {
+                continue;
+            }
+
+            try {
+                $data = validator($row, [
+                    'sku' => ['required', 'string', 'max:100'],
+                    'name' => ['required', 'string', 'max:255'],
+                    'category_code' => ['nullable', 'string', 'max:100'],
+                    'base_uom_code' => ['required', 'string', 'max:100'],
+                    'default_barcode' => ['nullable', 'string', 'max:100'],
+                    'track_expired' => ['nullable'],
+                    'is_active' => ['nullable'],
+                    'warehouse_code' => ['nullable', 'string', 'max:100'],
+                    'min_stock_base' => ['nullable', 'numeric', 'min:0'],
+                ])->validate();
+
+                $categoryId = null;
+                if (! empty($data['category_code'])) {
+                    $categoryId = Category::query()->where('code', $data['category_code'])->value('id');
+                    if (! $categoryId) {
+                        throw new \RuntimeException('Kategori tidak ditemukan: '.$data['category_code']);
+                    }
+                }
+
+                $baseUomId = Uom::query()->where('code', $data['base_uom_code'])->value('id');
+                if (! $baseUomId) {
+                    throw new \RuntimeException('Base UOM tidak ditemukan: '.$data['base_uom_code']);
+                }
+
+                $item = Item::query()->updateOrCreate(
+                    ['sku' => $data['sku']],
+                    [
+                        'name' => $data['name'],
+                        'category_id' => $categoryId,
+                        'base_uom_id' => $baseUomId,
+                        'track_expired' => $this->toBoolean($data['track_expired'] ?? null),
+                        'is_active' => $this->toBoolean($data['is_active'] ?? 1),
+                    ]
+                );
+
+                if ($item->wasRecentlyCreated) {
+                    $inserted++;
+                } else {
+                    $updated++;
+                }
+
+                $this->syncDefaultBarcode($item, $data['default_barcode'] ?? null);
+
+                if (! empty($data['warehouse_code']) && ($data['min_stock_base'] ?? null) !== null && $data['min_stock_base'] !== '') {
+                    $warehouseId = Warehouse::query()->where('code', $data['warehouse_code'])->value('id');
+                    if (! $warehouseId) {
+                        throw new \RuntimeException('Gudang tidak ditemukan: '.$data['warehouse_code']);
+                    }
+
+                    $this->syncMinimumStock($item, $warehouseId, $data['min_stock_base']);
+                }
+            } catch (\Throwable $exception) {
+                $errors[] = [
+                    'row' => $index + 2,
+                    'message' => $exception->getMessage(),
+                ];
+            }
+        }
+
+        if (! empty($errors)) {
+            DB::rollBack();
+        } else {
+            DB::commit();
+        }
+
+        if (! empty($errors)) {
+            return response()->json([
+                'message' => 'Import item gagal, periksa data file.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        if (($inserted + $updated) === 0) {
+            return response()->json([
+                'message' => 'Tidak ada data item yang diproses dari file import.',
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => "Import item berhasil. {$inserted} item baru, {$updated} item diperbarui.",
         ]);
     }
 
@@ -235,5 +355,152 @@ class ItemController extends Controller implements HasMiddleware
             ->when($filters['sort_by'] === 'category_name', fn ($query) => $query->orderBy('categories.name', $filters['sort_dir']))
             ->when($filters['sort_by'] !== 'category_name', fn ($query) => $query->orderBy('items.'.$filters['sort_by'], $filters['sort_dir']))
             ->orderBy('items.id', 'desc');
+    }
+
+    private function parseImportRows(UploadedFile $file): Collection
+    {
+        $ext = strtolower($file->getClientOriginalExtension());
+
+        return match ($ext) {
+            'xlsx' => $this->parseXlsxRows($file->getRealPath()),
+            default => $this->parseCsvRows($file->getRealPath()),
+        };
+    }
+
+    private function parseCsvRows(string $path): Collection
+    {
+        $rows = [];
+        $handle = fopen($path, 'r');
+        if (! $handle) {
+            return collect();
+        }
+
+        $header = null;
+        while (($data = fgetcsv($handle)) !== false) {
+            if (! $header) {
+                $header = array_map(fn ($item) => trim((string) $item), $data);
+                continue;
+            }
+
+            $rows[] = collect($header)->mapWithKeys(function ($key, $index) use ($data) {
+                return [$key => trim((string) ($data[$index] ?? ''))];
+            })->all();
+        }
+
+        fclose($handle);
+
+        return collect($rows);
+    }
+
+    private function parseXlsxRows(string $path): Collection
+    {
+        $zip = new ZipArchive();
+        $opened = $zip->open($path);
+
+        if ($opened !== true) {
+            return collect();
+        }
+
+        $sharedStrings = [];
+        $sharedXml = $zip->getFromName('xl/sharedStrings.xml');
+        if ($sharedXml) {
+            $shared = simplexml_load_string($sharedXml);
+            if ($shared !== false && isset($shared->si)) {
+                foreach ($shared->si as $si) {
+                    $sharedStrings[] = isset($si->t) ? (string) $si->t : '';
+                }
+            }
+        }
+
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+        if (! $sheetXml) {
+            return collect();
+        }
+
+        $xml = simplexml_load_string($sheetXml);
+        if ($xml === false || ! isset($xml->sheetData->row)) {
+            return collect();
+        }
+
+        $table = [];
+        foreach ($xml->sheetData->row as $row) {
+            $line = [];
+            foreach ($row->c as $cell) {
+                $type = (string) ($cell['t'] ?? '');
+                $value = '';
+
+                if ($type === 's') {
+                    $idx = (int) ($cell->v ?? 0);
+                    $value = $sharedStrings[$idx] ?? '';
+                } elseif ($type === 'inlineStr' && isset($cell->is->t)) {
+                    $value = (string) $cell->is->t;
+                } else {
+                    $value = isset($cell->v) ? (string) $cell->v : '';
+                }
+
+                $line[] = trim($value);
+            }
+            $table[] = $line;
+        }
+
+        if (count($table) < 2) {
+            return collect();
+        }
+
+        $header = $table[0];
+        $rows = [];
+
+        foreach (array_slice($table, 1) as $line) {
+            $rows[] = collect($header)->mapWithKeys(function ($key, $index) use ($line) {
+                return [$key => trim((string) ($line[$index] ?? ''))];
+            })->all();
+        }
+
+        return collect($rows);
+    }
+
+    private function buildTemplateXlsx(string $path, array $rows): void
+    {
+        $zip = new ZipArchive();
+        if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            return;
+        }
+
+        $sheetRows = '';
+        foreach ($rows as $rowIndex => $row) {
+            $cellXml = '';
+            foreach ($row as $colIndex => $value) {
+                $column = chr(65 + $colIndex);
+                $escaped = htmlspecialchars((string) $value, ENT_XML1);
+                $cellXml .= "<c r=\"{$column}".($rowIndex + 1)."\" t=\"inlineStr\"><is><t>{$escaped}</t></is></c>";
+            }
+            $sheetRows .= "<row r=\"".($rowIndex + 1)."\">{$cellXml}</row>";
+        }
+
+        $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+        $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+        $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Template" sheetId="1" r:id="rId1"/></sheets></workbook>');
+        $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
+        $zip->addFromString('xl/worksheets/sheet1.xml', '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'.$sheetRows.'</sheetData></worksheet>');
+        $zip->close();
+    }
+
+    private function isRowEmpty(array $row): bool
+    {
+        foreach ($row as $value) {
+            if (trim((string) $value) !== '') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function toBoolean(mixed $value): bool
+    {
+        $normalized = strtolower(trim((string) $value));
+
+        return in_array($normalized, ['1', 'true', 'yes', 'ya'], true);
     }
 }
