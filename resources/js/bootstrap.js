@@ -22,5 +22,12 @@ setCsrfHeader();
 window.axios.interceptors.request.use((config) => {
     setCsrfHeader();
 
+    const method = String(config.method ?? 'get').toLowerCase();
+    const csrfToken = getMetaCsrfToken();
+
+    if (csrfToken && ['post', 'put', 'patch', 'delete'].includes(method) && config.data && !(config.data instanceof FormData)) {
+        config.data = { _token: csrfToken, ...config.data };
+    }
+
     return config;
 });
