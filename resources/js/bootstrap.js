@@ -4,30 +4,3 @@ window.axios = axios;
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 window.axios.defaults.withCredentials = true;
 window.axios.defaults.withXSRFToken = true;
-
-const getMetaCsrfToken = () => document.head.querySelector('meta[name="csrf-token"]')?.content;
-
-const setCsrfHeader = () => {
-    const token = getMetaCsrfToken();
-
-    if (!token) {
-        return;
-    }
-
-    window.axios.defaults.headers.common['X-CSRF-TOKEN'] = token;
-};
-
-setCsrfHeader();
-
-window.axios.interceptors.request.use((config) => {
-    setCsrfHeader();
-
-    const method = String(config.method ?? 'get').toLowerCase();
-    const csrfToken = getMetaCsrfToken();
-
-    if (csrfToken && ['post', 'put', 'patch', 'delete'].includes(method) && config.data && !(config.data instanceof FormData)) {
-        config.data = { _token: csrfToken, ...config.data };
-    }
-
-    return config;
-});
