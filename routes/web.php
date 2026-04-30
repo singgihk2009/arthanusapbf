@@ -29,6 +29,9 @@ use Illuminate\Support\Facades\Route;
 Route::redirect('/', '/login');
 
 Route::middleware('auth')->group(function () {
+    // Compatibility alias for Breeze/Fortify default route name used by Ziggy/frontend
+    Route::redirect('/dashboard', '/apps/dashboard')->name('dashboard');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -61,6 +64,10 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::post('/items/{item}/pictures', [ItemPictureController::class, 'store'])->name('pictures.store');
         Route::patch('/items/{item}/pictures/default', [ItemPictureController::class, 'setDefault'])->name('pictures.default');
         Route::delete('/items/{item}/pictures/{picture}', [ItemPictureController::class, 'destroy'])->name('pictures.destroy');
+
+        // Backward-compatible aliases (old singular URLs)
+        Route::redirect('/regulatory-source', '/apps/master-data/regulatory-sources', 301);
+        Route::redirect('/regulatory-product', '/apps/master-data/regulatory-products', 301);
 
         Route::get('/regulatory-sources', [RegulatorySourceController::class, 'index'])->name('regulatory-sources.index');
         Route::resource('/regulatory-products', RegulatoryProductController::class)->parameters(['regulatory-products' => 'regulatoryProduct']);
