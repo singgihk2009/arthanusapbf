@@ -69,7 +69,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::redirect('/regulatory-source', '/apps/master-data/regulatory-sources', 301);
         Route::redirect('/regulatory-product', '/apps/master-data/regulatory-products', 301);
 
-        Route::get('/regulatory-sources', [RegulatorySourceController::class, 'index'])->name('regulatory-sources.index');
+        Route::resource('/regulatory-sources', RegulatorySourceController::class)->parameters(['regulatory-sources' => 'regulatorySource']);
         Route::resource('/regulatory-products', RegulatoryProductController::class)->parameters(['regulatory-products' => 'regulatoryProduct']);
         Route::post('/regulatory-products/import/bpom', [RegulatoryProductController::class, 'importBpom'])->name('regulatory-products.import.bpom');
         Route::post('/regulatory-products/import/kemenkes', [RegulatoryProductController::class, 'importKemenkes'])->name('regulatory-products.import.kemenkes');
