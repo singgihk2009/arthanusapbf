@@ -190,6 +190,21 @@ export default function Menu() {
                     active: url.startsWith('/apps/master-data/pictures'),
                     permissions: true,
                 },
+
+                {
+                    title: 'Regulatory Sources',
+                    href: '/apps/master-data/regulatory-sources',
+                    icon: <IconStack2 size={20} strokeWidth={1.5} />,
+                    active: url.startsWith('/apps/master-data/regulatory-sources'),
+                    permissions: true,
+                },
+                {
+                    title: 'Regulatory Products',
+                    href: '/apps/master-data/regulatory-products',
+                    icon: <IconStack2 size={20} strokeWidth={1.5} />,
+                    active: url.startsWith('/apps/master-data/regulatory-products'),
+                    permissions: true,
+                },
                 {
                     title: 'Min Stock',
                     href: '/apps/master-data/min-stocks',

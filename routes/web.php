@@ -12,6 +12,8 @@ use App\Http\Controllers\Apps\MasterData\ItemBarcodeController;
 use App\Http\Controllers\Apps\MasterData\ItemUomConversionController;
 use App\Http\Controllers\Apps\MasterData\MinStockController;
 use App\Http\Controllers\Apps\MasterData\ItemPictureController;
+use App\Http\Controllers\Apps\MasterData\RegulatoryProductController;
+use App\Http\Controllers\Apps\MasterData\RegulatorySourceController;
 use App\Http\Controllers\Apps\Reports\InventoryReportPageController;
 use App\Http\Controllers\Apps\Inbound\ReceivingEntryController;
 use App\Http\Controllers\Apps\Outbound\InternalUsageController;
@@ -59,6 +61,15 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::post('/items/{item}/pictures', [ItemPictureController::class, 'store'])->name('pictures.store');
         Route::patch('/items/{item}/pictures/default', [ItemPictureController::class, 'setDefault'])->name('pictures.default');
         Route::delete('/items/{item}/pictures/{picture}', [ItemPictureController::class, 'destroy'])->name('pictures.destroy');
+
+        Route::get('/regulatory-sources', [RegulatorySourceController::class, 'index'])->name('regulatory-sources.index');
+        Route::resource('/regulatory-products', RegulatoryProductController::class)->parameters(['regulatory-products' => 'regulatoryProduct']);
+        Route::post('/regulatory-products/import/bpom', [RegulatoryProductController::class, 'importBpom'])->name('regulatory-products.import.bpom');
+        Route::post('/regulatory-products/import/kemenkes', [RegulatoryProductController::class, 'importKemenkes'])->name('regulatory-products.import.kemenkes');
+        Route::post('/regulatory-products/mapping/attach', [RegulatoryProductController::class, 'attach'])->name('regulatory-products.mapping.attach');
+        Route::post('/regulatory-products/mapping/detach', [RegulatoryProductController::class, 'detach'])->name('regulatory-products.mapping.detach');
+        Route::post('/regulatory-products/mapping/set-primary', [RegulatoryProductController::class, 'setPrimary'])->name('regulatory-products.mapping.set-primary');
+        Route::get('/regulatory-products/{regulatoryProduct}/candidates', [RegulatoryProductController::class, 'candidates'])->name('regulatory-products.candidates');
     });
 
     // inventory report page
