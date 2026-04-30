@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Regulatory\RegulatoryProduct;
+use App\Models\Regulatory\ProductAlias;
 
 class Item extends Model
 {
@@ -19,6 +22,13 @@ class Item extends Model
         'default_barcode',
         'track_expired',
         'is_active',
+        'regulatory_name',
+        'market_name',
+        'dosage_form',
+        'strength',
+        'commodity_type',
+        'requires_batch_tracking',
+        'requires_expiry_tracking',
     ];
 
     protected function casts(): array
@@ -26,6 +36,8 @@ class Item extends Model
         return [
             'track_expired' => 'bool',
             'is_active' => 'bool',
+            'requires_batch_tracking' => 'bool',
+            'requires_expiry_tracking' => 'bool',
         ];
     }
 
@@ -58,4 +70,20 @@ class Item extends Model
     {
         return $this->hasOne(ItemPicture::class)->where('is_default', true);
     }
+    public function regulatoryProducts(): BelongsToMany
+    {
+        return $this->belongsToMany(RegulatoryProduct::class, 'item_regulatory_products')->withPivot(['is_primary', 'notes'])->withTimestamps();
+    }
+
+    public function aliases(): HasMany
+    {
+        return $this->hasMany(ProductAlias::class);
+    }
+
+    public function primaryRegulatoryProduct(): BelongsToMany
+    {
+        return $this->regulatoryProducts()->wherePivot('is_primary', true);
+    }
+
 }
+
