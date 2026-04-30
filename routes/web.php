@@ -62,6 +62,10 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::patch('/items/{item}/pictures/default', [ItemPictureController::class, 'setDefault'])->name('pictures.default');
         Route::delete('/items/{item}/pictures/{picture}', [ItemPictureController::class, 'destroy'])->name('pictures.destroy');
 
+        // Backward-compatible aliases (old singular URLs)
+        Route::redirect('/regulatory-source', '/apps/master-data/regulatory-sources', 301);
+        Route::redirect('/regulatory-product', '/apps/master-data/regulatory-products', 301);
+
         Route::get('/regulatory-sources', [RegulatorySourceController::class, 'index'])->name('regulatory-sources.index');
         Route::resource('/regulatory-products', RegulatoryProductController::class)->parameters(['regulatory-products' => 'regulatoryProduct']);
         Route::post('/regulatory-products/import/bpom', [RegulatoryProductController::class, 'importBpom'])->name('regulatory-products.import.bpom');
