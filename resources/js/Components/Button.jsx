@@ -54,7 +54,7 @@ export default function Button({className, icon, label, type, href, url, id, var
                 </Link>
             }
             {type === 'button' &&
-                <button className={clsx(styleButton, className, variants)} {...props}>
+                <button type='button' className={clsx(styleButton, className, variants)} {...props}>
                     {icon} <span className="hidden md:block">{label}</span>
                 </button>
             }
