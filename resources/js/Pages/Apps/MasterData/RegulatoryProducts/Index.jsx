@@ -2,13 +2,12 @@ import AppLayout from '@/Layouts/AppLayout';
 import Button from '@/Components/Button';
 import Pagination from '@/Components/Pagination';
 import Table from '@/Components/Table';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { IconCirclePlus, IconDatabaseOff, IconFileImport, IconPencilCog, IconSearch, IconTrash } from '@tabler/icons-react';
 import React, { useEffect, useState } from 'react';
 
 export default function Index() {
     const { products, filters, filterOptions } = usePage().props;
-    const { delete: destroy } = useForm();
     const [importFile, setImportFile] = useState(null);
     const [importing, setImporting] = useState(false);
     const [importResult, setImportResult] = useState(null);
@@ -39,11 +38,6 @@ export default function Index() {
         }, { preserveState: true, replace: true, preserveScroll: true });
     };
 
-    const bulkDelete = () => {
-        const ids = products.data.map((item) => item.id).join(',');
-        if (!ids) return;
-        destroy(route('apps.master-data.regulatory-products.destroy', ids));
-    };
     const handleImport = async () => {
         if (!importFile || importing) return;
         setImporting(true);
@@ -79,7 +73,6 @@ export default function Index() {
                 </div>
                 <div className="flex gap-2">
                     <Button type="link" href={route('apps.master-data.regulatory-products.create')} icon={<IconCirclePlus size={20} strokeWidth={1.5} />} variant="gray" label="Tambah" />
-                    <Button type="bulk" onClick={bulkDelete} icon={<IconTrash size={16} strokeWidth={1.5} />} variant="rose" label="Hapus Halaman" />
                 </div>
             </div>
             <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-5">
@@ -129,7 +122,7 @@ export default function Index() {
                             <Table.Th>Kekuatan</Table.Th>
                             <Table.Th>Jenis Komoditi</Table.Th>
                             <Table.Th>Packing</Table.Th>
-                            <Table.Th>Bahan Obat</Table.Th>
+                            <Table.Th className="w-[40ch] max-w-[40ch]">Bahan Obat</Table.Th>
                             <Table.Th className="w-32"></Table.Th>
                         </tr>
                     </Table.Thead>
@@ -145,7 +138,7 @@ export default function Index() {
                                 <Table.Td>{product.strength ?? '-'}</Table.Td>
                                 <Table.Td>{product.commodity_type ?? '-'}</Table.Td>
                                 <Table.Td>{product.raw_packaging_text ?? '-'}</Table.Td>
-                                <Table.Td>{product.raw_composition_text ?? '-'}</Table.Td>
+                                <Table.Td className="w-[40ch] max-w-[40ch]"><div className="max-w-[40ch] whitespace-normal break-all leading-relaxed">{product.raw_composition_text ?? '-'}</div></Table.Td>
                                 <Table.Td>
                                     <div className="flex gap-2">
                                         <Button type="edit" href={route('apps.master-data.regulatory-products.edit', product.id)} icon={<IconPencilCog size={16} strokeWidth={1.5} />} variant="orange" />
