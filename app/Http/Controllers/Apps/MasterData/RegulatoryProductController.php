@@ -107,17 +107,27 @@ class RegulatoryProductController extends Controller {
     }
     $line[$columnIndex]=trim($value);
    }
-   if(!empty($line)){
-    $maxIndex=max(array_keys($line));
-    $line=array_replace(array_fill(0,$maxIndex+1,''),$line);
-   }
    $table[]=$line;
   }
 
   if(count($table)<2) return collect();
-  $header=array_map(fn($x)=>trim((string)$x),$table[0]);
+  $headerRow=$table[0] ?? [];
+  $header=[];
+  foreach($headerRow as $index => $value){
+   $header[$index]=trim((string)$value);
+  }
+
+  $validHeaderIndexes=array_keys(array_filter($header, fn($value)=>$value!==''));
+  if(empty($validHeaderIndexes)) return collect();
+
   $rows=[];
-  foreach(array_slice($table,1) as $line){$rows[]=collect($header)->mapWithKeys(fn($key,$index)=>[$key=>trim((string)($line[$index]??''))])->all();}
+  foreach(array_slice($table,1) as $line){
+   $mapped=[];
+   foreach($validHeaderIndexes as $index){
+    $mapped[$header[$index]]=trim((string)($line[$index] ?? ''));
+   }
+   $rows[]=$mapped;
+  }
   return collect($rows);
  }
 
