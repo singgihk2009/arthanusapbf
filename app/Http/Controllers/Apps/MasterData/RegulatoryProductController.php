@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use ZipArchive;
 class RegulatoryProductController extends Controller {
@@ -36,7 +37,7 @@ class RegulatoryProductController extends Controller {
    ->when($shouldSearch,function($x) use ($q){
     $driver=config('database.default');
     $isMysql=in_array(config("database.connections.{$driver}.driver"),['mysql','mariadb'],true);
-    if($isMysql){
+    if($isMysql && $this->hasRegulatoryProductFulltextIndex()){
       $x->where(function($query) use ($q){
        $query->whereRaw("MATCH(product_name_source,industry_name,raw_composition_text) AGAINST (? IN BOOLEAN MODE)",[$q.'*'])
         ->orWhere('nie','like',"%$q%");
@@ -142,6 +143,16 @@ class RegulatoryProductController extends Controller {
  public function detach(ItemRegulatoryMappingRequest $request){ItemRegulatoryProduct::where('item_id',$request->item_id)->where('regulatory_product_id',$request->regulatory_product_id)->delete();return back();}
  public function setPrimary(ItemRegulatoryMappingRequest $request){ItemRegulatoryProduct::where('item_id',$request->item_id)->update(['is_primary'=>false]); ItemRegulatoryProduct::where('item_id',$request->item_id)->where('regulatory_product_id',$request->regulatory_product_id)->update(['is_primary'=>true]);return back();}
  public function candidates(RegulatoryProduct $regulatoryProduct, ProductMatchingService $service){ return response()->json($service->candidates($regulatoryProduct)); }
+
+ private function hasRegulatoryProductFulltextIndex(): bool {
+  static $hasIndex=null;
+  if($hasIndex!==null) return $hasIndex;
+
+  $index=DB::selectOne("SHOW INDEX FROM regulatory_products WHERE Key_name = 'fulltext_regulatory_product_search'");
+  $hasIndex=$index!==null;
+  return $hasIndex;
+ }
+
  private function parseImportRows(UploadedFile $file): Collection {
   $ext=strtolower($file->getClientOriginalExtension());
   return $ext==='xlsx' ? $this->parseXlsxRows($file->getRealPath()) : $this->parseCsvRows($file->getRealPath());
