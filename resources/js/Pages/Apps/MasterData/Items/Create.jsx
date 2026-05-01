@@ -26,7 +26,7 @@ export default function Create() {
 
     const handleSelectRegulatory = (product) => {
         setSelectedRegulatory(product);
-        const regulatoryNie = product.source_code ?? product.nie ?? '';
+        const regulatoryNie = product.nie ?? '';
         const combinedName = [product.product_name_source, product.raw_packaging_text].filter(Boolean).join(' - ');
 
         setData((prevData) => ({
