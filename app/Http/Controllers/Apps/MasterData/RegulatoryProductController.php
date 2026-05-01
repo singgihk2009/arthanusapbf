@@ -60,19 +60,38 @@ class RegulatoryProductController extends Controller {
   $request->validate(['file'=>['required','file','mimes:xlsx,csv,txt']]);
   $rows=$this->parseImportRows($request->file('file'));
   if($rows->isEmpty()) return response()->json(['message'=>'File import kosong atau tidak dapat dibaca.'],422);
-  $errors=[]; $inserted=0; $updated=0;
+  $errors=[]; $upsertRows=[]; $processed=0;
+  $sourceMap=RegulatorySource::query()->pluck('id','source_name')->all();
   foreach($rows as $index=>$row){
    if($this->isRowEmpty($row)) continue;
    try{
     $data=validator($row,['source_name'=>['required','string','max:255'],'nie'=>['required','string','max:255'],'product_name_source'=>['required','string','max:255'],'industry_name'=>['nullable','string'],'dosage_form'=>['nullable','string'],'strength'=>['nullable','string'],'commodity_type'=>['nullable','string'],'raw_packaging_text'=>['nullable','string'],'raw_composition_text'=>['nullable','string']])->validate();
-    $sourceId=RegulatorySource::query()->where('source_name',$data['source_name'])->value('id');
+    $sourceId=$sourceMap[$data['source_name']] ?? null;
     if(! $sourceId){throw new \RuntimeException('Source tidak ditemukan: '.$data['source_name']);}
-    $product=RegulatoryProduct::query()->updateOrCreate(['source_id'=>$sourceId,'nie'=>$data['nie']],$data+['source_id'=>$sourceId]);
-    $product->wasRecentlyCreated ? $inserted++ : $updated++;
+    $upsertRows[]=[
+      'source_id'=>$sourceId,
+      'nie'=>$data['nie'],
+      'product_name_source'=>$data['product_name_source'],
+      'industry_name'=>$data['industry_name'] ?: null,
+      'dosage_form'=>$data['dosage_form'] ?: null,
+      'strength'=>$data['strength'] ?: null,
+      'commodity_type'=>$data['commodity_type'] ?: null,
+      'raw_packaging_text'=>$data['raw_packaging_text'] ?: null,
+      'raw_composition_text'=>$data['raw_composition_text'] ?: null,
+      'updated_at'=>now(),
+      'created_at'=>now(),
+    ];
+    $processed++;
    }catch(\Throwable $exception){$errors[]=['row'=>$index+2,'message'=>$exception->getMessage()];}
   }
+
   if(!empty($errors)) return response()->json(['message'=>'Import regulatory product gagal, periksa data file.','errors'=>$errors],422);
-  return response()->json(['message'=>"Import regulatory product berhasil. {$inserted} data baru, {$updated} data diperbarui."]);
+
+  foreach(array_chunk($upsertRows,1000) as $chunk){
+   RegulatoryProduct::query()->upsert($chunk,['source_id','nie'],['product_name_source','industry_name','dosage_form','strength','commodity_type','raw_packaging_text','raw_composition_text','updated_at']);
+  }
+
+  return response()->json(['message'=>"Import regulatory product berhasil melalui upsert. {$processed} data diproses (unik berdasarkan source_name + NIE, sehingga aman untuk import ulang jika sebelumnya gagal)."]);
  }
  public function importBpom(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importBpom($request->file('file')->getRealPath());return back()->with('success',"Import BPOM berhasil: {$count}");}
  public function importKemenkes(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importKemenkes($request->file('file')->getRealPath());return back()->with('success',"Import KEMENKES berhasil: {$count}");}
