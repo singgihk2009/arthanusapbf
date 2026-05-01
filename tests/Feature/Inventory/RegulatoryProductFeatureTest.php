@@ -46,7 +46,7 @@ it('can search regulatory products by source name including custom sources', fun
     ]);
 
     $this->actingAs($user)
-        ->getJson('/api/regulatory-products/search?q=BOSKA')
+        ->getJson('/apps/master-data/regulatory-products/search?q=BOSKA')
         ->assertOk()
         ->assertJsonPath('data.0.source_name', 'BOSKA');
 });
