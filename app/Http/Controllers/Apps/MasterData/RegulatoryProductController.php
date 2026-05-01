@@ -67,11 +67,68 @@ class RegulatoryProductController extends Controller {
   fclose($handle); return collect($rows);
  }
  private function parseXlsxRows(string $path): Collection {
-  $zip=new ZipArchive(); if($zip->open($path)!==true) return collect(); $sheetXml=$zip->getFromName('xl/worksheets/sheet1.xml'); $zip->close(); if(! $sheetXml) return collect();
+  $zip=new ZipArchive(); if($zip->open($path)!==true) return collect();
+  $sheetXml=$zip->getFromName('xl/worksheets/sheet1.xml');
+  $sharedStringsXml=$zip->getFromName('xl/sharedStrings.xml');
+  $zip->close();
+  if(! $sheetXml) return collect();
+
+  $sharedStrings=[];
+  if($sharedStringsXml){
+   $sharedXml=simplexml_load_string($sharedStringsXml);
+   if($sharedXml!==false && isset($sharedXml->si)){
+    foreach($sharedXml->si as $stringItem){
+     $textParts=[];
+     if(isset($stringItem->t)) $textParts[]=(string)$stringItem->t;
+     if(isset($stringItem->r)){ foreach($stringItem->r as $run){ $textParts[]=(string)($run->t ?? ''); } }
+     $sharedStrings[]=trim(implode('', $textParts));
+    }
+   }
+  }
+
   $xml=simplexml_load_string($sheetXml); if($xml===false||!isset($xml->sheetData->row)) return collect(); $table=[];
-  foreach($xml->sheetData->row as $row){$line=[]; foreach($row->c as $cell){$line[]=trim(isset($cell->v)?(string)$cell->v:'');} $table[]=$line;}
-  if(count($table)<2) return collect(); $header=$table[0]; $rows=[]; foreach(array_slice($table,1) as $line){$rows[]=collect($header)->mapWithKeys(fn($key,$index)=>[$key=>trim((string)($line[$index]??''))])->all();}
+  foreach($xml->sheetData->row as $row){
+   $line=[];
+   foreach($row->c as $cell){
+    $reference=(string)($cell['r'] ?? '');
+    preg_match('/([A-Z]+)/', $reference, $matches);
+    $columnLetters=$matches[1] ?? '';
+    $columnIndex=$this->xlsxColumnToIndex($columnLetters);
+
+    $value='';
+    $cellType=(string)($cell['t'] ?? '');
+    if($cellType==='s'){
+     $sharedIndex=(int)($cell->v ?? -1);
+     $value=$sharedStrings[$sharedIndex] ?? '';
+    }elseif($cellType==='inlineStr'){
+     $value=(string)($cell->is->t ?? '');
+    }else{
+     $value=(string)($cell->v ?? '');
+    }
+    $line[$columnIndex]=trim($value);
+   }
+   if(!empty($line)){
+    $maxIndex=max(array_keys($line));
+    $line=array_replace(array_fill(0,$maxIndex+1,''),$line);
+   }
+   $table[]=$line;
+  }
+
+  if(count($table)<2) return collect();
+  $header=array_map(fn($x)=>trim((string)$x),$table[0]);
+  $rows=[];
+  foreach(array_slice($table,1) as $line){$rows[]=collect($header)->mapWithKeys(fn($key,$index)=>[$key=>trim((string)($line[$index]??''))])->all();}
   return collect($rows);
+ }
+
+ private function xlsxColumnToIndex(string $column): int {
+  if($column==='') return 0;
+  $index=0;
+  $length=strlen($column);
+  for($i=0;$i<$length;$i++){
+   $index=$index*26 + (ord($column[$i]) - 64);
+  }
+  return max(0,$index-1);
  }
  private function buildTemplateXlsx(string $path, array $rows): void {
   $zip=new ZipArchive(); if($zip->open($path, ZipArchive::CREATE|ZipArchive::OVERWRITE)!==true) return; $sheetRows='';
