@@ -300,7 +300,7 @@ class ItemController extends Controller implements HasMiddleware
             }
         });
 
-        return to_route('apps.master-data.items.index');
+        return back();
     }
 
     public function destroy(string $id): RedirectResponse
@@ -386,13 +386,21 @@ class ItemController extends Controller implements HasMiddleware
             return;
         }
 
+        $attributes = [
+            'is_primary' => true,
+        ];
+
+        if (Schema::hasColumn('item_regulatory_products', 'source_name')) {
+            $attributes['source_name'] = $product->source?->source_name;
+        }
+
+        if (Schema::hasColumn('item_regulatory_products', 'source_code')) {
+            $attributes['source_code'] = $product->source_code ?: $product->nie;
+        }
+
         ItemRegulatoryProduct::query()->updateOrCreate(
             ['item_id' => $item->id, 'regulatory_product_id' => $product->id],
-            [
-                'is_primary' => true,
-                'source_name' => $product->source?->source_name,
-                'source_code' => $product->source_code ?: $product->nie,
-            ]
+            $attributes
         );
 
         ItemRegulatoryProduct::query()
