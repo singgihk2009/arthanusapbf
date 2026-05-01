@@ -1,6 +1,5 @@
 import { usePage } from '@inertiajs/react';
 import {
-    IconAlertTriangle,
     IconArrowsExchange,
     IconBox,
     IconBuildingWarehouse,
@@ -21,14 +20,13 @@ import {
     IconStack2,
     IconUsers,
 } from '@tabler/icons-react';
-import React from 'react';
 
 export default function Menu() {
     const { url } = usePage();
 
     const menuNavigation = [
         {
-            title: 'Main Menu',
+            title: 'MAIN MENU',
             permissions: true,
             details: [
                 {
@@ -38,268 +36,73 @@ export default function Menu() {
                     icon: <IconLayoutDashboard size={20} strokeWidth={1.5} />,
                     permissions: true,
                 },
-                {
-                    title: 'User Management',
-                    href: '/apps/users',
-                    active: url.startsWith('/apps/users'),
-                    icon: <IconUsers size={20} strokeWidth={1.5} />,
-                    permissions: true,
-                },
-            ],
-        },
-        {
-            title: 'Inventory Management',
-            permissions: true,
-            details: [
-                {
-                    title: 'Inbound',
-                    icon: <IconPackageImport size={20} strokeWidth={1.5} />,
-                    permissions: true,
-                    subdetails: [
-                        {
-                            title: 'Purchase Order (PO)',
-                            href: '/apps/dashboard',
-                            icon: <IconReceipt size={20} strokeWidth={1.5} />,
-                            active: url === '/apps/dashboard',
-                            permissions: true,
-                        },
-                        {
-                            title: 'Manual Receiving',
-                            href: '/apps/inbound/receiving',
-                            icon: <IconClipboardCheck size={20} strokeWidth={1.5} />,
-                            active: url.startsWith('/apps/inbound/receiving') && !url.includes('source=po'),
-                            permissions: true,
-                        },
-                    ],
-                },
-                {
-                    title: 'Outbound',
-                    icon: <IconPackageExport size={20} strokeWidth={1.5} />,
-                    permissions: true,
-                    subdetails: [
-                        {
-                            title: 'Sales',
-                            href: '/apps/dashboard',
-                            icon: <IconShoppingCart size={20} strokeWidth={1.5} />,
-                            active: url === '/apps/dashboard',
-                            permissions: true,
-                        },
-                        {
-                            title: 'Dispatch',
-                            href: '/apps/outbound/internal-usage',
-                            icon: <IconBox size={20} strokeWidth={1.5} />,
-                            active: url.startsWith('/apps/outbound/internal-usage'),
-                            permissions: true,
-                        },
-                    ],
-                },
-                {
-                    title: 'Transfer Antar Gudang',
-                    href: '/apps/transfer/warehouse',
-                    active: url.startsWith('/apps/transfer/warehouse'),
-                    icon: <IconArrowsExchange size={20} strokeWidth={1.5} />,
-                    permissions: true,
-                },
-                {
-                    title: 'Adjustment & Stock Opname',
-                    icon: <IconClipboardCheck size={20} strokeWidth={1.5} />,
-                    permissions: true,
-                    subdetails: [
-                        {
-                            title: 'Stock Adjustment',
-                            href: '/apps/outbound/stock-adjustment',
-                            icon: <IconExchange size={20} strokeWidth={1.5} />,
-                            active: url.startsWith('/apps/outbound/stock-adjustment'),
-                            permissions: true,
-                        },
-                        {
-                            title: 'Stock Opname',
-                            href: '/apps/outbound/stock-opname',
-                            icon: <IconClipboardCheck size={20} strokeWidth={1.5} />,
-                            active: url.startsWith('/apps/outbound/stock-opname'),
-                            permissions: true,
-                        },
-                    ],
-                },
-                {
-                    title: 'Saldo Awal',
-                    href: '/apps/inventory/opening-balance',
-                    active: url.startsWith('/apps/inventory/opening-balance'),
-                    icon: <IconClipboardCheck size={20} strokeWidth={1.5} />,
-                    permissions: true,
-                },
-                {
-                    title: 'Expired Tracking & Alert',
-                    href: '/apps/dashboard',
-                    active: url.startsWith('/apps/dashboard'),
-                    icon: <IconAlertTriangle size={20} strokeWidth={1.5} />,
-                    permissions: true,
-                },
             ],
         },
         {
             title: 'MASTER',
             permissions: true,
             details: [
-                {
-                    title: 'Warehouse',
-                    href: '/apps/master-data/warehouses',
-                    icon: <IconBuildingWarehouse size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/master-data/warehouses'),
-                    permissions: true,
-                },
-                {
-                    title: 'Category',
-                    href: '/apps/master-data/categories',
-                    icon: <IconCategory size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/master-data/categories'),
-                    permissions: true,
-                },
-                {
-                    title: 'Item',
-                    href: '/apps/master-data/items',
-                    icon: <IconBox size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/master-data/items'),
-                    permissions: true,
-                },
-                {
-                    title: 'UOM',
-                    href: '/apps/master-data/uoms',
-                    icon: <IconRulerMeasure size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/master-data/uoms'),
-                    permissions: true,
-                },
-                {
-                    title: 'Conversion',
-                    href: '/apps/master-data/conversions',
-                    icon: <IconExchange size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/master-data/conversions'),
-                    permissions: true,
-                },
-                {
-                    title: 'Barcode',
-                    href: '/apps/master-data/barcodes',
-                    icon: <IconFileBarcode size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/master-data/barcodes'),
-                    permissions: true,
-                },
-                {
-                    title: 'Picture',
-                    href: '/apps/master-data/pictures',
-                    icon: <IconPhoto size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/master-data/pictures'),
-                    permissions: true,
-                },
-
-                {
-                    title: 'Regulatory Sources',
-                    href: '/apps/master-data/regulatory-sources',
-                    icon: <IconStack2 size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/master-data/regulatory-sources'),
-                    permissions: true,
-                },
-                {
-                    title: 'Regulatory Products',
-                    href: '/apps/master-data/regulatory-products',
-                    icon: <IconStack2 size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/master-data/regulatory-products'),
-                    permissions: true,
-                },
-                {
-                    title: 'Min Stock',
-                    href: '/apps/master-data/min-stocks',
-                    icon: <IconListCheck size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/master-data/min-stocks'),
-                    permissions: true,
-                },
+                { title: 'Warehouse', href: '/apps/master-data/warehouses', icon: <IconBuildingWarehouse size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/warehouses'), permissions: true },
+                { title: 'Kategory', href: '/apps/master-data/categories', icon: <IconCategory size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/categories'), permissions: true },
+                { title: 'Item', href: '/apps/master-data/items', icon: <IconBox size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/items'), permissions: true },
+                { title: 'UOM', href: '/apps/master-data/uoms', icon: <IconRulerMeasure size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/uoms'), permissions: true },
+                { title: 'Conversion', href: '/apps/master-data/conversions', icon: <IconExchange size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/conversions'), permissions: true },
+                { title: 'Barcode', href: '/apps/master-data/barcodes', icon: <IconFileBarcode size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/barcodes'), permissions: true },
+                { title: 'Picture', href: '/apps/master-data/pictures', icon: <IconPhoto size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/pictures'), permissions: true },
+                { title: 'Regulatory Source', href: '/apps/master-data/regulatory-sources', icon: <IconStack2 size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/regulatory-sources'), permissions: true },
+                { title: 'Regulatory Product', href: '/apps/master-data/regulatory-products', icon: <IconStack2 size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/regulatory-products'), permissions: true },
+                { title: 'Minimum Stock', href: '/apps/master-data/min-stocks', icon: <IconListCheck size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/min-stocks'), permissions: true },
             ],
         },
         {
-            title: 'INTEGRATION',
+            title: 'PROCUREMENT',
             permissions: true,
             details: [
-                {
-                    title: 'Finance Hub Posting',
-                    href: '/apps/integration',
-                    icon: <IconPlugConnected size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/integration'),
-                    permissions: true,
-                },
+                { title: 'Purchase Order', href: '/apps/dashboard', icon: <IconReceipt size={20} strokeWidth={1.5} />, active: false, permissions: true },
+                { title: 'Goods Receipt', href: '/apps/inbound/receiving?source=po', icon: <IconPackageImport size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/inbound/receiving') && url.includes('source=po'), permissions: true },
+                { title: 'Purchase Return', href: '/apps/dashboard', icon: <IconPackageExport size={20} strokeWidth={1.5} />, active: false, permissions: true },
+                { title: 'Vendor Invoice', href: '/apps/dashboard', icon: <IconFileBarcode size={20} strokeWidth={1.5} />, active: false, permissions: true },
+                { title: 'Payment to Vendor', href: '/apps/dashboard', icon: <IconShoppingCart size={20} strokeWidth={1.5} />, active: false, permissions: true },
+            ],
+        },
+        {
+            title: 'INVENTORY',
+            permissions: true,
+            details: [
+                { title: 'Manual Receiving', href: '/apps/inbound/receiving', icon: <IconClipboardCheck size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/inbound/receiving') && !url.includes('source=po'), permissions: true },
+                { title: 'Dispatch', href: '/apps/outbound/internal-usage', icon: <IconBox size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/outbound/internal-usage'), permissions: true },
+                { title: 'Transfer Antar Gudang', href: '/apps/transfer/warehouse', icon: <IconArrowsExchange size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/transfer/warehouse'), permissions: true },
+                { title: 'Stock Adjustment', href: '/apps/outbound/stock-adjustment', icon: <IconExchange size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/outbound/stock-adjustment'), permissions: true },
+                { title: 'Stock Opname', href: '/apps/outbound/stock-opname', icon: <IconClipboardCheck size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/outbound/stock-opname'), permissions: true },
+                { title: 'Saldo Awal', href: '/apps/inventory/opening-balance', icon: <IconClipboardCheck size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/inventory/opening-balance'), permissions: true },
+            ],
+        },
+        {
+            title: 'SALES',
+            permissions: true,
+            details: [
+                { title: 'Sales Order', href: '/apps/dashboard', icon: <IconShoppingCart size={20} strokeWidth={1.5} />, active: false, permissions: true },
             ],
         },
         {
             title: 'REPORT',
             permissions: true,
             details: [
-                {
-                    title: 'Barang Masuk',
-                    href: '/apps/reports/inventory?type=incoming-items',
-                    icon: <IconReportAnalytics size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/reports/inventory') && url.includes('incoming-items'),
-                    permissions: true,
-                },
-                {
-                    title: 'Pemakaian Barang',
-                    href: '/apps/reports/inventory?type=item-usage',
-                    icon: <IconArrowsExchange size={20} strokeWidth={1.5} />,
-                    active: url.startsWith('/apps/reports/inventory') && url.includes('item-usage'),
-                    permissions: true,
-                },
+                { title: 'Barang Masuk', href: '/apps/reports/inventory?type=incoming-items', icon: <IconReportAnalytics size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/reports/inventory') && url.includes('incoming-items'), permissions: true },
             ],
         },
         {
-            title: '🛒 3. PROCUREMENT MANAGEMENT',
+            title: 'SETUP',
             permissions: true,
             details: [
-                {
-                    title: 'Procure to Pay',
-                    icon: <IconShoppingCart size={20} strokeWidth={1.5} />,
-                    permissions: true,
-                    subdetails: [
-                        {
-                            title: 'Purchase Requisition (PR)',
-                            href: '/apps/dashboard',
-                            icon: <IconClipboardCheck size={20} strokeWidth={1.5} />,
-                            active: false,
-                            permissions: true,
-                        },
-                        {
-                            title: 'Purchase Order (PO)',
-                            href: '/apps/dashboard',
-                            icon: <IconReceipt size={20} strokeWidth={1.5} />,
-                            active: false,
-                            permissions: true,
-                        },
-                        {
-                            title: 'Auto Receiving (GRN / Goods Receipt from PO)',
-                            href: '/apps/inbound/receiving?source=po',
-                            icon: <IconPackageImport size={20} strokeWidth={1.5} />,
-                            active: url.startsWith('/apps/inbound/receiving') && url.includes('source=po'),
-                            permissions: true,
-                        },
-                        {
-                            title: 'Purchase Return',
-                            href: '/apps/dashboard',
-                            icon: <IconPackageExport size={20} strokeWidth={1.5} />,
-                            active: false,
-                            permissions: true,
-                        },
-                        {
-                            title: 'Vendor Invoice',
-                            href: '/apps/dashboard',
-                            icon: <IconFileBarcode size={20} strokeWidth={1.5} />,
-                            active: false,
-                            permissions: true,
-                        },
-                        {
-                            title: 'Payment to Vendor',
-                            href: '/apps/dashboard',
-                            icon: <IconShoppingCart size={20} strokeWidth={1.5} />,
-                            active: false,
-                            permissions: true,
-                        },
-                    ],
-                },
+                { title: 'User Management', href: '/apps/users', icon: <IconUsers size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/users'), permissions: true },
+            ],
+        },
+        {
+            title: 'INTEGRATION',
+            permissions: true,
+            details: [
+                { title: 'Finance Hub Posting', href: '/apps/integration', icon: <IconPlugConnected size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/integration'), permissions: true },
             ],
         },
     ];
