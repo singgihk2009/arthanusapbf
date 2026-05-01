@@ -11,6 +11,7 @@ export default function Create() {
     const { data, setData, post, errors } = useForm({
         source_id: '',
         nie: '',
+        source_code: '',
         product_name_source: '',
         dosage_form: '',
         strength: '',
@@ -39,6 +40,7 @@ export default function Create() {
                         {errors.source_id && <small className='text-xs text-red-500'>{errors.source_id}</small>}
                     </div>
                     <Input label="NIE" type="text" value={data.nie} onChange={(e) => setData('nie', e.target.value)} errors={errors.nie} />
+                    <Input label="Kode BPOM" type="text" value={data.source_code} onChange={(e) => setData('source_code', e.target.value)} errors={errors.source_code} />
                     <Input label="Nama Produk (Source)" type="text" value={data.product_name_source} onChange={(e) => setData('product_name_source', e.target.value)} errors={errors.product_name_source} />
                     <Input label="Dosage Form" type="text" value={data.dosage_form} onChange={(e) => setData('dosage_form', e.target.value)} errors={errors.dosage_form} />
                     <Input label="Strength" type="text" value={data.strength} onChange={(e) => setData('strength', e.target.value)} errors={errors.strength} />

@@ -119,11 +119,12 @@ class RegulatoryProductController extends Controller {
   $rows=RegulatoryProduct::with('source')->when($q,fn($x)=>$x->where('nie','like',"%$q%")->orWhere('product_name_source','like',"%$q%"))->orderBy('id')->get();
   return response()->streamDownload(function() use ($rows): void {
    $output=fopen('php://output','w');
-   fputcsv($output,['Source','NIE','Nama Produk','Produsen','Kemasan','Kekuatan','Jenis Komoditi','Packing','Bahan Obat']);
+   fputcsv($output,['Source','NIE','Kode BPOM','Nama Produk','Produsen','Kemasan','Kekuatan','Jenis Komoditi','Packing','Bahan Obat']);
    foreach($rows as $product){
     fputcsv($output,[
      $product->source?->source_name ?? '-',
      $product->nie,
+     $product->source_code,
      $product->product_name_source,
      $product->industry_name,
      $product->dosage_form,
@@ -143,8 +144,8 @@ class RegulatoryProductController extends Controller {
  public function destroy(RegulatoryProduct $regulatoryProduct){$regulatoryProduct->delete();return back();}
  public function downloadTemplateExcel(){
   $rows=[
-   ['source_name','nie','product_name_source','industry_name','dosage_form','strength','commodity_type','raw_packaging_text','raw_composition_text'],
-   ['BPOM','NIE-0001','Contoh Produk','Contoh Industri','Tablet','500mg','Obat','Strip 10 Tablet','Paracetamol']
+   ['source_name','nie','source_code','product_name_source','industry_name','dosage_form','strength','commodity_type','raw_packaging_text','raw_composition_text'],
+   ['BPOM','NIE-0001','BPOM-V1','Contoh Produk','Contoh Industri','Tablet','500mg','Obat','Strip 10 Tablet','Paracetamol']
   ];
   $tempPath=storage_path('app/regulatory-product-template-'.now()->format('YmdHis').'.xlsx');
   $this->buildTemplateXlsx($tempPath,$rows);
@@ -159,12 +160,13 @@ class RegulatoryProductController extends Controller {
   foreach($rows as $index=>$row){
    if($this->isRowEmpty($row)) continue;
    try{
-    $data=validator($row,['source_name'=>['required','string','max:255'],'nie'=>['required','string','max:255'],'product_name_source'=>['required','string','max:255'],'industry_name'=>['nullable','string'],'dosage_form'=>['nullable','string'],'strength'=>['nullable','string'],'commodity_type'=>['nullable','string'],'raw_packaging_text'=>['nullable','string'],'raw_composition_text'=>['nullable','string']])->validate();
+    $data=validator($row,['source_name'=>['required','string','max:255'],'nie'=>['required','string','max:255'],'source_code'=>['nullable','string','max:255'],'product_name_source'=>['required','string','max:255'],'industry_name'=>['nullable','string'],'dosage_form'=>['nullable','string'],'strength'=>['nullable','string'],'commodity_type'=>['nullable','string'],'raw_packaging_text'=>['nullable','string'],'raw_composition_text'=>['nullable','string']])->validate();
     $sourceId=$sourceMap[$data['source_name']] ?? null;
     if(! $sourceId){throw new \RuntimeException('Source tidak ditemukan: '.$data['source_name']);}
     $upsertRows[]=[
       'source_id'=>$sourceId,
       'nie'=>$data['nie'],
+      'source_code'=>$data['source_code'] ?: null,
       'product_name_source'=>$data['product_name_source'],
       'industry_name'=>$data['industry_name'] ?: null,
       'dosage_form'=>$data['dosage_form'] ?: null,
@@ -182,7 +184,7 @@ class RegulatoryProductController extends Controller {
   if(!empty($errors)) return response()->json(['message'=>'Import regulatory product gagal, periksa data file.','errors'=>$errors],422);
 
   foreach(array_chunk($upsertRows,1000) as $chunk){
-   RegulatoryProduct::query()->upsert($chunk,['source_id','nie'],['product_name_source','industry_name','dosage_form','strength','commodity_type','raw_packaging_text','raw_composition_text','updated_at']);
+   RegulatoryProduct::query()->upsert($chunk,['source_id','nie'],['source_code','product_name_source','industry_name','dosage_form','strength','commodity_type','raw_packaging_text','raw_composition_text','updated_at']);
   }
 
   return response()->json(['message'=>"Import regulatory product berhasil melalui upsert. {$processed} data diproses (unik berdasarkan source_name + NIE, sehingga aman untuk import ulang jika sebelumnya gagal)."]);
