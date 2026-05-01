@@ -235,7 +235,7 @@ class ItemController extends Controller implements HasMiddleware
     public function create()
     {
         return inertia('Apps/MasterData/Items/Create', [
-            'categories' => Category::query()->select('id', 'name')->orderBy('name')->get(),
+            'categories' => $this->categoryOptions(),
             'uoms' => Uom::query()->select('id', 'code', 'name')->orderBy('code')->get(),
             'warehouses' => Warehouse::query()->select('id', 'code', 'name')->orderBy('name')->get(),
             'primaryRegulatoryProduct' => null,
@@ -268,7 +268,7 @@ class ItemController extends Controller implements HasMiddleware
 
         return inertia('Apps/MasterData/Items/Edit', [
             'item' => $item,
-            'categories' => Category::query()->select('id', 'name')->orderBy('name')->get(),
+            'categories' => $this->categoryOptions(),
             'uoms' => Uom::query()->select('id', 'code', 'name')->orderBy('code')->get(),
             'warehouses' => Warehouse::query()->select('id', 'code', 'name')->orderBy('name')->get(),
             'minimumStockSetting' => $item->warehouseItemSettings->first(),
@@ -310,6 +310,39 @@ class ItemController extends Controller implements HasMiddleware
         Item::query()->whereIn('id', $ids)->delete();
 
         return back();
+    }
+
+
+    private function categoryOptions(): Collection
+    {
+        $categories = Category::query()->select('id', 'name', 'parent_id')->orderBy('name')->get()->keyBy('id');
+
+        return $categories
+            ->map(fn (Category $category): array => [
+                'id' => $category->id,
+                'name' => $category->name,
+                'hierarchy_name' => $this->buildCategoryHierarchyName($category, $categories),
+            ])
+            ->sortBy('hierarchy_name')
+            ->values();
+    }
+
+    private function buildCategoryHierarchyName(Category $category, Collection $categories): string
+    {
+        $names = [];
+        $current = $category;
+
+        while ($current) {
+            array_unshift($names, $current->name);
+
+            if (! $current->parent_id) {
+                break;
+            }
+
+            $current = $categories->get($current->parent_id);
+        }
+
+        return implode(' - ', $names);
     }
 
     private function syncDefaultBarcode(Item $item, ?string $barcode): void

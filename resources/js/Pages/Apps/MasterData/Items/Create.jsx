@@ -57,7 +57,7 @@ export default function Create() {
                         <label className='text-gray-600 text-sm'>Category</label>
                         <select value={data.category_id} onChange={(e) => setData('category_id', e.target.value)} className='w-full px-3 py-1.5 border text-sm rounded-md bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'>
                             <option value=''>-</option>
-                            {categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}
+                            {categories.map((category) => <option value={category.id} key={category.id}>{category.hierarchy_name ?? category.name}</option>)}
                         </select>
                         {errors.category_id && <small className='text-xs text-red-500'>{errors.category_id}</small>}
                     </div>
