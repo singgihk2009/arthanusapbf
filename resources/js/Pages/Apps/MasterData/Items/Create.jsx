@@ -4,15 +4,36 @@ import Card from '@/Components/Card';
 import Input from '@/Components/Input';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { IconBox, IconPencilPlus } from '@tabler/icons-react';
-import React from 'react';
+import React, { useState } from 'react';
+import RegulatoryProductSearch from '@/Components/RegulatoryProductSearch';
 
 export default function Create() {
-    const { categories, uoms, warehouses } = usePage().props;
+    const { categories, uoms, warehouses, primaryRegulatoryProduct } = usePage().props;
     const { data, setData, post, errors, processing } = useForm({
         sku: '', name: '', category_id: '', base_uom_id: '', default_barcode: '', warehouse_id: '', min_stock_base: '', track_expired: false, is_active: true,
         pictures: [],
         default_new_picture_index: '',
+        regulatory_product_id: '',
+        manufacturer_name: '',
+        composition_text: '',
+        packing_text: '',
+        regulatory_class: '',
+        dosage_form: '',
+        strength: '',
     });
+
+    const [selectedRegulatory, setSelectedRegulatory] = useState(primaryRegulatoryProduct ?? null);
+
+    const handleSelectRegulatory = (product) => {
+        setSelectedRegulatory(product);
+        setData('regulatory_product_id', product.id);
+        const mapping = { name: product.product_name_source, manufacturer_name: product.industry_name, composition_text: product.raw_composition_text, packing_text: product.raw_packaging_text, regulatory_class: product.commodity_type, dosage_form: product.dosage_form, strength: product.strength };
+        Object.entries(mapping).forEach(([key, value]) => {
+            if (!data[key] && value) setData(key, value);
+        });
+    };
+
+    const clearRegulatory = () => { setSelectedRegulatory(null); setData('regulatory_product_id', ''); };
 
     const submit = (e) => {
         e.preventDefault();
@@ -23,6 +44,10 @@ export default function Create() {
         <>
             <Head title="Tambah Item" />
             <Card title="Tambah Item" icon={<IconBox size={20} strokeWidth={1.5} />} form={submit} footer={<Button type="submit" label="Simpan" disabled={processing} icon={<IconPencilPlus size={20} strokeWidth={1.5} />} variant="gray" />}>
+                <div className="md:col-span-2">
+                    <h3 className="mb-2 text-sm font-semibold">Regulatory Reference</h3>
+                    <RegulatoryProductSearch selectedProduct={selectedRegulatory} onSelect={handleSelectRegulatory} onClear={clearRegulatory} />
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input label="SKU" type="text" value={data.sku} onChange={(e) => setData('sku', e.target.value)} errors={errors.sku} />
                     <Input label="Nama" type="text" value={data.name} onChange={(e) => setData('name', e.target.value)} errors={errors.name} />

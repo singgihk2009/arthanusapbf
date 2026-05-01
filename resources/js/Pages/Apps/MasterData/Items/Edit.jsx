@@ -4,10 +4,11 @@ import Card from '@/Components/Card';
 import Input from '@/Components/Input';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { IconBox, IconPencilPlus } from '@tabler/icons-react';
-import React from 'react';
+import React, { useState } from 'react';
+import RegulatoryProductSearch from '@/Components/RegulatoryProductSearch';
 
 export default function Edit() {
-    const { item, categories, uoms, warehouses, minimumStockSetting, regulatoryProducts } = usePage().props;
+    const { item, categories, uoms, warehouses, minimumStockSetting, primaryRegulatoryProduct } = usePage().props;
     const { data, setData, post, errors, processing } = useForm({
         sku: item.sku,
         name: item.name,
@@ -20,11 +21,27 @@ export default function Edit() {
         is_active: item.is_active,
         pictures: [],
         default_new_picture_index: '',
-        default_picture_id: item.pictures?.find((picture) => picture.is_default)?.id ?? '',
         regulatory_product_id: '',
-        regulatory_is_primary: false,
+        manufacturer_name: item?.manufacturer_name ?? '',
+        composition_text: item?.composition_text ?? '',
+        packing_text: item?.packing_text ?? '',
+        regulatory_class: item?.regulatory_class ?? '',
+        default_picture_id: item.pictures?.find((picture) => picture.is_default)?.id ?? '',
         _method: 'PUT',
     });
+
+    const [selectedRegulatory, setSelectedRegulatory] = useState(primaryRegulatoryProduct ?? null);
+
+    const handleSelectRegulatory = (product) => {
+        setSelectedRegulatory(product);
+        setData('regulatory_product_id', product.id);
+        const mapping = { name: product.product_name_source, manufacturer_name: product.industry_name, composition_text: product.raw_composition_text, packing_text: product.raw_packaging_text, regulatory_class: product.commodity_type, dosage_form: product.dosage_form, strength: product.strength };
+        Object.entries(mapping).forEach(([key, value]) => {
+            if (!data[key] && value) setData(key, value);
+        });
+    };
+
+    const clearRegulatory = () => { setSelectedRegulatory(null); setData('regulatory_product_id', ''); };
 
     const submit = (e) => {
         e.preventDefault();
@@ -46,6 +63,10 @@ export default function Edit() {
         <>
             <Head title="Edit Item" />
             <Card title="Edit Item" icon={<IconBox size={20} strokeWidth={1.5} />} form={submit} footer={<Button type="submit" disabled={processing} label="Update" icon={<IconPencilPlus size={20} strokeWidth={1.5} />} variant="gray" />}>
+                <div className="md:col-span-2">
+                    <h3 className="mb-2 text-sm font-semibold">Regulatory Reference</h3>
+                    <RegulatoryProductSearch selectedProduct={selectedRegulatory} onSelect={handleSelectRegulatory} onClear={clearRegulatory} />
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input label="SKU" type="text" value={data.sku} onChange={(e) => setData('sku', e.target.value)} errors={errors.sku} />
                     <Input label="Nama" type="text" value={data.name} onChange={(e) => setData('name', e.target.value)} errors={errors.name} />
@@ -58,26 +79,6 @@ export default function Edit() {
 
                 <div className="mt-4 flex gap-6"><label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={data.track_expired} onChange={(e) => setData('track_expired', e.target.checked)} /> Track Expired</label><label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} /> Aktif</label></div>
 
-                <div className="mt-8 border-t pt-6">
-                    <h3 className="text-base font-semibold mb-3">Mapping Regulatory Product</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                        <div className='flex flex-col gap-2 md:col-span-2'>
-                            <label className='text-gray-600 text-sm'>Pilih Regulatory Product</label>
-                            <select value={data.regulatory_product_id} onChange={(e) => setData('regulatory_product_id', e.target.value)} className='w-full px-3 py-1.5 border text-sm rounded-md bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'><option value=''>-</option>{regulatoryProducts.map((product) => <option value={product.id} key={product.id}>{product.nie} - {product.product_name_source}</option>)}</select>
-                        </div>
-                        <Button type="button" onClick={mapRegulatory} label="Hubungkan" variant="gray" />
-                    </div>
-                    <label className="mt-3 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={data.regulatory_is_primary} onChange={(e) => setData('regulatory_is_primary', e.target.checked)} /> Set sebagai primary</label>
-
-                    <div className="mt-4 overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-                            <thead><tr><th className="px-3 py-2 text-left">NIE</th><th className="px-3 py-2 text-left">Nama Produk</th><th className="px-3 py-2 text-left">Primary</th><th className="px-3 py-2 text-left">Aksi</th></tr></thead>
-                            <tbody>
-                                {item.regulatory_products?.length ? item.regulatory_products.map((product) => (<tr key={product.id}><td className="px-3 py-2">{product.nie}</td><td className="px-3 py-2">{product.product_name_source}</td><td className="px-3 py-2">{product.pivot?.is_primary ? 'Ya' : 'Tidak'}</td><td className="px-3 py-2 flex gap-2">{!product.pivot?.is_primary && <Button type="button" onClick={() => setPrimary(product.id)} label="Set Primary" variant="orange" />}<Button type="button" onClick={() => detachRegulatory(product.id)} label="Lepas" variant="rose" /></td></tr>)) : <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-500">Belum ada regulatory product terhubung.</td></tr>}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
             </Card>
         </>
     );

@@ -64,6 +64,43 @@ class RegulatoryProductController extends Controller {
     ],
   ]);
  }
+
+ public function search(Request $request): JsonResponse {
+  $validated=$request->validate([
+    'q'=>['required','string','min:3'],
+    'source_name'=>['nullable','in:BPOM,KEMENKES'],
+    'limit'=>['nullable','integer','min:1','max:50'],
+  ]);
+  $q=trim($validated['q']);
+  $limit=(int)($validated['limit'] ?? 20);
+  $items=RegulatoryProduct::query()
+    ->select('regulatory_products.id','regulatory_products.source_code','regulatory_products.nie','regulatory_products.product_name_source','regulatory_products.industry_name','regulatory_products.dosage_form','regulatory_products.strength','regulatory_products.commodity_type','regulatory_products.raw_packaging_text','regulatory_products.raw_composition_text','regulatory_sources.source_name')
+    ->join('regulatory_sources','regulatory_sources.id','=','regulatory_products.source_id')
+    ->when(!empty($validated['source_name']),fn($x)=>$x->where('regulatory_sources.source_name',$validated['source_name']))
+    ->where(function($query) use ($q){
+      $query->where('regulatory_products.source_code','like',$q.'%')
+        ->orWhere('regulatory_products.nie','like',$q.'%')
+        ->orWhere('regulatory_products.product_name_source','like','%'.$q.'%')
+        ->orWhere('regulatory_products.industry_name','like','%'.$q.'%')
+        ->orWhere('regulatory_products.raw_composition_text','like','%'.$q.'%');
+    })
+    ->limit($limit)
+    ->get()
+    ->map(fn($row)=>[
+      'id'=>$row->id,
+      'source_name'=>$row->source_name,
+      'source_code'=>$row->source_code ?: $row->nie,
+      'product_name_source'=>$row->product_name_source,
+      'industry_name'=>$row->industry_name,
+      'dosage_form'=>$row->dosage_form,
+      'strength'=>$row->strength,
+      'commodity_type'=>$row->commodity_type,
+      'raw_packaging_text'=>$row->raw_packaging_text,
+      'raw_composition_text'=>$row->raw_composition_text,
+    ]);
+
+  return response()->json(['data'=>$items]);
+ }
  public function exportExcel(Request $request): StreamedResponse {
   $q=trim((string)$request->get('q'));
   $rows=RegulatoryProduct::with('source')->when($q,fn($x)=>$x->where('nie','like',"%$q%")->orWhere('product_name_source','like',"%$q%"))->orderBy('id')->get();

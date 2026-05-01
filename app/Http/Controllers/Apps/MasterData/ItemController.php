@@ -237,6 +237,7 @@ class ItemController extends Controller implements HasMiddleware
             'categories' => Category::query()->select('id', 'name')->orderBy('name')->get(),
             'uoms' => Uom::query()->select('id', 'code', 'name')->orderBy('code')->get(),
             'warehouses' => Warehouse::query()->select('id', 'code', 'name')->orderBy('name')->get(),
+            'primaryRegulatoryProduct' => null,
         ]);
     }
 
@@ -245,11 +246,12 @@ class ItemController extends Controller implements HasMiddleware
         $validated = $request->validated();
 
         DB::transaction(function () use ($request, $validated): void {
-            $item = Item::query()->create(collect($validated)->except(['warehouse_id', 'min_stock_base', 'pictures', 'default_new_picture_index', 'default_picture_id'])->all());
+            $item = Item::query()->create(collect($validated)->except(['warehouse_id', 'min_stock_base', 'pictures', 'default_new_picture_index', 'default_picture_id', 'regulatory_product_id'])->all());
 
             $this->syncDefaultBarcode($item, $validated['default_barcode'] ?? null);
             $this->syncMinimumStock($item, $validated['warehouse_id'] ?? null, $validated['min_stock_base'] ?? null);
             $this->itemPictureService->upload($item, $request->file('pictures', []), $validated['default_new_picture_index'] ?? null);
+            $this->syncRegulatoryReference($item, $validated['regulatory_product_id'] ?? null);
         });
 
         return to_route('apps.master-data.items.index');
@@ -260,7 +262,7 @@ class ItemController extends Controller implements HasMiddleware
         $item->load([
             'warehouseItemSettings' => fn ($query) => $query->latest()->limit(1),
             'pictures:id,item_id,path,disk,file_name,mime_type,size,is_default,created_at',
-            'regulatoryProducts:id,source_id,nie,product_name_source',
+            'regulatoryProducts' => fn ($query) => $query->withPivot(['is_primary', 'source_name', 'source_code'])->with('source:id,source_name'),
         ]);
 
         return inertia('Apps/MasterData/Items/Edit', [
@@ -269,7 +271,7 @@ class ItemController extends Controller implements HasMiddleware
             'uoms' => Uom::query()->select('id', 'code', 'name')->orderBy('code')->get(),
             'warehouses' => Warehouse::query()->select('id', 'code', 'name')->orderBy('name')->get(),
             'minimumStockSetting' => $item->warehouseItemSettings->first(),
-            'regulatoryProducts' => RegulatoryProduct::query()->select('id', 'nie', 'product_name_source')->orderBy('product_name_source')->limit(200)->get(),
+            'primaryRegulatoryProduct' => $item->regulatoryProducts->firstWhere('pivot.is_primary', true),
         ]);
     }
 
@@ -278,11 +280,12 @@ class ItemController extends Controller implements HasMiddleware
         $validated = $request->validated();
 
         DB::transaction(function () use ($request, $item, $validated): void {
-            $item->update(collect($validated)->except(['warehouse_id', 'min_stock_base', 'pictures', 'default_new_picture_index', 'default_picture_id'])->all());
+            $item->update(collect($validated)->except(['warehouse_id', 'min_stock_base', 'pictures', 'default_new_picture_index', 'default_picture_id', 'regulatory_product_id'])->all());
 
             $this->syncDefaultBarcode($item, $validated['default_barcode'] ?? null);
             $this->syncMinimumStock($item, $validated['warehouse_id'] ?? null, $validated['min_stock_base'] ?? null);
             $this->itemPictureService->upload($item, $request->file('pictures', []), $validated['default_new_picture_index'] ?? null);
+            $this->syncRegulatoryReference($item, $validated['regulatory_product_id'] ?? null);
 
             if (! empty($validated['default_picture_id'])) {
                 $picture = ItemPicture::query()
@@ -333,6 +336,33 @@ class ItemController extends Controller implements HasMiddleware
             ],
             [
                 'min_stock_base' => $minimumStock,
+            ]
+        );
+    }
+
+    private function syncRegulatoryReference(Item $item, mixed $regulatoryProductId): void
+    {
+        if (! $regulatoryProductId) {
+            return;
+        }
+
+        $product = RegulatoryProduct::query()->with('source:id,source_name')->find($regulatoryProductId);
+
+        if (! $product) {
+            return;
+        }
+
+        $hasPrimary = ItemRegulatoryProduct::query()
+            ->where('item_id', $item->id)
+            ->where('is_primary', true)
+            ->exists();
+
+        ItemRegulatoryProduct::query()->updateOrCreate(
+            ['item_id' => $item->id, 'regulatory_product_id' => $product->id],
+            [
+                'is_primary' => $hasPrimary ? false : true,
+                'source_name' => $product->source?->source_name,
+                'source_code' => $product->source_code ?: $product->nie,
             ]
         );
     }

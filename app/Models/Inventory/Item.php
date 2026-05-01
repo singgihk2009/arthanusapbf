@@ -27,6 +27,10 @@ class Item extends Model
         'dosage_form',
         'strength',
         'commodity_type',
+        'manufacturer_name',
+        'composition_text',
+        'packing_text',
+        'regulatory_class',
         'requires_batch_tracking',
         'requires_expiry_tracking',
     ];
@@ -72,7 +76,7 @@ class Item extends Model
     }
     public function regulatoryProducts(): BelongsToMany
     {
-        return $this->belongsToMany(RegulatoryProduct::class, 'item_regulatory_products')->withPivot(['is_primary', 'notes'])->withTimestamps();
+        return $this->belongsToMany(RegulatoryProduct::class, 'item_regulatory_products')->withPivot(['is_primary', 'notes', 'source_name', 'source_code'])->withTimestamps();
     }
 
     public function aliases(): HasMany
