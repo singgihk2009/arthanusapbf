@@ -11,6 +11,7 @@ use App\Models\Inventory\ItemPicture;
 use App\Models\Inventory\Uom;
 use App\Models\Inventory\Warehouse;
 use App\Models\Inventory\WarehouseItemSetting;
+use App\Models\Regulatory\RegulatoryProduct;
 use App\Services\Inventory\ItemPictureService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
@@ -259,6 +260,7 @@ class ItemController extends Controller implements HasMiddleware
         $item->load([
             'warehouseItemSettings' => fn ($query) => $query->latest()->limit(1),
             'pictures:id,item_id,path,disk,file_name,mime_type,size,is_default,created_at',
+            'regulatoryProducts:id,source_id,nie,product_name_source',
         ]);
 
         return inertia('Apps/MasterData/Items/Edit', [
@@ -267,6 +269,7 @@ class ItemController extends Controller implements HasMiddleware
             'uoms' => Uom::query()->select('id', 'code', 'name')->orderBy('code')->get(),
             'warehouses' => Warehouse::query()->select('id', 'code', 'name')->orderBy('name')->get(),
             'minimumStockSetting' => $item->warehouseItemSettings->first(),
+            'regulatoryProducts' => RegulatoryProduct::query()->select('id', 'nie', 'product_name_source')->orderBy('product_name_source')->limit(200)->get(),
         ]);
     }
 
