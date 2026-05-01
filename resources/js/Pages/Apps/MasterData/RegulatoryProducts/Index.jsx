@@ -61,6 +61,7 @@ export default function Index() {
                 <div className="flex items-end gap-2 md:col-span-8">
                     <a href="/apps/master-data/regulatory-products?download_template=1" className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">Download Template Import</a>
                     <button type="button" onClick={handleImport} disabled={!importFile || importing} className="inline-flex items-center gap-1 rounded-lg border border-indigo-500 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-indigo-950/30"><IconFileImport size={16} strokeWidth={1.5} />{importing ? 'Importing...' : 'Import Excel'}</button>
+                    <a href={route('apps.master-data.regulatory-products.export.excel')} className="inline-flex items-center gap-1 rounded-lg border border-emerald-500 px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30">Export Excel</a>
                     {importResult && <span className={`text-xs ${importResult.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>{importResult.message}</span>}
                 </div>
             </div>
@@ -73,6 +74,12 @@ export default function Index() {
                             <Table.Th>Source</Table.Th>
                             <Table.Th>NIE</Table.Th>
                             <Table.Th>Nama Produk</Table.Th>
+                            <Table.Th>Produsen</Table.Th>
+                            <Table.Th>Kemasan</Table.Th>
+                            <Table.Th>Kekuatan</Table.Th>
+                            <Table.Th>Jenis Komoditi</Table.Th>
+                            <Table.Th>Packing</Table.Th>
+                            <Table.Th>Bahan Obat</Table.Th>
                             <Table.Th className="w-32"></Table.Th>
                         </tr>
                     </Table.Thead>
@@ -83,6 +90,12 @@ export default function Index() {
                                 <Table.Td>{product.source?.source_name ?? '-'}</Table.Td>
                                 <Table.Td>{product.nie}</Table.Td>
                                 <Table.Td>{product.product_name_source}</Table.Td>
+                                <Table.Td>{product.industry_name ?? '-'}</Table.Td>
+                                <Table.Td>{product.dosage_form ?? '-'}</Table.Td>
+                                <Table.Td>{product.strength ?? '-'}</Table.Td>
+                                <Table.Td>{product.commodity_type ?? '-'}</Table.Td>
+                                <Table.Td>{product.raw_packaging_text ?? '-'}</Table.Td>
+                                <Table.Td>{product.raw_composition_text ?? '-'}</Table.Td>
                                 <Table.Td>
                                     <div className="flex gap-2">
                                         <Button type="edit" href={route('apps.master-data.regulatory-products.edit', product.id)} icon={<IconPencilCog size={16} strokeWidth={1.5} />} variant="orange" />
@@ -90,7 +103,7 @@ export default function Index() {
                                     </div>
                                 </Table.Td>
                             </tr>
-                        )) : <Table.Empty colSpan={5} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto text-gray-500 dark:text-white mb-2'/><span className='text-gray-500'>Data regulatory product tidak ditemukan.</span></>} />}
+                        )) : <Table.Empty colSpan={11} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto text-gray-500 dark:text-white mb-2'/><span className='text-gray-500'>Data regulatory product tidak ditemukan.</span></>} />}
                     </Table.Tbody>
                 </Table>
             </Table.Card>

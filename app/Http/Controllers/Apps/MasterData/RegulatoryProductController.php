@@ -13,11 +13,34 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use ZipArchive;
 class RegulatoryProductController extends Controller {
  public function index(Request $request){
   if($request->boolean('download_template')){return $this->downloadTemplateExcel();}
   $q=trim((string)$request->get('q'));$items=RegulatoryProduct::with('source')->when($q,fn($x)=>$x->where('nie','like',"%$q%")->orWhere('product_name_source','like',"%$q%"))->paginate(10)->withQueryString(); return inertia('Apps/MasterData/RegulatoryProducts/Index',['products'=>$items,'filters'=>['q'=>$q]]);
+ }
+ public function exportExcel(Request $request): StreamedResponse {
+  $q=trim((string)$request->get('q'));
+  $rows=RegulatoryProduct::with('source')->when($q,fn($x)=>$x->where('nie','like',"%$q%")->orWhere('product_name_source','like',"%$q%"))->orderBy('id')->get();
+  return response()->streamDownload(function() use ($rows): void {
+   $output=fopen('php://output','w');
+   fputcsv($output,['Source','NIE','Nama Produk','Produsen','Kemasan','Kekuatan','Jenis Komoditi','Packing','Bahan Obat']);
+   foreach($rows as $product){
+    fputcsv($output,[
+     $product->source?->source_name ?? '-',
+     $product->nie,
+     $product->product_name_source,
+     $product->industry_name,
+     $product->dosage_form,
+     $product->strength,
+     $product->commodity_type,
+     $product->raw_packaging_text,
+     $product->raw_composition_text,
+    ]);
+   }
+   fclose($output);
+  },'master-regulatory-products-'.now()->format('Ymd-His').'.csv',['Content-Type'=>'text/csv; charset=UTF-8']);
  } 
  public function create(){return inertia('Apps/MasterData/RegulatoryProducts/Create',['sources'=>RegulatorySource::all()]);}
  public function store(RegulatoryProductRequest $request){RegulatoryProduct::create($request->validated());return to_route('apps.master-data.regulatory-products.index');}
