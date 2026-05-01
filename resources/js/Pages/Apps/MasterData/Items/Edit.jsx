@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import RegulatoryProductSearch from '@/Components/RegulatoryProductSearch';
 
 export default function Edit() {
-    const { item, categories, uoms, warehouses, minimumStockSetting, primaryRegulatoryProduct } = usePage().props;
+    const { item, categories, uoms, warehouses, minimumStockSetting } = usePage().props;
     const { data, setData, post, errors, processing } = useForm({
         sku: item.sku,
         name: item.name,
@@ -31,7 +31,7 @@ export default function Edit() {
         _method: 'PUT',
     });
 
-    const [selectedRegulatory, setSelectedRegulatory] = useState(primaryRegulatoryProduct ?? null);
+    const [selectedRegulatory, setSelectedRegulatory] = useState(null);
 
     const handleSelectRegulatory = (product) => {
         setSelectedRegulatory(product);
@@ -52,7 +52,14 @@ export default function Edit() {
 
     const mapRegulatory = () => {
         if (!data.regulatory_product_id) return;
-        post(route('apps.master-data.regulatory-products.mapping.attach'), { data: { item_id: item.id, regulatory_product_id: data.regulatory_product_id }, preserveScroll: true });
+        post(route('apps.master-data.regulatory-products.mapping.attach'), {
+            data: { item_id: item.id, regulatory_product_id: data.regulatory_product_id },
+            preserveScroll: true,
+            onSuccess: () => {
+                setSelectedRegulatory(null);
+                setData('regulatory_product_id', '');
+            },
+        });
     };
 
     const setPrimary = (regulatoryProductId) => post(route('apps.master-data.regulatory-products.mapping.set-primary'), { data: { item_id: item.id, regulatory_product_id: regulatoryProductId }, preserveScroll: true });
