@@ -19,6 +19,7 @@ class ItemRequest extends FormRequest
         return [
             'sku' => ['required', 'string', 'max:100', 'unique:items,sku,'. $itemId],
             'name' => ['required', 'string', 'max:255'],
+            'nie' => ['nullable', 'string', 'max:100'],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'base_uom_id' => ['required', 'integer', 'exists:uoms,id'],
             'default_barcode' => ['nullable', 'string', 'max:100'],
