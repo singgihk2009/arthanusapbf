@@ -17,6 +17,7 @@ class Item extends Model
     protected $fillable = [
         'sku',
         'name',
+        'nie',
         'category_id',
         'base_uom_id',
         'default_barcode',

@@ -12,6 +12,7 @@ export default function Edit() {
     const { data, setData, post, errors, processing } = useForm({
         sku: item.sku,
         name: item.name,
+        nie: item.nie ?? '',
         category_id: item.category_id ?? '',
         base_uom_id: item.base_uom_id,
         default_barcode: item.default_barcode ?? '',
@@ -35,7 +36,8 @@ export default function Edit() {
     const handleSelectRegulatory = (product) => {
         setSelectedRegulatory(product);
         setData('regulatory_product_id', product.id);
-        const mapping = { name: product.product_name_source, manufacturer_name: product.industry_name, composition_text: product.raw_composition_text, packing_text: product.raw_packaging_text, regulatory_class: product.commodity_type, dosage_form: product.dosage_form, strength: product.strength };
+        const combinedName = [product.product_name_source, product.raw_packaging_text].filter(Boolean).join(' - ');
+        const mapping = { name: combinedName, nie: product.nie ?? product.source_code, manufacturer_name: product.industry_name, composition_text: product.raw_composition_text, packing_text: product.raw_packaging_text, regulatory_class: product.commodity_type, dosage_form: product.dosage_form, strength: product.strength };
         Object.entries(mapping).forEach(([key, value]) => {
             if (!data[key] && value) setData(key, value);
         });
@@ -67,6 +69,7 @@ export default function Edit() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input label="SKU" type="text" value={data.sku} onChange={(e) => setData('sku', e.target.value)} errors={errors.sku} />
                     <Input label="Nama" type="text" value={data.name} onChange={(e) => setData('name', e.target.value)} errors={errors.name} />
+                    <Input label="NIE" type="text" value={data.nie} onChange={(e) => setData('nie', e.target.value)} errors={errors.nie} />
                     <div className='flex flex-col gap-2'><label className='text-gray-600 text-sm'>Category</label><select value={data.category_id} onChange={(e) => setData('category_id', e.target.value)} className='w-full px-3 py-1.5 border text-sm rounded-md bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'><option value=''>-</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select>{errors.category_id && <small className='text-xs text-red-500'>{errors.category_id}</small>}</div>
                     <div className='flex flex-col gap-2'><label className='text-gray-600 text-sm'>Base UOM</label><select value={data.base_uom_id} onChange={(e) => setData('base_uom_id', e.target.value)} className='w-full px-3 py-1.5 border text-sm rounded-md bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'><option value=''>-</option>{uoms.map((uom) => <option value={uom.id} key={uom.id}>{uom.code} - {uom.name}</option>)}</select>{errors.base_uom_id && <small className='text-xs text-red-500'>{errors.base_uom_id}</small>}</div>
                     <Input label="Default Barcode" type="text" value={data.default_barcode} onChange={(e) => setData('default_barcode', e.target.value)} errors={errors.default_barcode} />
