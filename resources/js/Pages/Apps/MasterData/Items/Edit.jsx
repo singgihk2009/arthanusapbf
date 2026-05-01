@@ -51,9 +51,6 @@ export default function Edit() {
     const mapRegulatory = () => {
         if (!data.regulatory_product_id) return;
         post(route('apps.master-data.regulatory-products.mapping.attach'), { data: { item_id: item.id, regulatory_product_id: data.regulatory_product_id }, preserveScroll: true });
-        if (data.regulatory_is_primary) {
-            post(route('apps.master-data.regulatory-products.mapping.set-primary'), { data: { item_id: item.id, regulatory_product_id: data.regulatory_product_id }, preserveScroll: true });
-        }
     };
 
     const setPrimary = (regulatoryProductId) => post(route('apps.master-data.regulatory-products.mapping.set-primary'), { data: { item_id: item.id, regulatory_product_id: regulatoryProductId }, preserveScroll: true });
@@ -75,6 +72,42 @@ export default function Edit() {
                     <Input label="Default Barcode" type="text" value={data.default_barcode} onChange={(e) => setData('default_barcode', e.target.value)} errors={errors.default_barcode} />
                     <div className='flex flex-col gap-2'><label className='text-gray-600 text-sm'>Gudang Minimum Stok</label><select value={data.warehouse_id} onChange={(e) => setData('warehouse_id', e.target.value)} className='w-full px-3 py-1.5 border text-sm rounded-md bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'><option value=''>-</option>{warehouses.map((warehouse) => <option value={warehouse.id} key={warehouse.id}>{warehouse.code} - {warehouse.name}</option>)}</select>{errors.warehouse_id && <small className='text-xs text-red-500'>{errors.warehouse_id}</small>}</div>
                     <Input label="Minimum Stok" type="number" min="0" step="0.000001" value={data.min_stock_base} onChange={(e) => setData('min_stock_base', e.target.value)} errors={errors.min_stock_base} className="md:col-span-2" />
+                </div>
+
+                <div className="mt-6 md:col-span-2">
+                    <div className="mb-2 flex items-center justify-between">
+                        <h3 className="text-sm font-semibold">Linked Regulatory Products</h3>
+                        <Button type="button" label="Add regulatory link" onClick={mapRegulatory} />
+                    </div>
+                    <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-800">
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-gray-50 dark:bg-gray-900/50">
+                                <tr>
+                                    {['Source', 'NIE/Kode', 'Nama Regulatory', 'Produsen', 'Sediaan', 'Kekuatan', 'Komoditi', 'Primary', 'Action'].map((header) => <th key={header} className="px-3 py-2 text-left">{header}</th>)}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(item.regulatory_products ?? item.regulatoryProducts ?? []).map((product) => (
+                                    <tr key={product.id} className="border-t border-gray-100 dark:border-gray-800">
+                                        <td className="px-3 py-2">{product.pivot?.source_name ?? product.source?.source_name ?? '-'}</td>
+                                        <td className="px-3 py-2">{product.pivot?.source_code ?? product.source_code ?? product.nie ?? '-'}</td>
+                                        <td className="px-3 py-2">{product.product_name_source ?? '-'}</td>
+                                        <td className="px-3 py-2">{product.industry_name ?? '-'}</td>
+                                        <td className="px-3 py-2">{product.dosage_form ?? '-'}</td>
+                                        <td className="px-3 py-2">{product.strength ?? '-'}</td>
+                                        <td className="px-3 py-2">{product.commodity_type ?? '-'}</td>
+                                        <td className="px-3 py-2">{product.pivot?.is_primary ? 'Yes' : 'No'}</td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex gap-2">
+                                                <Button type="button" label="Set as primary" onClick={() => setPrimary(product.id)} />
+                                                <Button type="button" label="Remove" onClick={() => detachRegulatory(product.id)} variant="red" />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div className="mt-4 flex gap-6"><label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={data.track_expired} onChange={(e) => setData('track_expired', e.target.checked)} /> Track Expired</label><label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} /> Aktif</label></div>
