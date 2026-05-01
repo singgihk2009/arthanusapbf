@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use ZipArchive;
 class RegulatoryProductController extends Controller {
@@ -73,14 +74,24 @@ class RegulatoryProductController extends Controller {
   ]);
   $q=trim($validated['q']);
   $limit=(int)($validated['limit'] ?? 20);
+  $hasSourceCodeColumn = Schema::hasColumn('regulatory_products', 'source_code');
+  $sourceCodeSelect = $hasSourceCodeColumn ? 'regulatory_products.source_code as source_code' : 'regulatory_products.nie as source_code';
+
   $items=RegulatoryProduct::query()
-    ->select('regulatory_products.id','regulatory_products.source_code','regulatory_products.nie','regulatory_products.product_name_source','regulatory_products.industry_name','regulatory_products.dosage_form','regulatory_products.strength','regulatory_products.commodity_type','regulatory_products.raw_packaging_text','regulatory_products.raw_composition_text','regulatory_sources.source_name')
+    ->select('regulatory_products.id','regulatory_products.nie','regulatory_products.product_name_source','regulatory_products.industry_name','regulatory_products.dosage_form','regulatory_products.strength','regulatory_products.commodity_type','regulatory_products.raw_packaging_text','regulatory_products.raw_composition_text','regulatory_sources.source_name')
+    ->selectRaw($sourceCodeSelect)
     ->join('regulatory_sources','regulatory_sources.id','=','regulatory_products.source_id')
     ->when(!empty($validated['source_name']),fn($x)=>$x->where('regulatory_sources.source_name',$validated['source_name']))
-    ->where(function($query) use ($q){
-      $query->where('regulatory_products.source_code','like',$q.'%')
-        ->orWhere('regulatory_products.nie','like',$q.'%')
-        ->orWhere('regulatory_products.product_name_source','like','%'.$q.'%')
+    ->where(function($query) use ($q, $hasSourceCodeColumn){
+      if ($hasSourceCodeColumn) {
+        $query->where(function ($inner) use ($q) {
+            $inner->where('regulatory_products.source_code','like',$q.'%')
+                ->orWhere('regulatory_products.nie','like',$q.'%');
+        });
+      } else {
+        $query->where('regulatory_products.nie','like',$q.'%');
+      }
+      $query->orWhere('regulatory_products.product_name_source','like','%'.$q.'%')
         ->orWhere('regulatory_products.industry_name','like','%'.$q.'%')
         ->orWhere('regulatory_products.raw_composition_text','like','%'.$q.'%')
         ->orWhere('regulatory_sources.source_name','like','%'.$q.'%');
