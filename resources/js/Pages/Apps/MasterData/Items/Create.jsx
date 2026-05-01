@@ -28,7 +28,7 @@ export default function Create() {
         setSelectedRegulatory(product);
         setData('regulatory_product_id', product.id);
         const combinedName = [product.product_name_source, product.raw_packaging_text].filter(Boolean).join(' - ');
-        const mapping = { name: combinedName, nie: product.nie, manufacturer_name: product.industry_name, composition_text: product.raw_composition_text, packing_text: product.raw_packaging_text, regulatory_class: product.commodity_type, dosage_form: product.dosage_form, strength: product.strength };
+        const mapping = { name: combinedName, nie: product.nie ?? product.source_code, manufacturer_name: product.industry_name, composition_text: product.raw_composition_text, packing_text: product.raw_packaging_text, regulatory_class: product.commodity_type, dosage_form: product.dosage_form, strength: product.strength };
         Object.entries(mapping).forEach(([key, value]) => {
             if (!data[key] && value) setData(key, value);
         });

@@ -102,6 +102,7 @@ class RegulatoryProductController extends Controller {
       'id'=>$row->id,
       'source_name'=>$row->source_name,
       'source_code'=>$row->source_code ?: $row->nie,
+      'nie'=>$row->nie,
       'product_name_source'=>$row->product_name_source,
       'industry_name'=>$row->industry_name,
       'dosage_form'=>$row->dosage_form,
