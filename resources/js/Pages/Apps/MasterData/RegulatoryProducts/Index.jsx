@@ -116,6 +116,7 @@ export default function Index() {
                             <Table.Th className="w-10">No</Table.Th>
                             <Table.Th>Source</Table.Th>
                             <Table.Th>NIE</Table.Th>
+                            <Table.Th>Kode BPOM</Table.Th>
                             <Table.Th>Nama Produk</Table.Th>
                             <Table.Th>Produsen</Table.Th>
                             <Table.Th>Kemasan</Table.Th>
@@ -132,6 +133,7 @@ export default function Index() {
                                 <Table.Td className="text-center">{++i + (products.current_page - 1) * products.per_page}</Table.Td>
                                 <Table.Td>{product.source?.source_name ?? '-'}</Table.Td>
                                 <Table.Td>{product.nie}</Table.Td>
+                                <Table.Td>{product.source_code ?? '-'}</Table.Td>
                                 <Table.Td>{product.product_name_source}</Table.Td>
                                 <Table.Td>{product.industry_name ?? '-'}</Table.Td>
                                 <Table.Td>{product.dosage_form ?? '-'}</Table.Td>
@@ -146,7 +148,7 @@ export default function Index() {
                                     </div>
                                 </Table.Td>
                             </tr>
-                        )) : <Table.Empty colSpan={11} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto text-gray-500 dark:text-white mb-2'/><span className='text-gray-500'>Data regulatory product tidak ditemukan.</span></>} />}
+                        )) : <Table.Empty colSpan={12} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto text-gray-500 dark:text-white mb-2'/><span className='text-gray-500'>Data regulatory product tidak ditemukan.</span></>} />}
                     </Table.Tbody>
                 </Table>
             </Table.Card>
