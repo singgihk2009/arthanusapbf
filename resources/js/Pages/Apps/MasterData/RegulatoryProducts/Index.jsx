@@ -1,18 +1,43 @@
 import AppLayout from '@/Layouts/AppLayout';
 import Button from '@/Components/Button';
 import Pagination from '@/Components/Pagination';
-import Search from '@/Components/Search';
 import Table from '@/Components/Table';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { IconCirclePlus, IconDatabaseOff, IconFileImport, IconPencilCog, IconTrash } from '@tabler/icons-react';
-import React, { useState } from 'react';
+import { IconCirclePlus, IconDatabaseOff, IconFileImport, IconPencilCog, IconSearch, IconTrash } from '@tabler/icons-react';
+import React, { useEffect, useState } from 'react';
 
 export default function Index() {
-    const { products } = usePage().props;
+    const { products, filters, filterOptions } = usePage().props;
     const { delete: destroy } = useForm();
     const [importFile, setImportFile] = useState(null);
     const [importing, setImporting] = useState(false);
     const [importResult, setImportResult] = useState(null);
+    const [query, setQuery] = useState(filters?.q ?? '');
+    const [searchError, setSearchError] = useState('');
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            const normalized = query.trim();
+            if (normalized.length > 0 && normalized.length < 3) {
+                setSearchError('Minimal 3 karakter untuk pencarian.');
+                return;
+            }
+            setSearchError('');
+            router.get(route('apps.master-data.regulatory-products.index'), {
+                ...filters,
+                q: normalized,
+            }, { preserveState: true, replace: true, preserveScroll: true, only: ['products', 'filters'] });
+        }, 500);
+
+        return () => clearTimeout(timeout);
+    }, [query]);
+
+    const onFilterChange = (key, value) => {
+        router.get(route('apps.master-data.regulatory-products.index'), {
+            ...filters,
+            [key]: value,
+        }, { preserveState: true, replace: true, preserveScroll: true });
+    };
 
     const bulkDelete = () => {
         const ids = products.data.map((item) => item.id).join(',');
@@ -46,12 +71,37 @@ export default function Index() {
             <Head title="Master Regulatory Product" />
             <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="w-full md:w-1/3">
-                    <Search url={route('apps.master-data.regulatory-products.index')} placeholder="Cari NIE / nama produk..." />
+                    <div className="relative">
+                        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cari NIE / nama produk / produsen / komposisi..." className='py-2 px-4 pr-11 block w-full rounded-lg text-sm border focus:outline-none focus:ring-0 text-gray-700 bg-white border-gray-200 dark:text-gray-200 dark:bg-gray-950 dark:border-gray-900' />
+                        <div className='absolute inset-y-0 right-0 flex items-center pointer-events-none pr-4'><IconSearch className='text-gray-500 w-5 h-5' /></div>
+                    </div>
+                    {searchError && <p className="mt-1 text-xs text-rose-600">{searchError}</p>}
                 </div>
                 <div className="flex gap-2">
                     <Button type="link" href={route('apps.master-data.regulatory-products.create')} icon={<IconCirclePlus size={20} strokeWidth={1.5} />} variant="gray" label="Tambah" />
                     <Button type="bulk" onClick={bulkDelete} icon={<IconTrash size={16} strokeWidth={1.5} />} variant="rose" label="Hapus Halaman" />
                 </div>
+            </div>
+            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-5">
+                <select className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-900 dark:bg-gray-950" value={filters?.source ?? ''} onChange={(e) => onFilterChange('source', e.target.value)}>
+                    <option value="">Semua Source</option>
+                    {filterOptions?.sources?.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+                <select className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-900 dark:bg-gray-950" value={filters?.commodity_type ?? ''} onChange={(e) => onFilterChange('commodity_type', e.target.value)}>
+                    <option value="">Semua Jenis Komoditi</option>
+                    {filterOptions?.commodity_types?.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+                <select className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-900 dark:bg-gray-950" value={filters?.dosage_form ?? ''} onChange={(e) => onFilterChange('dosage_form', e.target.value)}>
+                    <option value="">Semua Dosage Form</option>
+                    {filterOptions?.dosage_forms?.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+                <select className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-900 dark:bg-gray-950" value={filters?.producer ?? ''} onChange={(e) => onFilterChange('producer', e.target.value)}>
+                    <option value="">Semua Produsen</option>
+                    {filterOptions?.producers?.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+                <select className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-900 dark:bg-gray-950" value={filters?.per_page ?? 10} onChange={(e) => onFilterChange('per_page', e.target.value)}>
+                    <option value={10}>10 / halaman</option><option value={25}>25 / halaman</option><option value={50}>50 / halaman</option><option value={100}>100 / halaman</option>
+                </select>
             </div>
             <div className="mb-5 grid gap-3 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-900 dark:bg-gray-950 md:grid-cols-12">
                 <div className="md:col-span-4">

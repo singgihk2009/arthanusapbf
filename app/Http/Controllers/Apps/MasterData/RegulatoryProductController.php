@@ -18,7 +18,50 @@ use ZipArchive;
 class RegulatoryProductController extends Controller {
  public function index(Request $request){
   if($request->boolean('download_template')){return $this->downloadTemplateExcel();}
-  $q=trim((string)$request->get('q'));$items=RegulatoryProduct::with('source')->when($q,fn($x)=>$x->where('nie','like',"%$q%")->orWhere('product_name_source','like',"%$q%"))->paginate(10)->withQueryString(); return inertia('Apps/MasterData/RegulatoryProducts/Index',['products'=>$items,'filters'=>['q'=>$q]]);
+  $q=trim((string)$request->get('q'));
+  $source=$request->string('source')->toString();
+  $commodityType=$request->string('commodity_type')->toString();
+  $dosageForm=$request->string('dosage_form')->toString();
+  $producer=$request->string('producer')->toString();
+  $perPage=(int)$request->integer('per_page',10);
+  $perPage=in_array($perPage,[10,25,50,100],true)?$perPage:10;
+  $shouldSearch=mb_strlen($q)>=3;
+
+  $items=RegulatoryProduct::query()
+   ->with('source')
+   ->when($source!=='', fn($x)=>$x->whereHas('source', fn($s)=>$s->where('source_name',$source)))
+   ->when($commodityType!=='', fn($x)=>$x->where('commodity_type',$commodityType))
+   ->when($dosageForm!=='', fn($x)=>$x->where('dosage_form',$dosageForm))
+   ->when($producer!=='', fn($x)=>$x->where('industry_name',$producer))
+   ->when($shouldSearch,function($x) use ($q){
+    $driver=config('database.default');
+    $isMysql=in_array(config("database.connections.{$driver}.driver"),['mysql','mariadb'],true);
+    if($isMysql){
+      $x->where(function($query) use ($q){
+       $query->whereRaw("MATCH(product_name_source,industry_name,raw_composition_text) AGAINST (? IN BOOLEAN MODE)",[$q.'*'])
+        ->orWhere('nie','like',"%$q%");
+      });
+      return;
+    }
+    $x->where(function($query) use ($q){
+      $query->where('nie','like',"%$q%")
+        ->orWhere('product_name_source','like',"%$q%")
+        ->orWhere('industry_name','like',"%$q%")
+        ->orWhere('raw_composition_text','like',"%$q%");
+    });
+   })
+   ->paginate($perPage)->withQueryString();
+
+  return inertia('Apps/MasterData/RegulatoryProducts/Index',[
+    'products'=>$items,
+    'filters'=>['q'=>$q,'source'=>$source,'commodity_type'=>$commodityType,'dosage_form'=>$dosageForm,'producer'=>$producer,'per_page'=>$perPage],
+    'filterOptions'=>[
+      'sources'=>RegulatorySource::query()->orderBy('source_name')->pluck('source_name'),
+      'commodity_types'=>RegulatoryProduct::query()->whereNotNull('commodity_type')->where('commodity_type','!=','')->distinct()->orderBy('commodity_type')->pluck('commodity_type'),
+      'dosage_forms'=>RegulatoryProduct::query()->whereNotNull('dosage_form')->where('dosage_form','!=','')->distinct()->orderBy('dosage_form')->pluck('dosage_form'),
+      'producers'=>RegulatoryProduct::query()->whereNotNull('industry_name')->where('industry_name','!=','')->distinct()->orderBy('industry_name')->pluck('industry_name'),
+    ],
+  ]);
  }
  public function exportExcel(Request $request): StreamedResponse {
   $q=trim((string)$request->get('q'));
