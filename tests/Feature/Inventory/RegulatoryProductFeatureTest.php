@@ -35,3 +35,18 @@ it('can map and set primary regulatory product', function () {
 
     $this->assertDatabaseHas('item_regulatory_products',['item_id'=>$item->id,'regulatory_product_id'=>$rp->id,'is_primary'=>1]);
 });
+
+it('can search regulatory products by source name including custom sources', function () {
+    $user = User::factory()->create();
+    $source = RegulatorySource::firstOrCreate(['source_name' => 'BOSKA']);
+    RegulatoryProduct::create([
+        'source_id' => $source->id,
+        'nie' => 'NIE-BOSKA-001',
+        'product_name_source' => 'Produk Uji BOSKA',
+    ]);
+
+    $this->actingAs($user)
+        ->getJson('/api/regulatory-products/search?q=BOSKA')
+        ->assertOk()
+        ->assertJsonPath('data.0.source_name', 'BOSKA');
+});
