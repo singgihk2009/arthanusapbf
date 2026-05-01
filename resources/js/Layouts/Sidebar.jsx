@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import Menu from "@/Utils/Menu"
 import LinkItem from "@/Components/LinkItem";
 import LinkItemDropdown from "@/Components/LinkItemDropdown";
 import { usePage } from "@inertiajs/react";
-import { IconBrandReact } from "@tabler/icons-react";
+import { IconBrandReact, IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { clsx } from "clsx";
 export default function Sidebar({ sidebarOpen }) {
 
@@ -12,6 +12,11 @@ export default function Sidebar({ sidebarOpen }) {
 
     // get menu from utils
     const menuNavigation = Menu();
+    const [expandedMenus, setExpandedMenus] = useState({});
+
+    const toggleMenu = (title) => {
+        setExpandedMenus((prev) => ({ ...prev, [title]: !prev[title] }));
+    };
 
     return (
         <div
@@ -40,12 +45,17 @@ export default function Sidebar({ sidebarOpen }) {
                     <div className="w-full flex flex-col overflow-y-auto">
                         {menuNavigation.map((item, index) => (
                             <div key={index}>
-                                {item.permissions &&
-                                    <div className="text-gray-600 dark:text-gray-400 text-xs py-3 px-4 font-bold uppercase">
-                                        {item.title}
-                                    </div>
-                                }
-                                {item.details.map((detail, indexDetail) => (
+                                {item.permissions && (
+                                    <button
+                                        type="button"
+                                        className="w-full flex items-center justify-between text-gray-600 dark:text-gray-400 text-xs py-3 px-4 font-bold uppercase"
+                                        onClick={() => toggleMenu(item.title)}
+                                    >
+                                        <span>{item.title}</span>
+                                        {expandedMenus[item.title] ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+                                    </button>
+                                )}
+                                {expandedMenus[item.title] && item.details.map((detail, indexDetail) => (
                                     detail.hasOwnProperty('subdetails') ?
                                         <LinkItemDropdown
                                             key={indexDetail}
