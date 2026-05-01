@@ -74,6 +74,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
 
         Route::resource('/regulatory-sources', RegulatorySourceController::class)->parameters(['regulatory-sources' => 'regulatorySource']);
         Route::get('/regulatory-products/export/excel', [RegulatoryProductController::class, 'exportExcel'])->name('regulatory-products.export.excel');
+        Route::get('/regulatory-products/search', [RegulatoryProductController::class, 'search'])->name('regulatory-products.search');
         Route::resource('/regulatory-products', RegulatoryProductController::class)->parameters(['regulatory-products' => 'regulatoryProduct']);
         Route::get('/regulatory-products/template/excel', [RegulatoryProductController::class, 'downloadTemplateExcel'])->name('regulatory-products.template.excel');
         Route::post('/regulatory-products/import/excel', [RegulatoryProductController::class, 'importExcel'])->name('regulatory-products.import.excel');
