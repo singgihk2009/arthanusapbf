@@ -8,7 +8,17 @@ import React from 'react';
 
 export default function Create() {
     const { sources } = usePage().props;
-    const { data, setData, post, errors } = useForm({ source_id: '', nie: '', product_name_source: '' });
+    const { data, setData, post, errors } = useForm({
+        source_id: '',
+        nie: '',
+        product_name_source: '',
+        dosage_form: '',
+        strength: '',
+        industry_name: '',
+        commodity_type: '',
+        raw_composition_text: '',
+        raw_packaging_text: '',
+    });
 
     const submit = (e) => {
         e.preventDefault();
@@ -30,6 +40,12 @@ export default function Create() {
                     </div>
                     <Input label="NIE" type="text" value={data.nie} onChange={(e) => setData('nie', e.target.value)} errors={errors.nie} />
                     <Input label="Nama Produk (Source)" type="text" value={data.product_name_source} onChange={(e) => setData('product_name_source', e.target.value)} errors={errors.product_name_source} />
+                    <Input label="Dosage Form" type="text" value={data.dosage_form} onChange={(e) => setData('dosage_form', e.target.value)} errors={errors.dosage_form} />
+                    <Input label="Strength" type="text" value={data.strength} onChange={(e) => setData('strength', e.target.value)} errors={errors.strength} />
+                    <Input label="Industry Name" type="text" value={data.industry_name} onChange={(e) => setData('industry_name', e.target.value)} errors={errors.industry_name} />
+                    <Input label="Commodity Type" type="text" value={data.commodity_type} onChange={(e) => setData('commodity_type', e.target.value)} errors={errors.commodity_type} />
+                    <Input label="Raw Composition Text" type="text" value={data.raw_composition_text} onChange={(e) => setData('raw_composition_text', e.target.value)} errors={errors.raw_composition_text} />
+                    <Input label="Raw Packaging Text" type="text" value={data.raw_packaging_text} onChange={(e) => setData('raw_packaging_text', e.target.value)} errors={errors.raw_packaging_text} />
                 </div>
             </Card>
         </>
