@@ -68,11 +68,16 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         // Backward-compatible aliases (old singular URLs)
         Route::redirect('/regulatory-source', '/apps/master-data/regulatory-sources', 301);
         Route::redirect('/regulatory-product', '/apps/master-data/regulatory-products', 301);
+        Route::redirect('/regulartory-products', '/apps/master-data/regulatory-products', 301);
+        Route::redirect('/regulartory-products/template/excel', '/apps/master-data/regulatory-products/template/excel', 301);
+        Route::redirect('/regulartory-products/import/excel', '/apps/master-data/regulatory-products/import/excel', 301);
 
         Route::resource('/regulatory-sources', RegulatorySourceController::class)->parameters(['regulatory-sources' => 'regulatorySource']);
         Route::resource('/regulatory-products', RegulatoryProductController::class)->parameters(['regulatory-products' => 'regulatoryProduct']);
         Route::get('/regulatory-products/template/excel', [RegulatoryProductController::class, 'downloadTemplateExcel'])->name('regulatory-products.template.excel');
         Route::post('/regulatory-products/import/excel', [RegulatoryProductController::class, 'importExcel'])->name('regulatory-products.import.excel');
+        Route::get('/regulatory-product/template/excel', [RegulatoryProductController::class, 'downloadTemplateExcel']);
+        Route::post('/regulatory-product/import/excel', [RegulatoryProductController::class, 'importExcel']);
         Route::post('/regulatory-products/import/bpom', [RegulatoryProductController::class, 'importBpom'])->name('regulatory-products.import.bpom');
         Route::post('/regulatory-products/import/kemenkes', [RegulatoryProductController::class, 'importKemenkes'])->name('regulatory-products.import.kemenkes');
         Route::post('/regulatory-products/mapping/attach', [RegulatoryProductController::class, 'attach'])->name('regulatory-products.mapping.attach');
