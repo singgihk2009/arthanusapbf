@@ -15,7 +15,10 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use ZipArchive;
 class RegulatoryProductController extends Controller {
- public function index(Request $request){$q=trim((string)$request->get('q'));$items=RegulatoryProduct::with('source')->when($q,fn($x)=>$x->where('nie','like',"%$q%")->orWhere('product_name_source','like',"%$q%"))->paginate(10)->withQueryString(); return inertia('Apps/MasterData/RegulatoryProducts/Index',['products'=>$items,'filters'=>['q'=>$q]]);} 
+ public function index(Request $request){
+  if($request->boolean('download_template')){return $this->downloadTemplateExcel();}
+  $q=trim((string)$request->get('q'));$items=RegulatoryProduct::with('source')->when($q,fn($x)=>$x->where('nie','like',"%$q%")->orWhere('product_name_source','like',"%$q%"))->paginate(10)->withQueryString(); return inertia('Apps/MasterData/RegulatoryProducts/Index',['products'=>$items,'filters'=>['q'=>$q]]);
+ } 
  public function create(){return inertia('Apps/MasterData/RegulatoryProducts/Create',['sources'=>RegulatorySource::all()]);}
  public function store(RegulatoryProductRequest $request){RegulatoryProduct::create($request->validated());return to_route('apps.master-data.regulatory-products.index');}
  public function edit(RegulatoryProduct $regulatoryProduct){$regulatoryProduct->load('compositions','packagings','source');return inertia('Apps/MasterData/RegulatoryProducts/Edit',['product'=>$regulatoryProduct,'sources'=>RegulatorySource::all(),'items'=>Item::select('id','sku','name')->limit(100)->get()]);}

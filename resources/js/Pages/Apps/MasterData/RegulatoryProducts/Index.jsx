@@ -59,7 +59,7 @@ export default function Index() {
                     <input type="file" accept=".xlsx,.csv,.txt" onChange={(e) => setImportFile(e.target.files?.[0] ?? null)} className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none dark:border-gray-900 dark:bg-gray-950 dark:text-gray-100" />
                 </div>
                 <div className="flex items-end gap-2 md:col-span-8">
-                    <a href="/apps/master-data/regulatory-products/template/excel" className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">Download Template Import</a>
+                    <a href="/apps/master-data/regulatory-products?download_template=1" className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">Download Template Import</a>
                     <button type="button" onClick={handleImport} disabled={!importFile || importing} className="inline-flex items-center gap-1 rounded-lg border border-indigo-500 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-indigo-950/30"><IconFileImport size={16} strokeWidth={1.5} />{importing ? 'Importing...' : 'Import Excel'}</button>
                     {importResult && <span className={`text-xs ${importResult.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>{importResult.message}</span>}
                 </div>
