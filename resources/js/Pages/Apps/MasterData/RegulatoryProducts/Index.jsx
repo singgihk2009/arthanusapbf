@@ -138,7 +138,7 @@ export default function Index() {
                                 <Table.Td>{product.strength ?? '-'}</Table.Td>
                                 <Table.Td>{product.commodity_type ?? '-'}</Table.Td>
                                 <Table.Td>{product.raw_packaging_text ?? '-'}</Table.Td>
-                                <Table.Td className="w-[40ch] max-w-[40ch] whitespace-normal break-words">{product.raw_composition_text ?? '-'}</Table.Td>
+                                <Table.Td className="w-[40ch] max-w-[40ch]"><div className="max-w-[40ch] whitespace-normal break-all leading-relaxed">{product.raw_composition_text ?? '-'}</div></Table.Td>
                                 <Table.Td>
                                     <div className="flex gap-2">
                                         <Button type="edit" href={route('apps.master-data.regulatory-products.edit', product.id)} icon={<IconPencilCog size={16} strokeWidth={1.5} />} variant="orange" />
