@@ -11,6 +11,7 @@ use App\Models\Inventory\ItemPicture;
 use App\Models\Inventory\Uom;
 use App\Models\Inventory\Warehouse;
 use App\Models\Inventory\WarehouseItemSetting;
+use App\Models\Regulatory\ItemRegulatoryProduct;
 use App\Models\Regulatory\RegulatoryProduct;
 use App\Services\Inventory\ItemPictureService;
 use Illuminate\Database\Query\Builder;
@@ -352,19 +353,19 @@ class ItemController extends Controller implements HasMiddleware
             return;
         }
 
-        $hasPrimary = ItemRegulatoryProduct::query()
-            ->where('item_id', $item->id)
-            ->where('is_primary', true)
-            ->exists();
-
         ItemRegulatoryProduct::query()->updateOrCreate(
             ['item_id' => $item->id, 'regulatory_product_id' => $product->id],
             [
-                'is_primary' => $hasPrimary ? false : true,
+                'is_primary' => true,
                 'source_name' => $product->source?->source_name,
                 'source_code' => $product->source_code ?: $product->nie,
             ]
         );
+
+        ItemRegulatoryProduct::query()
+            ->where('item_id', $item->id)
+            ->where('regulatory_product_id', '!=', $product->id)
+            ->update(['is_primary' => false]);
     }
 
     private function baseItemQuery(array $filters)
