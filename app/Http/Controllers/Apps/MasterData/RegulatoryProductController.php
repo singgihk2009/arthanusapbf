@@ -68,7 +68,7 @@ class RegulatoryProductController extends Controller {
  public function search(Request $request): JsonResponse {
   $validated=$request->validate([
     'q'=>['required','string','min:3'],
-    'source_name'=>['nullable','in:BPOM,KEMENKES'],
+    'source_name'=>['nullable','string','max:255'],
     'limit'=>['nullable','integer','min:1','max:50'],
   ]);
   $q=trim($validated['q']);
@@ -82,7 +82,8 @@ class RegulatoryProductController extends Controller {
         ->orWhere('regulatory_products.nie','like',$q.'%')
         ->orWhere('regulatory_products.product_name_source','like','%'.$q.'%')
         ->orWhere('regulatory_products.industry_name','like','%'.$q.'%')
-        ->orWhere('regulatory_products.raw_composition_text','like','%'.$q.'%');
+        ->orWhere('regulatory_products.raw_composition_text','like','%'.$q.'%')
+        ->orWhere('regulatory_sources.source_name','like','%'.$q.'%');
     })
     ->limit($limit)
     ->get()
