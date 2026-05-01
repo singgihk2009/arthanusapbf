@@ -300,7 +300,7 @@ class ItemController extends Controller implements HasMiddleware
             }
         });
 
-        return to_route('apps.master-data.items.index');
+        return back();
     }
 
     public function destroy(string $id): RedirectResponse
