@@ -16,15 +16,16 @@ export default function Form() {
     address: vendor?.address ?? '',
     province: vendor?.province ?? '',
     status: vendor?.status ?? 'prospect',
-    _method: isEdit ? 'PUT' : 'POST',
   };
 
-  const { data, setData, post, errors, processing, reset } = useForm(initialData);
+  const { data, setData, post, put, errors, processing, reset } = useForm(initialData);
 
   const submit = (e) => {
     e.preventDefault();
 
-    post(isEdit ? `/apps/procurement/vendors/${vendor.id}` : '/apps/procurement/vendors', {
+    const submitAction = isEdit ? put : post;
+
+    submitAction(isEdit ? `/apps/procurement/vendors/${vendor.id}` : '/apps/procurement/vendors', {
       onSuccess: () => {
         toast.success('Data vendor berhasil disimpan.');
       },
