@@ -126,27 +126,55 @@ class RegulatoryProductController extends Controller {
  public function exportExcel(Request $request): StreamedResponse {
   $q=trim((string)$request->get('q'));
   $productType=$request->string('product_type')->toString();
+  $isMedicalDeviceExport=$productType===RegulatoryProduct::TYPE_MEDICAL_DEVICE;
   $rows=RegulatoryProduct::with('source')
     ->when($productType!=='',fn($x)=>$x->where('product_type',$productType))
     ->when($q,fn($x)=>$x->where('nie','like',"%$q%")->orWhere('product_name_source','like',"%$q%"))
     ->orderBy('id')
     ->get();
-  return response()->streamDownload(function() use ($rows): void {
+  return response()->streamDownload(function() use ($rows,$isMedicalDeviceExport): void {
    $output=fopen('php://output','w');
-   fputcsv($output,['Source','NIE','Kode BPOM','Nama Produk','Produsen','Kemasan','Kekuatan','Jenis Komoditi','Packing','Bahan Obat']);
+   if($isMedicalDeviceExport){
+    fputcsv($output,['Source','NIE','Jenis Izin','Tanggal Terbit','Tanggal Expired','Merk','Nama Produk','Sub Kategori','Tipe Alat','Golongan Produk','Jenis Model','Kelas Alat','Kelas Risiko','Nama Pendaftar','Alamat Pendaftar','Nama Produsen','Alamat Produsen','Nama Produsen 2']);
+   }else{
+    fputcsv($output,['Source','NIE','Kode BPOM','Nama Produk','Produsen','Kemasan','Kekuatan','Jenis Komoditi','Packing','Bahan Obat']);
+   }
    foreach($rows as $product){
-    fputcsv($output,[
-     $product->source?->source_name ?? '-',
-     $product->nie,
-     $product->source_code,
-     $product->product_name_source,
-     $product->industry_name,
-     $product->dosage_form,
-     $product->strength,
-     $product->commodity_type,
-     $product->raw_packaging_text,
-     $product->raw_composition_text,
-    ]);
+    if($isMedicalDeviceExport){
+      fputcsv($output,[
+       $product->source?->source_name ?? '-',
+       $product->nie,
+       $product->license_type,
+       optional($product->registration_date)?->format('Y-m-d'),
+       optional($product->expiry_date)?->format('Y-m-d'),
+       $product->brand,
+       $product->product_name_source,
+       $product->sub_category,
+       $product->device_type,
+       $product->product_group,
+       $product->model_type,
+       $product->device_class,
+       $product->risk_class,
+       $product->registrant_name,
+       $product->registrant_address,
+       $product->manufacturer_name,
+       $product->manufacturer_address,
+       $product->manufacturer_name_2,
+      ]);
+    }else{
+      fputcsv($output,[
+       $product->source?->source_name ?? '-',
+       $product->nie,
+       $product->source_code,
+       $product->product_name_source,
+       $product->industry_name,
+       $product->dosage_form,
+       $product->strength,
+       $product->commodity_type,
+       $product->raw_packaging_text,
+       $product->raw_composition_text,
+      ]);
+    }
    }
    fclose($output);
   },'master-regulatory-products-'.now()->format('Ymd-His').'.csv',['Content-Type'=>'text/csv; charset=UTF-8']);
