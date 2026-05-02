@@ -5,15 +5,16 @@ namespace App\Models\Procurement;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class VendorContact extends Model
+class VendorDocument extends Model
 {
     use SoftDeletes;
 
     protected $guarded = [];
 
     protected $casts = [
-        'license_expiry_date' => 'date',
-        'is_primary' => 'boolean',
+        'issue_date' => 'date',
+        'expiry_date' => 'date',
+        'verified_at' => 'datetime',
     ];
 
     public function vendor()

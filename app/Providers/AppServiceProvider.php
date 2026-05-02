@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Events\Inventory\StockLedgerCreated;
 use App\Listeners\Inventory\UpdateStockBalanceFromLedger;
+use App\Models\Procurement\Vendor;
+use App\Policies\VendorPolicy;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
@@ -33,6 +35,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::before(function ($user, $ability) {
             return $user->hasRole('super-admin') ? true : null;
         });
+
+        Gate::policy(Vendor::class, VendorPolicy::class);
 
         Event::listen(StockLedgerCreated::class, UpdateStockBalanceFromLedger::class);
     }
