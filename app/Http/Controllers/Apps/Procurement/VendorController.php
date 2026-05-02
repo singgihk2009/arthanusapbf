@@ -13,6 +13,7 @@ use App\Models\Procurement\VendorInvoice;
 use App\Models\Procurement\VendorLedger;
 use App\Models\Procurement\VendorPayment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -115,9 +116,9 @@ class VendorController extends Controller
     public function auditLogs(Vendor $vendor) { return response()->json(['audit_logs' => [['action' => 'Vendor created/updated', 'at' => $vendor->updated_at, 'by' => $vendor->updated_by]]]); }
 
     public function create(){ return Inertia::render('Apps/Procurement/Vendors/Form'); }
-    public function store(StoreVendorRequest $request){ DB::transaction(function () use ($request) { $vendor = Vendor::query()->create(array_merge($request->validated(), ['created_by' => auth()->id(), 'updated_by' => auth()->id()])); $this->upsertContacts($vendor, $request->validated()); }); return to_route('apps.procurement.vendors.index'); }
+    public function store(StoreVendorRequest $request){ DB::transaction(function () use ($request) { $validated = $request->validated(); $vendorPayload = Arr::except($validated, ['company_director', 'technical_responsible_person', 'documents']); $vendorPayload['status'] = $this->normalizeStatus($vendorPayload['status'] ?? null); $vendorPayload['name'] = $vendorPayload['vendor_name'] ?? ($vendorPayload['name'] ?? null); $vendor = Vendor::query()->create(array_merge($vendorPayload, ['created_by' => auth()->id(), 'updated_by' => auth()->id()])); $this->upsertContacts($vendor, $validated); }); return redirect('/apps/procurement/vendors'); }
     public function edit(Vendor $vendor){ $vendor->load('contacts', 'documents'); return Inertia::render('Apps/Procurement/Vendors/Form', compact('vendor')); }
-    public function update(UpdateVendorRequest $request, Vendor $vendor){ DB::transaction(function () use ($request, $vendor) { $vendor->update(array_merge($request->validated(), ['updated_by' => auth()->id()])); $this->upsertContacts($vendor, $request->validated()); }); return to_route('apps.procurement.vendors.index'); }
+    public function update(UpdateVendorRequest $request, Vendor $vendor){ DB::transaction(function () use ($request, $vendor) { $validated = $request->validated(); $vendorPayload = Arr::except($validated, ['company_director', 'technical_responsible_person', 'documents']); $vendorPayload['status'] = $this->normalizeStatus($vendorPayload['status'] ?? null); $vendorPayload['name'] = $vendorPayload['vendor_name'] ?? ($vendorPayload['name'] ?? null); $vendor->update(array_merge($vendorPayload, ['updated_by' => auth()->id()])); $this->upsertContacts($vendor, $validated); }); return redirect('/apps/procurement/vendors'); }
 
     public function submitQualification(Vendor $vendor){ $vendor->update(['qualification_status' => 'submitted', 'submitted_by' => auth()->id(), 'submitted_at' => now()]); return back(); }
     public function approveQualification(Vendor $vendor){ $invalid = $vendor->documents()->whereIn('verification_status', ['invalid', 'need_revision'])->exists(); if ($invalid) return back()->withErrors(['qualification' => 'Dokumen invalid / need revision harus diselesaikan.']); $vendor->update(['qualification_status' => 'qualified', 'qualification_date' => now(), 'approved_by' => auth()->id(), 'approved_at' => now()]); return back(); }
@@ -143,6 +144,11 @@ class VendorController extends Controller
             if (!isset($data[$type])) continue;
             $vendor->contacts()->updateOrCreate(['contact_type' => $type], array_merge($data[$type], ['contact_type' => $type, 'updated_by' => auth()->id(), 'created_by' => auth()->id()]));
         }
+    }
+
+    protected function normalizeStatus(?string $status): string
+    {
+        return in_array(strtolower((string) $status), ['active', 'prospect'], true) ? 'ACTIVE' : 'INACTIVE';
     }
 
     protected function summary(Vendor $vendor): array

@@ -184,6 +184,13 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::get('/minimum-stock-alerts', [InventoryReportController::class, 'minimumStockAlerts'])->name('minimum-stock-alerts');
     });
 
+    // Backward-compatible aliases under /apps prefix (old/typo procurement URLs)
+    Route::redirect('/procureme', '/apps/procurement/vendors', 301);
+    Route::redirect('/procureme/vendors', '/apps/procurement/vendors', 301);
+    Route::redirect('/procureme/vendors/create', '/apps/procurement/vendors/create', 301);
+    Route::redirect('/procuremen/vendors', '/apps/procurement/vendors', 301);
+    Route::redirect('/procuremen/vendors/create', '/apps/procurement/vendors/create', 301);
+
     // Backward-compatible aliases (old/typo procurement URLs)
     Route::redirect('/procurement', '/apps/procurement/vendors', 301);
     Route::redirect('/procureme', '/apps/procurement/vendors', 301);
@@ -215,7 +222,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::get('/vendors/{vendor}/payments', [VendorController::class, 'payments'])->name('vendors.payments');
         Route::get('/vendors/{vendor}/ledger', [VendorController::class, 'ledger'])->name('vendors.ledger');
         Route::get('/vendors/{vendor}/audit-logs', [VendorController::class, 'auditLogs'])->name('vendors.audit-logs');
-        Route::get('/vendors/{vendor}', [VendorController::class, 'show'])->name('vendors.show');
+        Route::get('/vendors/{vendor}', [VendorController::class, 'show'])->whereNumber('vendor')->name('vendors.show');
         Route::resource('/vendors', VendorController::class)->except(['show']);
         Route::resource('/purchase-orders', PurchaseOrderController::class);
         Route::resource('/goods-receipts', GoodsReceiptController::class);
