@@ -162,6 +162,7 @@ export default function Index() {
                 <div className="flex items-end gap-2 md:col-span-8">
                     <a href={route('apps.master-data.regulatory-products.import-alkes.template')} className="inline-flex items-center gap-1 rounded-lg border border-sky-400 px-3 py-2 text-sm text-sky-700 hover:bg-sky-100 dark:text-sky-300 dark:hover:bg-sky-950/30">Download Template ALKES</a>
                     <button type="button" onClick={handleImportAlkes} disabled={!alkesImportFile || alkesImporting} className="inline-flex items-center gap-1 rounded-lg border border-sky-500 px-3 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-sky-300 dark:hover:bg-sky-950/30"><IconFileImport size={16} strokeWidth={1.5} />{alkesImporting ? 'Importing...' : 'Import Excel ALKES'}</button>
+                    <a href={route('apps.master-data.regulatory-products.export.excel', { ...filters, product_type: activeProductType })} className="inline-flex items-center gap-1 rounded-lg border border-emerald-500 px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30">Export Excel ALKES</a>
                     {alkesImportResult && <span className={`text-xs ${alkesImportResult.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>{alkesImportResult.message}</span>}
                 </div>
             </div>}
