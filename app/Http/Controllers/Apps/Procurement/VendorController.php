@@ -54,6 +54,56 @@ class VendorController extends Controller
     }
 
     public function profile(Vendor $vendor) { return response()->json(['vendor' => $vendor]); }
+
+    public function updateProfile(Request $request, Vendor $vendor)
+    {
+        $data = $request->validate([
+            'vendor_name' => ['nullable', 'string', 'max:255'],
+            'vendor_type' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string'],
+            'postal_code' => ['nullable', 'string', 'max:20'],
+            'village' => ['nullable', 'string', 'max:255'],
+            'district' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'province' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'fax' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'npwp' => ['nullable', 'string', 'max:100'],
+            'nib_number' => ['nullable', 'string', 'max:100'],
+            'company_license_number' => ['nullable', 'string', 'max:100'],
+            'cdakb_cpakb_certificate_number' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $vendor->update(array_merge($data, ['updated_by' => auth()->id()]));
+
+        return back();
+    }
+
+    public function deleteProfile(Vendor $vendor)
+    {
+        $vendor->update([
+            'vendor_name' => null,
+            'vendor_type' => null,
+            'address' => null,
+            'postal_code' => null,
+            'village' => null,
+            'district' => null,
+            'city' => null,
+            'province' => null,
+            'phone' => null,
+            'fax' => null,
+            'email' => null,
+            'npwp' => null,
+            'nib_number' => null,
+            'company_license_number' => null,
+            'cdakb_cpakb_certificate_number' => null,
+            'updated_by' => auth()->id(),
+        ]);
+
+        return back();
+    }
+
     public function legal(Vendor $vendor) { return response()->json(['documents' => $vendor->documents()->get()]); }
     public function contacts(Vendor $vendor) { return response()->json(['contacts' => $vendor->contacts()->orderBy('contact_type')->get()->groupBy('contact_type')]); }
     public function documents(Vendor $vendor) { return response()->json(['documents' => $vendor->documents()->latest()->get()]); }
