@@ -185,7 +185,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     Route::redirect('/procurement/vendor', '/apps/procurement/vendors', 301);
 
     Route::prefix('procurement')->name('procurement.')->group(function () {
-        Route::resource('/vendors', VendorController::class)->except(['show','destroy']);
+        Route::resource('/vendors', VendorController::class)->except(['show']);
         Route::resource('/purchase-orders', PurchaseOrderController::class);
         Route::resource('/goods-receipts', GoodsReceiptController::class);
         Route::resource('/vendor-invoices', VendorInvoiceController::class);
