@@ -17,7 +17,7 @@ export default function Form() {
     technical_responsible_person: { name: vendor?.technical_responsible_person?.name ?? '', address: vendor?.technical_responsible_person?.address ?? '', license_number: vendor?.technical_responsible_person?.license_number ?? '', email: vendor?.technical_responsible_person?.email ?? '', phone: vendor?.technical_responsible_person?.phone ?? '' },
     _method: isEdit ? 'PUT' : 'POST',
   });
-  const submit = (e)=>{e.preventDefault(); post(isEdit ? route('apps.procurement.vendors.update', vendor.id) : route('apps.procurement.vendors.store'));};
+  const submit = (e)=>{e.preventDefault(); post(isEdit ? `/apps/procurement/vendors/${vendor.id}` : '/apps/procurement/vendors');};
   return <><Head title='Master Vendor'/><Card title='Master Vendor' form={submit} footer={<Button type='submit' label='Simpan' variant='gray'/>}><div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
     <Input label='Kode' value={data.vendor_code} onChange={e=>setData('vendor_code', e.target.value)} errors={errors.vendor_code}/><Input label='Nama' value={data.vendor_name} onChange={e=>setData('vendor_name', e.target.value)} errors={errors.vendor_name}/>
     <Input label='Tipe Vendor' value={data.vendor_type} onChange={e=>setData('vendor_type', e.target.value)} errors={errors.vendor_type}/><Input label='NIB' value={data.nib_number} onChange={e=>setData('nib_number', e.target.value)} errors={errors.nib_number}/>
