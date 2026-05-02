@@ -1,13 +1,15 @@
 import AppLayout from '@/Layouts/AppLayout';
 import Button from '@/Components/Button';
 import Table from '@/Components/Table';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { IconCircleCheck, IconCirclePlus } from '@tabler/icons-react';
 import React from 'react';
 
 export default function Index(){
- const { vendors } = usePage().props;
+ const { vendors, filters } = usePage().props;
  const { post, delete: destroy } = useForm();
+ const [search, setSearch] = React.useState(filters?.search || '');
+ const importForm = useForm({ file: null });
 
  const deleteVendor = (vendorId) => {
    if (!window.confirm('Apakah kamu yakin ingin menghapus data ini?')) return;
@@ -19,9 +21,32 @@ export default function Index(){
    post(`/apps/procurement/vendors/${vendorId}/approve-qualification`);
  };
 
+ const submitSearch = (e) => {
+   e.preventDefault();
+   router.get('/apps/procurement/vendors', { search }, { preserveState: true, replace: true });
+ };
+
+ const submitImport = (e) => {
+   e.preventDefault();
+   importForm.post('/apps/procurement/vendors/import/excel');
+ };
+
  return <>
    <Head title='Vendors'/>
 
+   <div className='mb-5 flex items-center justify-between gap-3'>
+     <form onSubmit={submitSearch} className='flex gap-2'>
+       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder='Global Search: nama/type/status kualifikasi' className='w-96 rounded-md border border-gray-300 px-3 py-2 text-sm' />
+       <button type='submit' className='rounded-md border px-3 py-2 text-sm'>Cari</button>
+     </form>
+     <div className='flex gap-2'>
+       <a href='/apps/procurement/vendors/template/excel' className='rounded-md border px-3 py-2 text-sm'>Template Import Excel</a>
+       <form onSubmit={submitImport} className='flex items-center gap-2'>
+         <input type='file' accept='.xlsx,.csv,.txt' onChange={(e) => importForm.setData('file', e.target.files?.[0] || null)} className='text-sm' />
+         <button type='submit' className='rounded-md border px-3 py-2 text-sm'>Import Excel</button>
+       </form>
+     </div>
+   </div>
    <div className='mb-5 flex justify-end'>
      <Button
        type='link'
