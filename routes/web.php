@@ -204,6 +204,8 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::get('/vendors/{vendor}/documents/{document}/download', [VendorController::class, 'downloadDocument'])->name('vendors.documents.download');
         Route::get('/vendors/{vendor}/overview', [VendorController::class, 'overview'])->name('vendors.overview');
         Route::get('/vendors/{vendor}/profile', [VendorController::class, 'profile'])->name('vendors.profile');
+        Route::put('/vendors/{vendor}/profile', [VendorController::class, 'updateProfile'])->name('vendors.profile.update');
+        Route::delete('/vendors/{vendor}/profile', [VendorController::class, 'deleteProfile'])->name('vendors.profile.delete');
         Route::get('/vendors/{vendor}/legal', [VendorController::class, 'legal'])->name('vendors.legal');
         Route::get('/vendors/{vendor}/contacts', [VendorController::class, 'contacts'])->name('vendors.contacts');
         Route::get('/vendors/{vendor}/documents', [VendorController::class, 'documents'])->name('vendors.documents');
