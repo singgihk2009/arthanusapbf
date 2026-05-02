@@ -18,7 +18,7 @@ class StoreVendorRequest extends FormRequest
             'vendor_name' => ['required', 'string', 'max:255'],
             'vendor_type' => ['required', 'string', 'max:100'],
             'address' => ['required', 'string'],
-            'province' => ['required', 'string', 'max:255'],
+            'province' => ['nullable', 'string', 'max:255'],
             'postal_code' => ['nullable', 'string', 'max:20'],
             'village' => ['nullable', 'string', 'max:255'],
             'district' => ['nullable', 'string', 'max:255'],
