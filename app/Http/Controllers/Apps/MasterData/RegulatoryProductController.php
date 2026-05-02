@@ -25,6 +25,7 @@ class RegulatoryProductController extends Controller {
   $commodityType=$request->string('commodity_type')->toString();
   $dosageForm=$request->string('dosage_form')->toString();
   $producer=$request->string('producer')->toString();
+  $productType=$request->string('product_type')->toString();
   $perPage=(int)$request->integer('per_page',10);
   $perPage=in_array($perPage,[10,25,50,100],true)?$perPage:10;
   $shouldSearch=mb_strlen($q)>=3;
@@ -35,6 +36,7 @@ class RegulatoryProductController extends Controller {
    ->when($commodityType!=='', fn($x)=>$x->where('commodity_type',$commodityType))
    ->when($dosageForm!=='', fn($x)=>$x->where('dosage_form',$dosageForm))
    ->when($producer!=='', fn($x)=>$x->where('industry_name',$producer))
+   ->when($productType!=='', fn($x)=>$x->where('product_type',$productType))
    ->when($shouldSearch,function($x) use ($q){
     $driver=config('database.default');
     $isMysql=in_array(config("database.connections.{$driver}.driver"),['mysql','mariadb'],true);
@@ -56,7 +58,14 @@ class RegulatoryProductController extends Controller {
 
   return inertia('Apps/MasterData/RegulatoryProducts/Index',[
     'products'=>$items,
-    'filters'=>['q'=>$q,'source'=>$source,'commodity_type'=>$commodityType,'dosage_form'=>$dosageForm,'producer'=>$producer,'per_page'=>$perPage],
+    'filters'=>['q'=>$q,'source'=>$source,'commodity_type'=>$commodityType,'dosage_form'=>$dosageForm,'producer'=>$producer,'product_type'=>$productType,'per_page'=>$perPage],
+    'counts'=>[
+      'total'=>RegulatoryProduct::count(),
+      'drug_count'=>RegulatoryProduct::where('product_type','DRUG')->count(),
+      'medical_device_count'=>RegulatoryProduct::where('product_type','MEDICAL_DEVICE')->count(),
+      'expiring_soon_count'=>RegulatoryProduct::whereDate('expiry_date','>=',now()->startOfDay())->whereDate('expiry_date','<=',now()->addDays(180)->startOfDay())->count(),
+      'expired_count'=>RegulatoryProduct::whereDate('expiry_date','<',now()->startOfDay())->count(),
+    ],
     'filterOptions'=>[
       'sources'=>RegulatorySource::query()->orderBy('source_name')->pluck('source_name'),
       'commodity_types'=>RegulatoryProduct::query()->whereNotNull('commodity_type')->where('commodity_type','!=','')->distinct()->orderBy('commodity_type')->pluck('commodity_type'),
@@ -137,10 +146,11 @@ class RegulatoryProductController extends Controller {
    fclose($output);
   },'master-regulatory-products-'.now()->format('Ymd-His').'.csv',['Content-Type'=>'text/csv; charset=UTF-8']);
  } 
- public function create(){return inertia('Apps/MasterData/RegulatoryProducts/Create',['sources'=>RegulatorySource::all()]);}
- public function store(RegulatoryProductRequest $request){RegulatoryProduct::create($request->validated());return to_route('apps.master-data.regulatory-products.index');}
+ public function create(Request $request){$type=$request->string('product_type')->toString() ?: RegulatoryProduct::TYPE_DRUG; return inertia('Apps/MasterData/RegulatoryProducts/Create',['sources'=>RegulatorySource::all(),'product_type'=>$type]);}
+ public function store(RegulatoryProductRequest $request){$data=$this->normalizePayload($request->validated());RegulatoryProduct::create($data);return to_route('apps.master-data.regulatory-products.index');}
  public function edit(RegulatoryProduct $regulatoryProduct){$regulatoryProduct->load('compositions','packagings','source');return inertia('Apps/MasterData/RegulatoryProducts/Edit',['product'=>$regulatoryProduct,'sources'=>RegulatorySource::all(),'items'=>Item::select('id','sku','name')->limit(100)->get()]);}
- public function update(RegulatoryProductRequest $request, RegulatoryProduct $regulatoryProduct){$regulatoryProduct->update($request->validated());return back();}
+ public function update(RegulatoryProductRequest $request, RegulatoryProduct $regulatoryProduct){$data=$this->normalizePayload($request->validated());$regulatoryProduct->update($data);return back();}
+ public function show(RegulatoryProduct $regulatoryProduct){$regulatoryProduct->load('compositions','packagings','source'); return inertia('Apps/MasterData/RegulatoryProducts/Show',['product'=>$regulatoryProduct]);}
  public function destroy(RegulatoryProduct $regulatoryProduct){$regulatoryProduct->delete();return back();}
  public function downloadTemplateExcel(){
   $rows=[
@@ -191,10 +201,22 @@ class RegulatoryProductController extends Controller {
  }
  public function importBpom(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importBpom($request->file('file')->getRealPath());return back()->with('success',"Import BPOM berhasil: {$count}");}
  public function importKemenkes(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importKemenkes($request->file('file')->getRealPath());return back()->with('success',"Import KEMENKES berhasil: {$count}");}
+ public function importKemenkesAlkes(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importKemenkesAlkes($request->file('file')->getRealPath());return back()->with('success',"Import ALKES berhasil: {$count}");}
  public function attach(ItemRegulatoryMappingRequest $request){ItemRegulatoryProduct::firstOrCreate($request->validated(),['is_primary'=>false]);return back();}
  public function detach(ItemRegulatoryMappingRequest $request){ItemRegulatoryProduct::where('item_id',$request->item_id)->where('regulatory_product_id',$request->regulatory_product_id)->delete();return back();}
  public function setPrimary(ItemRegulatoryMappingRequest $request){ItemRegulatoryProduct::where('item_id',$request->item_id)->update(['is_primary'=>false]); ItemRegulatoryProduct::where('item_id',$request->item_id)->where('regulatory_product_id',$request->regulatory_product_id)->update(['is_primary'=>true]);return back();}
  public function candidates(RegulatoryProduct $regulatoryProduct, ProductMatchingService $service){ return response()->json($service->candidates($regulatoryProduct)); }
+ private function normalizePayload(array $data): array {
+  $data['nie']=RegulatoryProduct::normalizeNie($data['nie'] ?? null);
+  if(($data['product_type'] ?? null)===RegulatoryProduct::TYPE_MEDICAL_DEVICE){
+   if(empty($data['product_name_source']) && !empty($data['brand'])) $data['product_name_source']=$data['brand'];
+   if(empty($data['license_type']) && isset($data['nie'])){
+    if(str_starts_with($data['nie'],'AKD')) $data['license_type']='AKD';
+    if(str_starts_with($data['nie'],'AKL')) $data['license_type']='AKL';
+   }
+  }
+  return $data;
+ }
 
  private function hasRegulatoryProductFulltextIndex(): bool {
   static $hasIndex=null;
