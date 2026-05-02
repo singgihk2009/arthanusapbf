@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Procurement;
 
 use App\Models\Procurement\Vendor;
+use App\Services\VendorComplianceService;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StorePurchaseOrderRequest extends FormRequest
@@ -24,10 +25,9 @@ class StorePurchaseOrderRequest extends FormRequest
             if (!$this->vendor_id) return;
             $vendor = Vendor::find($this->vendor_id);
             if (!$vendor) return;
-            if ($vendor->status !== 'active' || $vendor->qualification_status !== 'qualified') {
-                if (!$this->boolean('allow_unqualified_vendor')) {
-                    $validator->errors()->add('vendor_id', 'Vendor belum qualified. Lengkapi proses kualifikasi pemasok terlebih dahulu.');
-                }
+            $summary = app(VendorComplianceService::class)->evaluate($vendor);
+            if (!$summary['can_create_po'] && !$this->boolean('allow_unqualified_vendor')) {
+                $validator->errors()->add('vendor_id', 'Vendor tidak dapat digunakan untuk PO karena compliance belum valid: '.implode(', ', $summary['blocking_reasons']));
             }
         });
     }

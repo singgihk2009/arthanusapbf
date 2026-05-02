@@ -8,7 +8,9 @@ use App\Http\Requests\Procurement\UpdateVendorRequest;
 use App\Models\Procurement\GoodsReceipt;
 use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\Vendor;
+use App\Models\Procurement\DocumentType;
 use App\Models\Procurement\VendorDocument;
+use App\Services\VendorComplianceService;
 use App\Models\Procurement\VendorInvoice;
 use App\Models\Procurement\VendorLedger;
 use App\Models\Procurement\VendorPayment;
@@ -89,7 +91,10 @@ class VendorController extends Controller
 
     public function show(Vendor $vendor)
     {
-        $vendor->load(['documents:id,vendor_id,document_type,expiry_date,verification_status']);
+        $vendor->load(['documents.documentType']);
+        $compliance = app(VendorComplianceService::class)->evaluate($vendor);
+        $compliance['required_documents'] = app(VendorComplianceService::class)->getRequiredDocuments($vendor);
+        $vendor->setAttribute('compliance', $compliance);
         $currentTab = request('tab', 'overview');
 
         return Inertia::render('Apps/Procurement/Vendors/Show', [
@@ -162,7 +167,10 @@ class VendorController extends Controller
 
     public function legal(Vendor $vendor) { return response()->json(['documents' => $vendor->documents()->get()]); }
     public function contacts(Vendor $vendor) { return response()->json(['contacts' => $vendor->contacts()->orderBy('contact_type')->get()->groupBy('contact_type')]); }
-    public function documents(Vendor $vendor) { return response()->json(['documents' => $vendor->documents()->latest()->get()]); }
+    public function documents(Vendor $vendor) {
+        $requirements = app(VendorComplianceService::class)->getRequiredDocuments($vendor);
+        return response()->json(['documents' => $vendor->documents()->with('documentType')->latest()->get(), 'requirements'=>$requirements]);
+    }
     public function purchaseOrders(Vendor $vendor) { return response()->json(['purchase_orders' => PurchaseOrder::where('vendor_id', $vendor->id)->latest('document_date')->paginate(10)]); }
     public function receivings(Vendor $vendor) { return response()->json(['receivings' => GoodsReceipt::where('supplier_id', $vendor->id)->latest('document_date')->paginate(10)]); }
     public function invoices(Vendor $vendor) { return response()->json(['invoices' => VendorInvoice::where('vendor_id', $vendor->id)->latest('invoice_date')->paginate(10)]); }
@@ -181,9 +189,14 @@ class VendorController extends Controller
 
     public function uploadDocument(Request $request, Vendor $vendor)
     {
-        $data = $request->validate(['document_type' => ['required'], 'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'], 'document_number' => ['nullable'], 'issue_date' => ['nullable', 'date'], 'expiry_date' => ['nullable', 'date']]);
+        $data = $request->validate(['document_type_id' => ['nullable','exists:document_types,id'], 'document_type' => ['nullable','string'], 'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'], 'document_number' => ['nullable'], 'issue_date' => ['nullable', 'date'], 'expiry_date' => ['nullable', 'date']]);
         $path = $request->file('file')->store("private/vendor-documents/{$vendor->id}");
-        VendorDocument::updateOrCreate(['vendor_id' => $vendor->id, 'document_type' => $data['document_type']], ['file_path' => $path, 'original_filename' => $request->file('file')->getClientOriginalName(), 'mime_type' => $request->file('file')->getClientMimeType(), 'file_size' => $request->file('file')->getSize(), 'document_number' => $data['document_number'] ?? null, 'issue_date' => $data['issue_date'] ?? null, 'expiry_date' => $data['expiry_date'] ?? null, 'created_by' => auth()->id(), 'updated_by' => auth()->id()]);
+        $docTypeId = $data['document_type_id'] ?? null;
+        if (!$docTypeId && !empty($data['document_type'])) {
+            $docType = DocumentType::firstOrCreate(['code' => strtoupper($data['document_type'])], ['name' => strtoupper($data['document_type'])]);
+            $docTypeId = $docType->id;
+        }
+        VendorDocument::updateOrCreate(['vendor_id' => $vendor->id, 'document_type_id' => $docTypeId], ['document_type' => $data['document_type'] ?? null, 'file_path' => $path, 'original_filename' => $request->file('file')->getClientOriginalName(), 'mime_type' => $request->file('file')->getClientMimeType(), 'file_size' => $request->file('file')->getSize(), 'document_number' => $data['document_number'] ?? null, 'issue_date' => $data['issue_date'] ?? null, 'expiry_date' => $data['expiry_date'] ?? null, 'created_by' => auth()->id(), 'updated_by' => auth()->id()]);
         return back();
     }
 
