@@ -168,8 +168,8 @@ class RegulatoryProductController extends Controller {
  }
  public function downloadTemplateAlkesExcel(){
   $rows=[
-   ['NOMOR','TGL TERBIT','TGL EXP','MERK','SUB KATEGORI','JENIS PRODUK','KELOMPOK PRODUK','TIPE','KELAS','KELAS RESIKO','PENDAFTAR','ALAMAT PENDAFTAR','PABRIK','ALAMAT PABRIK','PABRIK2'],
-   ['AKD 12345678901','2026-01-01','2031-01-01','Contoh Merk Alkes','Alat Diagnostik','Rapid Test','Diagnostik In Vitro','Model A','A','Rendah','PT Contoh Distributor','Jakarta','Contoh Manufacturer','Bandung','Contoh Manufacturer 2']
+   ['nie','license_type','registration_date','expiry_date','brand','product_name_source','sub_category','device_type','product_group','model_type','device_class','risk_class','registrant_name','registrant_address','manufacturer_name','manufacturer_address','manufacturer_name_2'],
+   ['AKD12345678901','AKD','2026-01-01','2031-01-01','Contoh Merk Alkes','Contoh Merk Alkes','Alat Diagnostik','Rapid Test','Diagnostik In Vitro','Model A','A','Rendah','PT Contoh Distributor','Jakarta','Contoh Manufacturer','Bandung','Contoh Manufacturer 2']
   ];
   $tempPath=storage_path('app/regulatory-product-alkes-template-'.now()->format('YmdHis').'.xlsx');
   $this->buildTemplateXlsx($tempPath,$rows);
