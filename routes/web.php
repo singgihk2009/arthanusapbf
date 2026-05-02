@@ -176,6 +176,10 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     });
 
     // Backward-compatible aliases (old/typo procurement URLs)
+    Route::redirect('/procurement', '/apps/procurement/vendors', 301);
+    Route::redirect('/procureme', '/apps/procurement/vendors', 301);
+    Route::redirect('/procureme/vendors', '/apps/procurement/vendors', 301);
+    Route::redirect('/procureme/vendor', '/apps/procurement/vendors', 301);
     Route::redirect('/procuremen/vendors', '/apps/procurement/vendors', 301);
     Route::redirect('/procuremen/vendor', '/apps/procurement/vendors', 301);
     Route::redirect('/procurement/vendor', '/apps/procurement/vendors', 301);
