@@ -184,6 +184,13 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::get('/minimum-stock-alerts', [InventoryReportController::class, 'minimumStockAlerts'])->name('minimum-stock-alerts');
     });
 
+    // Backward-compatible aliases under /apps prefix (old/typo procurement URLs)
+    Route::redirect('/procureme', '/apps/procurement/vendors', 301);
+    Route::redirect('/procureme/vendors', '/apps/procurement/vendors', 301);
+    Route::redirect('/procureme/vendors/create', '/apps/procurement/vendors/create', 301);
+    Route::redirect('/procuremen/vendors', '/apps/procurement/vendors', 301);
+    Route::redirect('/procuremen/vendors/create', '/apps/procurement/vendors/create', 301);
+
     // Backward-compatible aliases (old/typo procurement URLs)
     Route::redirect('/procurement', '/apps/procurement/vendors', 301);
     Route::redirect('/procureme', '/apps/procurement/vendors', 301);
