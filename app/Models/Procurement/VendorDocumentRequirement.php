@@ -5,18 +5,19 @@ namespace App\Models\Procurement;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class VendorDocument extends Model
+class VendorDocumentRequirement extends Model
 {
     use SoftDeletes;
 
     protected $guarded = [];
 
     protected $casts = [
-        'issue_date' => 'date',
-        'expiry_date' => 'date',
-        'verified_at' => 'datetime',
+        'is_required' => 'boolean',
+        'is_critical' => 'boolean',
+        'blocks_transaction' => 'boolean',
+        'requires_expiry_date' => 'boolean',
+        'is_active' => 'boolean',
     ];
 
-    public function vendor(){ return $this->belongsTo(Vendor::class); }
     public function documentType(){ return $this->belongsTo(DocumentType::class); }
 }

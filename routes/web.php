@@ -29,6 +29,8 @@ use App\Http\Controllers\Apps\Procurement\GoodsReceiptController;
 use App\Http\Controllers\Apps\Procurement\VendorInvoiceController;
 use App\Http\Controllers\Apps\Procurement\VendorPaymentController;
 use App\Http\Controllers\Apps\Procurement\VendorLedgerController;
+use App\Http\Controllers\Apps\Procurement\DocumentTypeController;
+use App\Http\Controllers\Apps\Procurement\VendorDocumentRequirementController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -231,6 +233,16 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::resource('/vendor-invoices', VendorInvoiceController::class);
         Route::resource('/vendor-payments', VendorPaymentController::class);
         Route::resource('/vendor-ledgers', VendorLedgerController::class)->only(['index','show']);
+
+        Route::get('/settings/document-types', [DocumentTypeController::class, 'index'])->name('settings.document-types.index');
+        Route::post('/settings/document-types', [DocumentTypeController::class, 'store'])->name('settings.document-types.store');
+        Route::put('/settings/document-types/{documentType}', [DocumentTypeController::class, 'update'])->name('settings.document-types.update');
+        Route::delete('/settings/document-types/{documentType}', [DocumentTypeController::class, 'destroy'])->name('settings.document-types.destroy');
+
+        Route::get('/settings/vendor-document-requirements', [VendorDocumentRequirementController::class, 'index'])->name('settings.vendor-document-requirements.index');
+        Route::post('/settings/vendor-document-requirements', [VendorDocumentRequirementController::class, 'store'])->name('settings.vendor-document-requirements.store');
+        Route::put('/settings/vendor-document-requirements/{requirement}', [VendorDocumentRequirementController::class, 'update'])->name('settings.vendor-document-requirements.update');
+        Route::delete('/settings/vendor-document-requirements/{requirement}', [VendorDocumentRequirementController::class, 'destroy'])->name('settings.vendor-document-requirements.destroy');
     });
 });
 
