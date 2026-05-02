@@ -92,7 +92,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::post('/regulatory-products/import-kemenkes-drug', [RegulatoryProductController::class, 'importKemenkes'])->name('regulatory-products.import.kemenkes-drug');
         Route::get('/regulatory-products/import-alkes', [RegulatoryProductController::class, 'create'])->name('regulatory-products.import-alkes');
         Route::post('/regulatory-products/import-alkes', [RegulatoryProductController::class, 'importKemenkesAlkes'])->name('regulatory-products.import.alkes');
-        Route::get('/regulatory-products/import-alkes/template', [RegulatoryProductController::class, 'downloadTemplateExcel'])->name('regulatory-products.import-alkes.template');
+        Route::get('/regulatory-products/import-alkes/template', [RegulatoryProductController::class, 'downloadTemplateAlkesExcel'])->name('regulatory-products.import-alkes.template');
         Route::post('/regulatory-products/mapping/attach', [RegulatoryProductController::class, 'attach'])->name('regulatory-products.mapping.attach');
         Route::post('/regulatory-products/mapping/detach', [RegulatoryProductController::class, 'detach'])->name('regulatory-products.mapping.detach');
         Route::post('/regulatory-products/mapping/set-primary', [RegulatoryProductController::class, 'setPrimary'])->name('regulatory-products.mapping.set-primary');
