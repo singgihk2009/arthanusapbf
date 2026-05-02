@@ -10,7 +10,10 @@ export default function Index() {
     const { products, filters, filterOptions } = usePage().props;
     const [importFile, setImportFile] = useState(null);
     const [importing, setImporting] = useState(false);
+    const [alkesImporting, setAlkesImporting] = useState(false);
     const [importResult, setImportResult] = useState(null);
+    const [alkesImportFile, setAlkesImportFile] = useState(null);
+    const [alkesImportResult, setAlkesImportResult] = useState(null);
     const [query, setQuery] = useState(filters?.q ?? '');
     const [searchError, setSearchError] = useState('');
 
@@ -57,6 +60,26 @@ export default function Index() {
             setImportResult({ type: 'error', message: data?.message ? `${data.message}${errorLines ? ` (${errorLines})` : ''}` : 'Import gagal.' });
         } finally {
             setImporting(false);
+        }
+    };
+    const handleImportAlkes = async () => {
+        if (!alkesImportFile || alkesImporting) return;
+        setAlkesImporting(true);
+        setAlkesImportResult(null);
+        try {
+            const formData = new FormData();
+            formData.append('file', alkesImportFile);
+            const response = await window.axios.post(route('apps.master-data.regulatory-products.import.alkes'), formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            setAlkesImportResult({ type: 'success', message: response.data?.message ?? 'Import ALKES berhasil.' });
+            setAlkesImportFile(null);
+            router.reload({ only: ['products'] });
+        } catch (error) {
+            const fallback = error?.response?.data?.message ?? 'Import ALKES gagal.';
+            setAlkesImportResult({ type: 'error', message: fallback });
+        } finally {
+            setAlkesImporting(false);
         }
     };
 
@@ -106,6 +129,17 @@ export default function Index() {
                     <button type="button" onClick={handleImport} disabled={!importFile || importing} className="inline-flex items-center gap-1 rounded-lg border border-indigo-500 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-indigo-950/30"><IconFileImport size={16} strokeWidth={1.5} />{importing ? 'Importing...' : 'Import Excel'}</button>
                     <a href={route('apps.master-data.regulatory-products.export.excel')} className="inline-flex items-center gap-1 rounded-lg border border-emerald-500 px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30">Export Excel</a>
                     {importResult && <span className={`text-xs ${importResult.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>{importResult.message}</span>}
+                </div>
+            </div>
+            <div className="mb-5 grid gap-3 rounded-lg border border-sky-200 bg-sky-50/30 p-3 dark:border-sky-900/40 dark:bg-sky-950/20 md:grid-cols-12">
+                <div className="md:col-span-4">
+                    <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">Import ALKES (XLSX/CSV)</label>
+                    <input type="file" accept=".xlsx,.csv,.txt" onChange={(e) => setAlkesImportFile(e.target.files?.[0] ?? null)} className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-sky-500 focus:outline-none dark:border-gray-900 dark:bg-gray-950 dark:text-gray-100" />
+                </div>
+                <div className="flex items-end gap-2 md:col-span-8">
+                    <a href={route('apps.master-data.regulatory-products.import-alkes.template')} className="inline-flex items-center gap-1 rounded-lg border border-sky-400 px-3 py-2 text-sm text-sky-700 hover:bg-sky-100 dark:text-sky-300 dark:hover:bg-sky-950/30">Download Template ALKES</a>
+                    <button type="button" onClick={handleImportAlkes} disabled={!alkesImportFile || alkesImporting} className="inline-flex items-center gap-1 rounded-lg border border-sky-500 px-3 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-sky-300 dark:hover:bg-sky-950/30"><IconFileImport size={16} strokeWidth={1.5} />{alkesImporting ? 'Importing...' : 'Import Excel ALKES'}</button>
+                    {alkesImportResult && <span className={`text-xs ${alkesImportResult.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>{alkesImportResult.message}</span>}
                 </div>
             </div>
 
