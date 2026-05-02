@@ -23,6 +23,12 @@ use App\Http\Controllers\Apps\Transfer\WarehouseTransferController;
 use App\Http\Controllers\Apps\InventoryPostingController;
 use App\Http\Controllers\Apps\Reports\InventoryReportController;
 use App\Http\Controllers\Apps\Integration\IntegrationController;
+use App\Http\Controllers\Apps\Procurement\VendorController;
+use App\Http\Controllers\Apps\Procurement\PurchaseOrderController;
+use App\Http\Controllers\Apps\Procurement\GoodsReceiptController;
+use App\Http\Controllers\Apps\Procurement\VendorInvoiceController;
+use App\Http\Controllers\Apps\Procurement\VendorPaymentController;
+use App\Http\Controllers\Apps\Procurement\VendorLedgerController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -167,6 +173,15 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::get('/stock-card', [InventoryReportController::class, 'stockCard'])->name('stock-card');
         Route::get('/expired-soon', [InventoryReportController::class, 'expiredSoon'])->name('expired-soon');
         Route::get('/minimum-stock-alerts', [InventoryReportController::class, 'minimumStockAlerts'])->name('minimum-stock-alerts');
+    });
+
+    Route::prefix('procurement')->name('procurement.')->group(function () {
+        Route::resource('/vendors', VendorController::class)->except(['show','destroy']);
+        Route::resource('/purchase-orders', PurchaseOrderController::class);
+        Route::resource('/goods-receipts', GoodsReceiptController::class);
+        Route::resource('/vendor-invoices', VendorInvoiceController::class);
+        Route::resource('/vendor-payments', VendorPaymentController::class);
+        Route::resource('/vendor-ledgers', VendorLedgerController::class)->only(['index','show']);
     });
 });
 
