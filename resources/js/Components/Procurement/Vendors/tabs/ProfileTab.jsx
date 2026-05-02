@@ -18,7 +18,7 @@ export default function Tab({ data, vendor }) {
     }, {});
 
     setData(mappedProfile);
-  }, [profile, setData]);
+  }, [profile]);
 
   const submit = (e) => {
     e.preventDefault();
