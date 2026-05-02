@@ -194,6 +194,14 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     Route::redirect('/procurement/vendor', '/apps/procurement/vendors', 301);
 
     Route::prefix('procurement')->name('procurement.')->group(function () {
+        Route::get('/vendors/qualification-report', [VendorController::class, 'qualificationReport'])->name('vendors.qualification-report');
+        Route::post('/vendors/{vendor}/submit-qualification', [VendorController::class, 'submitQualification'])->name('vendors.submit-qualification');
+        Route::post('/vendors/{vendor}/approve-qualification', [VendorController::class, 'approveQualification'])->name('vendors.approve-qualification');
+        Route::post('/vendors/{vendor}/reject-qualification', [VendorController::class, 'rejectQualification'])->name('vendors.reject-qualification');
+        Route::post('/vendors/{vendor}/documents', [VendorController::class, 'uploadDocument'])->name('vendors.documents.upload');
+        Route::delete('/vendors/{vendor}/documents/{document}', [VendorController::class, 'deleteDocument'])->name('vendors.documents.delete');
+        Route::post('/vendors/{vendor}/documents/{document}/verify', [VendorController::class, 'verifyDocument'])->name('vendors.documents.verify');
+        Route::get('/vendors/{vendor}/documents/{document}/download', [VendorController::class, 'downloadDocument'])->name('vendors.documents.download');
         Route::resource('/vendors', VendorController::class)->except(['show']);
         Route::resource('/purchase-orders', PurchaseOrderController::class);
         Route::resource('/goods-receipts', GoodsReceiptController::class);
