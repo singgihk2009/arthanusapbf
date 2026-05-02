@@ -86,12 +86,21 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::post('/regulatory-products/import/excel', [RegulatoryProductController::class, 'importExcel'])->name('regulatory-products.import.excel');
         Route::get('/regulatory-product/template/excel', [RegulatoryProductController::class, 'downloadTemplateExcel']);
         Route::post('/regulatory-product/import/excel', [RegulatoryProductController::class, 'importExcel']);
-        Route::post('/regulatory-products/import/bpom', [RegulatoryProductController::class, 'importBpom'])->name('regulatory-products.import.bpom');
-        Route::post('/regulatory-products/import/kemenkes', [RegulatoryProductController::class, 'importKemenkes'])->name('regulatory-products.import.kemenkes');
+        Route::get('/regulatory-products/import-bpom', [RegulatoryProductController::class, 'create'])->name('regulatory-products.import-bpom');
+        Route::post('/regulatory-products/import-bpom', [RegulatoryProductController::class, 'importBpom'])->name('regulatory-products.import.bpom');
+        Route::get('/regulatory-products/import-kemenkes-drug', [RegulatoryProductController::class, 'create'])->name('regulatory-products.import-kemenkes-drug');
+        Route::post('/regulatory-products/import-kemenkes-drug', [RegulatoryProductController::class, 'importKemenkes'])->name('regulatory-products.import.kemenkes-drug');
+        Route::get('/regulatory-products/import-alkes', [RegulatoryProductController::class, 'create'])->name('regulatory-products.import-alkes');
+        Route::post('/regulatory-products/import-alkes', [RegulatoryProductController::class, 'importKemenkesAlkes'])->name('regulatory-products.import.alkes');
+        Route::get('/regulatory-products/import-alkes/template', [RegulatoryProductController::class, 'downloadTemplateExcel'])->name('regulatory-products.import-alkes.template');
         Route::post('/regulatory-products/mapping/attach', [RegulatoryProductController::class, 'attach'])->name('regulatory-products.mapping.attach');
         Route::post('/regulatory-products/mapping/detach', [RegulatoryProductController::class, 'detach'])->name('regulatory-products.mapping.detach');
         Route::post('/regulatory-products/mapping/set-primary', [RegulatoryProductController::class, 'setPrimary'])->name('regulatory-products.mapping.set-primary');
         Route::get('/regulatory-products/{regulatoryProduct}/candidates', [RegulatoryProductController::class, 'candidates'])->name('regulatory-products.candidates');
+        Route::get('/items/{item}/regulatory-products', [ItemController::class, 'edit'])->name('items.regulatory-products.index');
+        Route::post('/items/{item}/regulatory-products', [ItemController::class, 'updateRegulatoryProduct'])->name('items.regulatory-products.attach');
+        Route::delete('/items/{item}/regulatory-products/{regulatoryProduct}', [ItemController::class, 'removeRegulatoryProduct'])->name('items.regulatory-products.detach');
+        Route::patch('/items/{item}/regulatory-products/{regulatoryProduct}/set-primary', [ItemController::class, 'setPrimaryRegulatoryProduct'])->name('items.regulatory-products.set-primary');
     });
 
     // inventory report page

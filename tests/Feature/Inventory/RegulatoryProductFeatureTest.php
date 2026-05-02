@@ -10,6 +10,7 @@ it('can create regulatory product', function () {
     $user = User::factory()->create();
     $source = RegulatorySource::firstOrCreate(['source_name' => 'BPOM']);
     $this->actingAs($user)->post('/apps/master-data/regulatory-products', [
+        'product_type' => 'DRUG',
         'source_id' => $source->id,
         'nie' => 'NIE-001',
         'product_name_source' => 'Paracetamol',
@@ -23,7 +24,7 @@ it('can map and set primary regulatory product', function () {
     $uomId = DB::table('uoms')->insertGetId(['code'=>'PCS-T','name'=>'PCS T','created_at'=>now(),'updated_at'=>now()]);
     $item = Item::create(['sku'=>'SKU-T1','name'=>'Item T1','base_uom_id'=>$uomId,'is_active'=>1]);
     $source = RegulatorySource::firstOrCreate(['source_name' => 'BPOM']);
-    $rp = RegulatoryProduct::create(['source_id'=>$source->id,'nie'=>'NIE-XYZ','product_name_source'=>'X']);
+    $rp = RegulatoryProduct::create(['product_type'=>'DRUG','source_id'=>$source->id,'nie'=>'NIE-XYZ','product_name_source'=>'X']);
 
     $this->actingAs($user)->post('/apps/master-data/regulatory-products/mapping/attach', [
         'item_id'=>$item->id,'regulatory_product_id'=>$rp->id,
@@ -40,6 +41,7 @@ it('can search regulatory products by source name including custom sources', fun
     $user = User::factory()->create();
     $source = RegulatorySource::firstOrCreate(['source_name' => 'BOSKA']);
     RegulatoryProduct::create([
+        'product_type' => 'DRUG',
         'source_id' => $source->id,
         'nie' => 'NIE-BOSKA-001',
         'product_name_source' => 'Produk Uji BOSKA',
