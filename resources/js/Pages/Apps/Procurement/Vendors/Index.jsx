@@ -114,7 +114,7 @@ export default function Index() {
                                     disabled={v.qualification_status === 'qualified'}
                                     className='inline-flex items-center gap-1 rounded-md border border-emerald-300 px-3 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-transparent dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-950/30'
                                 >
-                                    <IconCircleCheck size={16} strokeWidth={1.75} /> Checklist
+                                    <IconCircleCheck size={16} strokeWidth={1.75} /> Qualified
                                 </button>
                                 <button type='button' onClick={() => deleteVendor(v.id)} className='inline-flex items-center gap-1 rounded-md border border-red-300 px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30'><IconTrash size={16} strokeWidth={1.75} />Delete</button>
                             </div>
