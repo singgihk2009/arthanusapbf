@@ -168,8 +168,8 @@ class RegulatoryProductController extends Controller {
  }
  public function downloadTemplateAlkesExcel(){
   $rows=[
-   ['nie','license_type','registration_date','expiry_date','brand','product_name_source','sub_category','device_type','product_group','model_type','device_class','risk_class','registrant_name','registrant_address','manufacturer_name','manufacturer_address','manufacturer_name_2'],
-   ['AKD12345678901','AKD','2026-01-01','2031-01-01','Contoh Merk Alkes','Contoh Merk Alkes','Alat Diagnostik','Rapid Test','Diagnostik In Vitro','Model A','A','Rendah','PT Contoh Distributor','Jakarta','Contoh Manufacturer','Bandung','Contoh Manufacturer 2']
+   ['source_name','nie','license_type','registration_date','expiry_date','brand','product_name_source','sub_category','device_type','product_group','model_type','device_class','risk_class','registrant_name','registrant_address','manufacturer_name','manufacturer_address','manufacturer_name_2'],
+   ['AKD','AKD12345678901','AKD','2026-01-01','2031-01-01','Contoh Merk Alkes','Contoh Merk Alkes','Alat Diagnostik','Rapid Test','Diagnostik In Vitro','Model A','A','Rendah','PT Contoh Distributor','Jakarta','Contoh Manufacturer','Bandung','Contoh Manufacturer 2']
   ];
   $tempPath=storage_path('app/regulatory-product-alkes-template-'.now()->format('YmdHis').'.xlsx');
   $this->buildTemplateXlsx($tempPath,$rows);
@@ -224,17 +224,25 @@ class RegulatoryProductController extends Controller {
    return back()->with('error',$message);
   }
 
-  $source=RegulatorySource::firstOrCreate(['source_name'=>'KEMENKES']);
+  $sourceMap=RegulatorySource::query()->pluck('id','source_name')->all();
   $upsertRows=[]; $errors=[]; $processed=0;
 
   foreach($rows as $index=>$row){
    if($this->isRowEmpty($row)) continue;
    try{
     $normalized=$service->normalizeAlkesRow($row);
-    if(empty($normalized['nie'])) throw new \RuntimeException('NOMOR wajib diisi.');
+    if(empty($normalized['nie'])) throw new \RuntimeException('NIE/NOMOR wajib diisi.');
+    $sourceName=trim((string)($row['source_name'] ?? ''));
+    if($sourceName==='') $sourceName=trim((string)($normalized['license_type'] ?? ''));
+    if($sourceName==='') $sourceName='KEMENKES';
+    $sourceId=$sourceMap[$sourceName] ?? null;
+    if(! $sourceId){
+      $sourceId=RegulatorySource::query()->create(['source_name'=>$sourceName])->id;
+      $sourceMap[$sourceName]=$sourceId;
+    }
     $upsertRows[]=[
       ...$normalized,
-      'source_id'=>$source->id,
+      'source_id'=>$sourceId,
       'raw_payload'=>json_encode($row, JSON_UNESCAPED_UNICODE),
       'created_at'=>now(),
       'updated_at'=>now(),
