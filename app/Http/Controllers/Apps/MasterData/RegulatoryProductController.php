@@ -235,7 +235,7 @@ class RegulatoryProductController extends Controller {
     $upsertRows[]=[
       ...$normalized,
       'source_id'=>$source->id,
-      'raw_payload'=>$row,
+      'raw_payload'=>json_encode($row, JSON_UNESCAPED_UNICODE),
       'created_at'=>now(),
       'updated_at'=>now(),
     ];
