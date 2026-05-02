@@ -125,7 +125,12 @@ class RegulatoryProductController extends Controller {
  }
  public function exportExcel(Request $request): StreamedResponse {
   $q=trim((string)$request->get('q'));
-  $rows=RegulatoryProduct::with('source')->when($q,fn($x)=>$x->where('nie','like',"%$q%")->orWhere('product_name_source','like',"%$q%"))->orderBy('id')->get();
+  $productType=$request->string('product_type')->toString();
+  $rows=RegulatoryProduct::with('source')
+    ->when($productType!=='',fn($x)=>$x->where('product_type',$productType))
+    ->when($q,fn($x)=>$x->where('nie','like',"%$q%")->orWhere('product_name_source','like',"%$q%"))
+    ->orderBy('id')
+    ->get();
   return response()->streamDownload(function() use ($rows): void {
    $output=fopen('php://output','w');
    fputcsv($output,['Source','NIE','Kode BPOM','Nama Produk','Produsen','Kemasan','Kekuatan','Jenis Komoditi','Packing','Bahan Obat']);
@@ -160,6 +165,15 @@ class RegulatoryProductController extends Controller {
   $tempPath=storage_path('app/regulatory-product-template-'.now()->format('YmdHis').'.xlsx');
   $this->buildTemplateXlsx($tempPath,$rows);
   return response()->download($tempPath,'regulatory-product-template.xlsx')->deleteFileAfterSend(true);
+ }
+ public function downloadTemplateAlkesExcel(){
+  $rows=[
+   ['nie','license_type','registration_date','expiry_date','brand','product_name_source','sub_category','device_type','product_group','model_type','device_class','risk_class','registrant_name','registrant_address','manufacturer_name','manufacturer_address','manufacturer_name_2'],
+   ['AKD12345678901','AKD','2026-01-01','2031-01-01','Contoh Merk Alkes','Contoh Merk Alkes','Alat Diagnostik','Rapid Test','Diagnostik In Vitro','Model A','A','Rendah','PT Contoh Distributor','Jakarta','Contoh Manufacturer','Bandung','Contoh Manufacturer 2']
+  ];
+  $tempPath=storage_path('app/regulatory-product-alkes-template-'.now()->format('YmdHis').'.xlsx');
+  $this->buildTemplateXlsx($tempPath,$rows);
+  return response()->download($tempPath,'regulatory-product-alkes-template.xlsx')->deleteFileAfterSend(true);
  }
  public function importExcel(Request $request): JsonResponse {
   $request->validate(['file'=>['required','file','mimes:xlsx,csv,txt']]);
@@ -201,7 +215,53 @@ class RegulatoryProductController extends Controller {
  }
  public function importBpom(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importBpom($request->file('file')->getRealPath());return back()->with('success',"Import BPOM berhasil: {$count}");}
  public function importKemenkes(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importKemenkes($request->file('file')->getRealPath());return back()->with('success',"Import KEMENKES berhasil: {$count}");}
- public function importKemenkesAlkes(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importKemenkesAlkes($request->file('file')->getRealPath());return back()->with('success',"Import ALKES berhasil: {$count}");}
+ public function importKemenkesAlkes(Request $request, RegulatoryProductImportService $service){
+  $request->validate(['file'=>['required','file','mimes:xlsx,csv,txt']]);
+  $rows=$this->parseImportRows($request->file('file'));
+  if($rows->isEmpty()){
+   $message='File ALKES kosong atau tidak dapat dibaca.';
+   if($request->expectsJson()) return response()->json(['message'=>$message],422);
+   return back()->with('error',$message);
+  }
+
+  $source=RegulatorySource::firstOrCreate(['source_name'=>'KEMENKES']);
+  $upsertRows=[]; $errors=[]; $processed=0;
+
+  foreach($rows as $index=>$row){
+   if($this->isRowEmpty($row)) continue;
+   try{
+    $normalized=$service->normalizeAlkesRow($row);
+    if(empty($normalized['nie'])) throw new \RuntimeException('NOMOR wajib diisi.');
+    $upsertRows[]=[
+      ...$normalized,
+      'source_id'=>$source->id,
+      'raw_payload'=>json_encode($row, JSON_UNESCAPED_UNICODE),
+      'created_at'=>now(),
+      'updated_at'=>now(),
+    ];
+    $processed++;
+   }catch(\Throwable $exception){
+    $errors[]=['row'=>$index+2,'message'=>$exception->getMessage()];
+   }
+  }
+
+  if(!empty($errors)){
+   $message='Import ALKES gagal. '.collect($errors)->map(fn($e)=>"Baris {$e['row']}: {$e['message']}")->implode(' | ');
+   if($request->expectsJson()) return response()->json(['message'=>$message,'errors'=>$errors],422);
+   return back()->with('error',$message);
+  }
+
+  foreach(array_chunk($upsertRows, 1000) as $chunk){
+   RegulatoryProduct::query()->upsert(
+    $chunk,
+    ['source_id','nie'],
+    ['product_type','license_type','registration_date','expiry_date','brand','product_name_source','sub_category','device_type','product_group','model_type','device_class','risk_class','registrant_name','registrant_address','manufacturer_name','manufacturer_address','manufacturer_name_2','raw_payload','updated_at']
+   );
+  }
+  $message="Import ALKES berhasil: {$processed}";
+  if($request->expectsJson()) return response()->json(['message'=>$message]);
+  return back()->with('success',$message);
+ }
  public function attach(ItemRegulatoryMappingRequest $request){ItemRegulatoryProduct::firstOrCreate($request->validated(),['is_primary'=>false]);return back();}
  public function detach(ItemRegulatoryMappingRequest $request){ItemRegulatoryProduct::where('item_id',$request->item_id)->where('regulatory_product_id',$request->regulatory_product_id)->delete();return back();}
  public function setPrimary(ItemRegulatoryMappingRequest $request){ItemRegulatoryProduct::where('item_id',$request->item_id)->update(['is_primary'=>false]); ItemRegulatoryProduct::where('item_id',$request->item_id)->where('regulatory_product_id',$request->regulatory_product_id)->update(['is_primary'=>true]);return back();}
