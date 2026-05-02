@@ -47,7 +47,7 @@ class VendorController extends Controller
     {
         return response()->json([
             'financial_summary' => $this->summary($vendor),
-            'recent_purchase_orders' => PurchaseOrder::where('vendor_id', $vendor->id)->latest('po_date')->limit(5)->get(),
+            'recent_purchase_orders' => PurchaseOrder::where('vendor_id', $vendor->id)->latest('document_date')->limit(5)->get(),
             'recent_invoices' => VendorInvoice::where('vendor_id', $vendor->id)->latest('invoice_date')->limit(5)->get(),
             'recent_payments' => VendorPayment::where('vendor_id', $vendor->id)->latest('payment_date')->limit(5)->get(),
         ]);
@@ -57,11 +57,11 @@ class VendorController extends Controller
     public function legal(Vendor $vendor) { return response()->json(['documents' => $vendor->documents()->get()]); }
     public function contacts(Vendor $vendor) { return response()->json(['contacts' => $vendor->contacts()->orderBy('contact_type')->get()->groupBy('contact_type')]); }
     public function documents(Vendor $vendor) { return response()->json(['documents' => $vendor->documents()->latest()->get()]); }
-    public function purchaseOrders(Vendor $vendor) { return response()->json(['purchase_orders' => PurchaseOrder::where('vendor_id', $vendor->id)->latest('po_date')->paginate(10)]); }
-    public function receivings(Vendor $vendor) { return response()->json(['receivings' => GoodsReceipt::where('vendor_id', $vendor->id)->latest('receipt_date')->paginate(10)]); }
+    public function purchaseOrders(Vendor $vendor) { return response()->json(['purchase_orders' => PurchaseOrder::where('vendor_id', $vendor->id)->latest('document_date')->paginate(10)]); }
+    public function receivings(Vendor $vendor) { return response()->json(['receivings' => GoodsReceipt::where('supplier_id', $vendor->id)->latest('document_date')->paginate(10)]); }
     public function invoices(Vendor $vendor) { return response()->json(['invoices' => VendorInvoice::where('vendor_id', $vendor->id)->latest('invoice_date')->paginate(10)]); }
     public function payments(Vendor $vendor) { return response()->json(['payments' => VendorPayment::where('vendor_id', $vendor->id)->latest('payment_date')->paginate(10)]); }
-    public function ledger(Vendor $vendor) { return response()->json(['ledger' => VendorLedger::where('vendor_id', $vendor->id)->latest('entry_date')->paginate(10)]); }
+    public function ledger(Vendor $vendor) { return response()->json(['ledger' => VendorLedger::where('vendor_id', $vendor->id)->latest('transaction_date')->paginate(10)]); }
     public function auditLogs(Vendor $vendor) { return response()->json(['audit_logs' => [['action' => 'Vendor created/updated', 'at' => $vendor->updated_at, 'by' => $vendor->updated_by]]]); }
 
     public function create(){ return Inertia::render('Apps/Procurement/Vendors/Form'); }
@@ -99,10 +99,10 @@ class VendorController extends Controller
     {
         return [
             'outstanding_ap' => VendorInvoice::where('vendor_id', $vendor->id)->sum('outstanding_amount'),
-            'total_purchase_ytd' => PurchaseOrder::where('vendor_id', $vendor->id)->whereYear('po_date', now()->year)->sum('total_amount'),
-            'last_purchase_date' => PurchaseOrder::where('vendor_id', $vendor->id)->max('po_date'),
-            'open_po' => PurchaseOrder::where('vendor_id', $vendor->id)->whereIn('status', ['draft','approved','partial'])->count(),
-            'unpaid_invoice' => VendorInvoice::where('vendor_id', $vendor->id)->where('status', 'unpaid')->count(),
+            'total_purchase_ytd' => PurchaseOrder::where('vendor_id', $vendor->id)->whereYear('document_date', now()->year)->sum('grand_total'),
+            'last_purchase_date' => PurchaseOrder::where('vendor_id', $vendor->id)->max('document_date'),
+            'open_po' => PurchaseOrder::where('vendor_id', $vendor->id)->whereIn('status', ['DRAFT','APPROVED','PARTIALLY_RECEIVED','SENT'])->count(),
+            'unpaid_invoice' => VendorInvoice::where('vendor_id', $vendor->id)->whereIn('status', ['POSTED','PARTIAL_PAID'])->count(),
             'expiring_documents' => $vendor->documents()->whereDate('expiry_date', '<=', now()->addDays(30))->count(),
         ];
     }
