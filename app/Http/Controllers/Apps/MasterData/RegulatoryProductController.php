@@ -161,6 +161,15 @@ class RegulatoryProductController extends Controller {
   $this->buildTemplateXlsx($tempPath,$rows);
   return response()->download($tempPath,'regulatory-product-template.xlsx')->deleteFileAfterSend(true);
  }
+ public function downloadTemplateAlkesExcel(){
+  $rows=[
+   ['NOMOR','TGL TERBIT','TGL EXP','MERK','SUB KATEGORI','JENIS PRODUK','KELOMPOK PRODUK','TIPE','KELAS','KELAS RESIKO','PENDAFTAR','ALAMAT PENDAFTAR','PABRIK','ALAMAT PABRIK','PABRIK2'],
+   ['AKD 12345678901','2026-01-01','2031-01-01','Contoh Merk Alkes','Alat Diagnostik','Rapid Test','Diagnostik In Vitro','Model A','A','Rendah','PT Contoh Distributor','Jakarta','Contoh Manufacturer','Bandung','Contoh Manufacturer 2']
+  ];
+  $tempPath=storage_path('app/regulatory-product-alkes-template-'.now()->format('YmdHis').'.xlsx');
+  $this->buildTemplateXlsx($tempPath,$rows);
+  return response()->download($tempPath,'regulatory-product-alkes-template.xlsx')->deleteFileAfterSend(true);
+ }
  public function importExcel(Request $request): JsonResponse {
   $request->validate(['file'=>['required','file','mimes:xlsx,csv,txt']]);
   $rows=$this->parseImportRows($request->file('file'));
@@ -201,7 +210,53 @@ class RegulatoryProductController extends Controller {
  }
  public function importBpom(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importBpom($request->file('file')->getRealPath());return back()->with('success',"Import BPOM berhasil: {$count}");}
  public function importKemenkes(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importKemenkes($request->file('file')->getRealPath());return back()->with('success',"Import KEMENKES berhasil: {$count}");}
- public function importKemenkesAlkes(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importKemenkesAlkes($request->file('file')->getRealPath());return back()->with('success',"Import ALKES berhasil: {$count}");}
+ public function importKemenkesAlkes(Request $request, RegulatoryProductImportService $service){
+  $request->validate(['file'=>['required','file','mimes:xlsx,csv,txt']]);
+  $rows=$this->parseImportRows($request->file('file'));
+  if($rows->isEmpty()){
+   $message='File ALKES kosong atau tidak dapat dibaca.';
+   if($request->expectsJson()) return response()->json(['message'=>$message],422);
+   return back()->with('error',$message);
+  }
+
+  $source=RegulatorySource::firstOrCreate(['source_name'=>'KEMENKES']);
+  $upsertRows=[]; $errors=[]; $processed=0;
+
+  foreach($rows as $index=>$row){
+   if($this->isRowEmpty($row)) continue;
+   try{
+    $normalized=$service->normalizeAlkesRow($row);
+    if(empty($normalized['nie'])) throw new \RuntimeException('NOMOR wajib diisi.');
+    $upsertRows[]=[
+      ...$normalized,
+      'source_id'=>$source->id,
+      'raw_payload'=>$row,
+      'created_at'=>now(),
+      'updated_at'=>now(),
+    ];
+    $processed++;
+   }catch(\Throwable $exception){
+    $errors[]=['row'=>$index+2,'message'=>$exception->getMessage()];
+   }
+  }
+
+  if(!empty($errors)){
+   $message='Import ALKES gagal. '.collect($errors)->map(fn($e)=>"Baris {$e['row']}: {$e['message']}")->implode(' | ');
+   if($request->expectsJson()) return response()->json(['message'=>$message,'errors'=>$errors],422);
+   return back()->with('error',$message);
+  }
+
+  foreach(array_chunk($upsertRows, 1000) as $chunk){
+   RegulatoryProduct::query()->upsert(
+    $chunk,
+    ['source_id','nie'],
+    ['product_type','license_type','registration_date','expiry_date','brand','product_name_source','sub_category','device_type','product_group','model_type','device_class','risk_class','registrant_name','registrant_address','manufacturer_name','manufacturer_address','manufacturer_name_2','raw_payload','updated_at']
+   );
+  }
+  $message="Import ALKES berhasil: {$processed}";
+  if($request->expectsJson()) return response()->json(['message'=>$message]);
+  return back()->with('success',$message);
+ }
  public function attach(ItemRegulatoryMappingRequest $request){ItemRegulatoryProduct::firstOrCreate($request->validated(),['is_primary'=>false]);return back();}
  public function detach(ItemRegulatoryMappingRequest $request){ItemRegulatoryProduct::where('item_id',$request->item_id)->where('regulatory_product_id',$request->regulatory_product_id)->delete();return back();}
  public function setPrimary(ItemRegulatoryMappingRequest $request){ItemRegulatoryProduct::where('item_id',$request->item_id)->update(['is_primary'=>false]); ItemRegulatoryProduct::where('item_id',$request->item_id)->where('regulatory_product_id',$request->regulatory_product_id)->update(['is_primary'=>true]);return back();}
