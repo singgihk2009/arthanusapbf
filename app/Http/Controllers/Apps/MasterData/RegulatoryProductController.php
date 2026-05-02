@@ -146,7 +146,7 @@ class RegulatoryProductController extends Controller {
    fclose($output);
   },'master-regulatory-products-'.now()->format('Ymd-His').'.csv',['Content-Type'=>'text/csv; charset=UTF-8']);
  } 
- public function create(Request $request){$type=$request->string('product_type')->toString() ?: RegulatoryProduct::TYPE_DRUG; return inertia('Apps/MasterData/RegulatoryProducts/Create',['sources'=>RegulatorySource::all(),'product_type'=>$type]);}
+ public function create(Request $request){$type=$request->string('product_type')->toString() ?: null; return inertia('Apps/MasterData/RegulatoryProducts/Create',['sources'=>RegulatorySource::all(),'product_type'=>$type]);}
  public function store(RegulatoryProductRequest $request){$data=$this->normalizePayload($request->validated());RegulatoryProduct::create($data);return to_route('apps.master-data.regulatory-products.index');}
  public function edit(RegulatoryProduct $regulatoryProduct){$regulatoryProduct->load('compositions','packagings','source');return inertia('Apps/MasterData/RegulatoryProducts/Edit',['product'=>$regulatoryProduct,'sources'=>RegulatorySource::all(),'items'=>Item::select('id','sku','name')->limit(100)->get()]);}
  public function update(RegulatoryProductRequest $request, RegulatoryProduct $regulatoryProduct){$data=$this->normalizePayload($request->validated());$regulatoryProduct->update($data);return back();}

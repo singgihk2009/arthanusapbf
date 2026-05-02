@@ -63,7 +63,7 @@ export default function Create() {
                     </div>
                     <Input label="NIE" type="text" value={data.nie} onChange={(e) => setData('nie', e.target.value)} errors={errors.nie} />
                     <Input label="Kode BPOM" type="text" value={data.source_code} onChange={(e) => setData('source_code', e.target.value)} errors={errors.source_code} />
-                    {(data.product_type || 'DRUG') === 'DRUG' ? (
+                    {data.product_type === 'DRUG' ? (
                         <>
                             <Input label="Nama Produk (Source)" type="text" value={data.product_name_source} onChange={(e) => setData('product_name_source', e.target.value)} errors={errors.product_name_source} />
                             <Input label="Dosage Form" type="text" value={data.dosage_form} onChange={(e) => setData('dosage_form', e.target.value)} errors={errors.dosage_form} />
@@ -73,7 +73,7 @@ export default function Create() {
                             <Input label="Raw Composition Text" type="text" value={data.raw_composition_text} onChange={(e) => setData('raw_composition_text', e.target.value)} errors={errors.raw_composition_text} />
                             <Input label="Raw Packaging Text" type="text" value={data.raw_packaging_text} onChange={(e) => setData('raw_packaging_text', e.target.value)} errors={errors.raw_packaging_text} />
                         </>
-                    ) : (
+                    ) : data.product_type === 'MEDICAL_DEVICE' ? (
                         <>
                             <Input label="MERK" type="text" value={data.brand} onChange={(e) => setData('brand', e.target.value)} errors={errors.brand} />
                             <Input label="AKD/AKL" type="text" value={data.license_type} onChange={(e) => setData('license_type', e.target.value)} errors={errors.license_type} />
@@ -91,6 +91,10 @@ export default function Create() {
                             <Input label="ALAMAT PABRIK" type="text" value={data.manufacturer_address} onChange={(e) => setData('manufacturer_address', e.target.value)} errors={errors.manufacturer_address} />
                             <Input label="PABRIK2" type="text" value={data.manufacturer_name_2} onChange={(e) => setData('manufacturer_name_2', e.target.value)} errors={errors.manufacturer_name_2} />
                         </>
+                    ) : (
+                        <div className="col-span-2 rounded-lg border border-dashed p-4 text-sm text-gray-600">
+                            Pilih tipe produk terlebih dahulu untuk menampilkan form input.
+                        </div>
                     )}
                 </div>
             </Card>
