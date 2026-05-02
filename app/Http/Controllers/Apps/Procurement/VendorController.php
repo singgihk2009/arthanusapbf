@@ -141,8 +141,15 @@ class VendorController extends Controller
     protected function upsertContacts(Vendor $vendor, array $data): void
     {
         foreach (['company_director', 'technical_responsible_person'] as $type) {
-            if (!isset($data[$type])) continue;
-            $vendor->contacts()->updateOrCreate(['contact_type' => $type], array_merge($data[$type], ['contact_type' => $type, 'updated_by' => auth()->id(), 'created_by' => auth()->id()]));
+            if (!isset($data[$type]) || !is_array($data[$type])) continue;
+
+            $contact = $data[$type];
+            if (empty($contact['name'])) continue;
+
+            $vendor->contacts()->updateOrCreate(
+                ['contact_type' => $type],
+                array_merge($contact, ['contact_type' => $type, 'updated_by' => auth()->id(), 'created_by' => auth()->id()])
+            );
         }
     }
 
