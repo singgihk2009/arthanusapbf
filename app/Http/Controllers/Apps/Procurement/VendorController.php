@@ -1,0 +1,4 @@
+<?php
+namespace App\Http\Controllers\Apps\Procurement;
+use App\Http\Controllers\Controller; use App\Models\Procurement\Vendor; use Inertia\Inertia; use App\Http\Requests\Procurement\StoreVendorRequest;
+class VendorController extends Controller { public function index(){ $vendors=Vendor::latest()->paginate(10); return Inertia::render('Apps/Procurement/Vendors/Index',compact('vendors')); } public function create(){ return Inertia::render('Apps/Procurement/Vendors/Form'); } public function store(StoreVendorRequest $r){ Vendor::create($r->all()); return back()->with('success','Saved'); } public function edit(Vendor $vendor){ return Inertia::render('Apps/Procurement/Vendors/Form',compact('vendor')); } public function update(StoreVendorRequest $r,Vendor $vendor){ $vendor->update($r->all()); return back()->with('success','Updated'); }}
