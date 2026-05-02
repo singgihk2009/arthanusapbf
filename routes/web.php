@@ -202,6 +202,18 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::delete('/vendors/{vendor}/documents/{document}', [VendorController::class, 'deleteDocument'])->name('vendors.documents.delete');
         Route::post('/vendors/{vendor}/documents/{document}/verify', [VendorController::class, 'verifyDocument'])->name('vendors.documents.verify');
         Route::get('/vendors/{vendor}/documents/{document}/download', [VendorController::class, 'downloadDocument'])->name('vendors.documents.download');
+        Route::get('/vendors/{vendor}/overview', [VendorController::class, 'overview'])->name('vendors.overview');
+        Route::get('/vendors/{vendor}/profile', [VendorController::class, 'profile'])->name('vendors.profile');
+        Route::get('/vendors/{vendor}/legal', [VendorController::class, 'legal'])->name('vendors.legal');
+        Route::get('/vendors/{vendor}/contacts', [VendorController::class, 'contacts'])->name('vendors.contacts');
+        Route::get('/vendors/{vendor}/documents', [VendorController::class, 'documents'])->name('vendors.documents');
+        Route::get('/vendors/{vendor}/purchase-orders', [VendorController::class, 'purchaseOrders'])->name('vendors.purchase-orders');
+        Route::get('/vendors/{vendor}/receivings', [VendorController::class, 'receivings'])->name('vendors.receivings');
+        Route::get('/vendors/{vendor}/invoices', [VendorController::class, 'invoices'])->name('vendors.invoices');
+        Route::get('/vendors/{vendor}/payments', [VendorController::class, 'payments'])->name('vendors.payments');
+        Route::get('/vendors/{vendor}/ledger', [VendorController::class, 'ledger'])->name('vendors.ledger');
+        Route::get('/vendors/{vendor}/audit-logs', [VendorController::class, 'auditLogs'])->name('vendors.audit-logs');
+        Route::get('/vendors/{vendor}', [VendorController::class, 'show'])->name('vendors.show');
         Route::resource('/vendors', VendorController::class)->except(['show']);
         Route::resource('/purchase-orders', PurchaseOrderController::class);
         Route::resource('/goods-receipts', GoodsReceiptController::class);
