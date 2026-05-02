@@ -52,3 +52,28 @@ it('can search regulatory products by source name including custom sources', fun
         ->assertOk()
         ->assertJsonPath('data.0.source_name', 'BOSKA');
 });
+
+it('exports medical device columns for alkes export', function () {
+    $user = User::factory()->create();
+    $source = RegulatorySource::firstOrCreate(['source_name' => 'KEMENKES']);
+    RegulatoryProduct::create([
+        'product_type' => 'MEDICAL_DEVICE',
+        'source_id' => $source->id,
+        'nie' => 'AKD-001',
+        'license_type' => 'AKD',
+        'registration_date' => '2026-01-01',
+        'expiry_date' => '2031-01-01',
+        'brand' => 'Brand Alkes',
+        'product_name_source' => 'Alat Tes',
+        'sub_category' => 'Diagnostik',
+    ]);
+
+    $response = $this->actingAs($user)->get('/apps/master-data/regulatory-products/export/excel?product_type=MEDICAL_DEVICE');
+    $response->assertOk();
+
+    $lines = preg_split("/\r\n|\n|\r/", trim($response->streamedContent()));
+    expect($lines[0])->toContain('Jenis Izin')
+        ->and($lines[0])->toContain('Kelas Risiko')
+        ->and($lines[1])->toContain('AKD-001')
+        ->and($lines[1])->toContain('Brand Alkes');
+});
