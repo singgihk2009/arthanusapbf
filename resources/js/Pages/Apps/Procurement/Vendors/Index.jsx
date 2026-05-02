@@ -1,7 +1,7 @@
 import AppLayout from '@/Layouts/AppLayout';
 import Button from '@/Components/Button';
 import Table from '@/Components/Table';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { IconCirclePlus } from '@tabler/icons-react';
 import React from 'react';
 
@@ -28,7 +28,7 @@ export default function Index(){
         </tr>
       </Table.Thead>
       <Table.Tbody>
-        {vendors.data.map(v=><tr key={v.id}><Table.Td>{v.vendor_code}</Table.Td><Table.Td>{v.vendor_name || v.name || '-'}</Table.Td><Table.Td>{v.vendor_type}</Table.Td><Table.Td>{v.city}</Table.Td><Table.Td>{v.phone}</Table.Td><Table.Td>{v.nib_number}</Table.Td><Table.Td>{v.company_license_number}</Table.Td><Table.Td>{v.qualification_status}</Table.Td><Table.Td>{v.status}</Table.Td></tr>)}
+        {vendors.data.map(v=><tr key={v.id}><Table.Td>{v.vendor_code}</Table.Td><Table.Td><Link href={route('apps.procurement.vendors.show', v.id)} className='text-indigo-600 hover:underline'>{v.vendor_name || v.name || '-'}</Link></Table.Td><Table.Td>{v.vendor_type}</Table.Td><Table.Td>{v.city}</Table.Td><Table.Td>{v.phone}</Table.Td><Table.Td>{v.nib_number}</Table.Td><Table.Td>{v.company_license_number}</Table.Td><Table.Td>{v.qualification_status}</Table.Td><Table.Td>{v.status}</Table.Td></tr>)}
       </Table.Tbody>
     </Table>
    </Table.Card>
