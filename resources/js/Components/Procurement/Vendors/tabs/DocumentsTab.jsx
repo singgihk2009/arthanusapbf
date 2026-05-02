@@ -66,9 +66,11 @@ export default function DocumentsTab({ vendor }) {
         <input value={customForm.document_number} onChange={(e) => setCustomForm((prev) => ({ ...prev, document_number: e.target.value }))} placeholder='Document Number' className='rounded border px-2 py-2' />
         <input type='date' value={customForm.issue_date} onChange={(e) => setCustomForm((prev) => ({ ...prev, issue_date: e.target.value }))} className='rounded border px-2 py-2' />
         <input type='date' value={customForm.expiry_date} onChange={(e) => setCustomForm((prev) => ({ ...prev, expiry_date: e.target.value }))} className='rounded border px-2 py-2' />
-        <input ref={customFileInput} type='file' accept='.pdf,.jpg,.jpeg,.png' className='rounded border px-2 py-2' />
+        <div className='flex items-center gap-2'>
+          <input ref={customFileInput} type='file' accept='.pdf,.jpg,.jpeg,.png' className='w-full rounded border px-2 py-2' />
+          <button type='button' onClick={submitCustomUpload} className='shrink-0 rounded border border-blue-300 px-3 py-2 text-xs text-blue-700'>Upload</button>
+        </div>
       </div>
-      <button type='button' onClick={submitCustomUpload} className='mt-3 rounded border border-blue-300 px-3 py-1.5 text-xs text-blue-700'>Upload Dokumen Baru</button>
     </div>
 
     <div className='overflow-auto rounded border p-3'>
