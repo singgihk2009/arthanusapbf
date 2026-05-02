@@ -16,7 +16,32 @@ class RegulatoryProductImportService {
         fclose($h); return $count;
     }
     public function normalizeDrugRow(array $r, string $source): array { return ['product_type'=>RegulatoryProduct::TYPE_DRUG,'nie'=>RegulatoryProduct::normalizeNie($r['NIE']??null),'product_name_source'=>$this->cleanHtmlText($r['Nama Obat Jadi'] ?? $r['NAMA PRODUK'] ?? ''),'industry_name'=>$this->cleanHtmlText($r['Produsen'] ?? $r['NAMA INDUSTRI'] ?? null),'dosage_form'=>$r['Sediaan'] ?? null,'strength'=>$r['Kekuatan'] ?? null,'commodity_type'=>$r['Jenis Komoditi'] ?? null,'raw_packaging_text'=>$this->cleanHtmlText($r['Kemasan'] ?? $r['PRODUK KEMASAN'] ?? null),'raw_composition_text'=>$this->cleanHtmlText($r['Bahan Obat'] ?? $r['KOMPOSISI'] ?? null)]; }
-    public function normalizeAlkesRow(array $r): array { $nie=RegulatoryProduct::normalizeNie($r['NOMOR'] ?? null); $brand=$this->cleanHtmlText($r['MERK'] ?? null); return ['product_type'=>RegulatoryProduct::TYPE_MEDICAL_DEVICE,'nie'=>$nie,'license_type'=>$this->detectLicenseType($nie),'registration_date'=>$this->normalizeDate($r['TGL TERBIT'] ?? null),'expiry_date'=>$this->normalizeDate($r['TGL EXP'] ?? null),'brand'=>$brand,'product_name_source'=>$brand,'sub_category'=>$r['SUB KATEGORI'] ?? null,'device_type'=>$r['JENIS PRODUK'] ?? null,'product_group'=>$r['KELOMPOK PRODUK'] ?? null,'model_type'=>$r['TIPE'] ?? null,'device_class'=>$r['KELAS'] ?? null,'risk_class'=>$r['KELAS RESIKO'] ?? null,'registrant_name'=>$r['PENDAFTAR'] ?? null,'registrant_address'=>$r['ALAMAT PENDAFTAR'] ?? null,'manufacturer_name'=>$r['PABRIK'] ?? null,'manufacturer_address'=>$r['ALAMAT PABRIK'] ?? null,'manufacturer_name_2'=>$r['PABRIK2'] ?? null]; }
+    public function normalizeAlkesRow(array $r): array {
+        $nie = RegulatoryProduct::normalizeNie($r['nie'] ?? ($r['NOMOR'] ?? null));
+        $brand = $this->cleanHtmlText($r['brand'] ?? ($r['MERK'] ?? null));
+        $licenseType = strtoupper(trim((string)($r['license_type'] ?? '')));
+
+        return [
+            'product_type' => RegulatoryProduct::TYPE_MEDICAL_DEVICE,
+            'nie' => $nie,
+            'license_type' => $licenseType !== '' ? $licenseType : $this->detectLicenseType($nie),
+            'registration_date' => $this->normalizeDate($r['registration_date'] ?? ($r['TGL TERBIT'] ?? null)),
+            'expiry_date' => $this->normalizeDate($r['expiry_date'] ?? ($r['TGL EXP'] ?? null)),
+            'brand' => $brand,
+            'product_name_source' => $this->cleanHtmlText($r['product_name_source'] ?? $brand),
+            'sub_category' => $r['sub_category'] ?? ($r['SUB KATEGORI'] ?? null),
+            'device_type' => $r['device_type'] ?? ($r['JENIS PRODUK'] ?? null),
+            'product_group' => $r['product_group'] ?? ($r['KELOMPOK PRODUK'] ?? null),
+            'model_type' => $r['model_type'] ?? ($r['TIPE'] ?? null),
+            'device_class' => $r['device_class'] ?? ($r['KELAS'] ?? null),
+            'risk_class' => $r['risk_class'] ?? ($r['KELAS RESIKO'] ?? null),
+            'registrant_name' => $r['registrant_name'] ?? ($r['PENDAFTAR'] ?? null),
+            'registrant_address' => $r['registrant_address'] ?? ($r['ALAMAT PENDAFTAR'] ?? null),
+            'manufacturer_name' => $r['manufacturer_name'] ?? ($r['PABRIK'] ?? null),
+            'manufacturer_address' => $r['manufacturer_address'] ?? ($r['ALAMAT PABRIK'] ?? null),
+            'manufacturer_name_2' => $r['manufacturer_name_2'] ?? ($r['PABRIK2'] ?? null),
+        ];
+    }
     public function parseCompositions(?string $text,string $separator=','): array { return array_values(array_filter(array_map('trim',explode($separator,(string)$text)))); }
     public function parsePackaging(?string $text): array { return ['packaging_type'=>trim((string)$text)?:null]; }
     public function cleanHtmlText($value): ?string { if($value===null) return null; $v=strip_tags((string)$value); $v=preg_replace('/\s+/', ' ', $v); return trim($v) ?: null; }
