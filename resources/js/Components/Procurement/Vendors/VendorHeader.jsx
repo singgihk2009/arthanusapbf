@@ -20,6 +20,7 @@ export default function VendorHeader({ vendor }) {
       </div>
     </div>
     <div className='mt-4 flex flex-wrap gap-2'>
+      <Link href={route('apps.procurement.vendors.index')} className='px-3 py-2 text-sm rounded bg-white border'>Back to List</Link>
       <Link href={route('apps.procurement.vendors.edit', vendor.id)} className='px-3 py-2 text-sm rounded bg-gray-100'>Edit Vendor</Link>
       <button className='px-3 py-2 text-sm rounded bg-gray-100'>Submit Qualification</button><button className='px-3 py-2 text-sm rounded bg-gray-100'>Approve / Reject</button>
       <button disabled={vendor.qualification_status !== 'qualified'} className='px-3 py-2 text-sm rounded bg-indigo-600 text-white disabled:opacity-50'>Create PO</button>
