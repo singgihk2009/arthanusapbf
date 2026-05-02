@@ -1,19 +1,24 @@
 import { useEffect } from 'react';
 import { useForm } from '@inertiajs/react';
 
-const fields = ['vendor_name','vendor_type','address','postal_code','village','district','city','province','phone','fax','email','npwp','nib_number','company_license_number','cdakb_cpakb_certificate_number'];
+const fields = ['vendor_name', 'vendor_type', 'address', 'postal_code', 'village', 'district', 'city', 'province', 'phone', 'fax', 'email', 'npwp', 'nib_number', 'company_license_number', 'cdakb_cpakb_certificate_number'];
+
+const emptyProfile = fields.reduce((acc, key) => ({ ...acc, [key]: '' }), {});
 
 export default function Tab({ data, vendor }) {
-  const { vendor: profile } = data;
-  const { data: form, setData, put, delete: destroy, processing, errors, reset } = useForm({
-    vendor_name: '', vendor_type: '', address: '', postal_code: '', village: '', district: '', city: '', province: '',
-    phone: '', fax: '', email: '', npwp: '', nib_number: '', company_license_number: '', cdakb_cpakb_certificate_number: '',
-  });
+  const profile = data?.vendor;
+  const { data: form, setData, put, delete: destroy, processing, errors } = useForm(emptyProfile);
 
   useEffect(() => {
     if (!profile) return;
-    fields.forEach((key) => setData(key, profile[key] ?? ''));
-  }, [profile]);
+
+    const mappedProfile = fields.reduce((acc, key) => {
+      acc[key] = profile[key] ?? '';
+      return acc;
+    }, {});
+
+    setData(mappedProfile);
+  }, [profile, setData]);
 
   const submit = (e) => {
     e.preventDefault();
@@ -22,7 +27,6 @@ export default function Tab({ data, vendor }) {
 
   const clearProfile = () => {
     destroy(`/apps/procurement/vendors/${vendor.id}/profile`, { preserveScroll: true });
-    reset();
   };
 
   return <form onSubmit={submit} className='grid grid-cols-1 md:grid-cols-2 gap-3'>
