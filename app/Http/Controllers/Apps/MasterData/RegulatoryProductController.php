@@ -125,7 +125,12 @@ class RegulatoryProductController extends Controller {
  }
  public function exportExcel(Request $request): StreamedResponse {
   $q=trim((string)$request->get('q'));
-  $rows=RegulatoryProduct::with('source')->when($q,fn($x)=>$x->where('nie','like',"%$q%")->orWhere('product_name_source','like',"%$q%"))->orderBy('id')->get();
+  $productType=$request->string('product_type')->toString();
+  $rows=RegulatoryProduct::with('source')
+    ->when($productType!=='',fn($x)=>$x->where('product_type',$productType))
+    ->when($q,fn($x)=>$x->where('nie','like',"%$q%")->orWhere('product_name_source','like',"%$q%"))
+    ->orderBy('id')
+    ->get();
   return response()->streamDownload(function() use ($rows): void {
    $output=fopen('php://output','w');
    fputcsv($output,['Source','NIE','Kode BPOM','Nama Produk','Produsen','Kemasan','Kekuatan','Jenis Komoditi','Packing','Bahan Obat']);
