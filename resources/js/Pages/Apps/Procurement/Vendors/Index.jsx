@@ -13,7 +13,7 @@ export default function Index(){
    <div className='mb-5 flex justify-end'>
      <Button
        type='link'
-       href={route('apps.procurement.vendors.create')}
+       href='/apps/procurement/vendors/create'
        icon={<IconCirclePlus size={20} strokeWidth={1.5} />}
        variant='gray'
        label='Tambah Vendor'
