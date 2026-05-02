@@ -10,6 +10,27 @@ export default function DocumentsTab({ vendor }) {
   const [customForm, setCustomForm] = useState({ document_type: '', document_number: '', issue_date: '', expiry_date: '' });
   const fileInputs = useRef({});
   const customFileInput = useRef(null);
+  const documentTypeLabel = (doc) => {
+    if (!doc) return '-';
+
+    if (typeof doc.document_type === 'string' && doc.document_type.trim()) {
+      return doc.document_type;
+    }
+
+    if (doc.document_type && typeof doc.document_type === 'object') {
+      return doc.document_type.name || doc.document_type.code || '-';
+    }
+
+    if (doc.document_type_label) {
+      return doc.document_type_label;
+    }
+
+    if (doc.document_type_id) {
+      return `TYPE #${doc.document_type_id}`;
+    }
+
+    return '-';
+  };
 
   const rowForm = (documentTypeId) => forms[documentTypeId] ?? { document_number: '', issue_date: '', expiry_date: '' };
 
@@ -97,7 +118,7 @@ export default function DocumentsTab({ vendor }) {
 
     <div className='overflow-auto'><table className='min-w-full text-sm border'>
       <thead><tr className='bg-gray-100'><th className='px-2 py-2 border text-left' colSpan={6}>Daftar Dokumen Vendor</th></tr><tr className='bg-gray-50'><th className='px-2 py-2 border'>Document Type</th><th className='px-2 py-2 border'>Document Number</th><th className='px-2 py-2 border'>Issue Date</th><th className='px-2 py-2 border'>Expiry Date</th><th className='px-2 py-2 border'>Verification</th><th className='px-2 py-2 border'>File</th></tr></thead>
-      <tbody>{docs.length ? docs.map((d) => <tr key={d.id}><td className='border px-2'>{d.document_type || d.document_type_label || d.document_type_id}</td><td className='border px-2'>{d.document_number || '-'}</td><td className='border px-2'>{d.issue_date || '-'}</td><td className='border px-2'>{d.expiry_date || '-'}</td><td className='border px-2'>{d.verification_status || 'pending'}</td><td className='border px-2'>{d.original_filename || '-'}</td></tr>) : <tr><td className='border px-2 py-3 text-center text-gray-500' colSpan={6}>Belum ada dokumen tersimpan.</td></tr>}</tbody>
+      <tbody>{docs.length ? docs.map((d) => <tr key={d.id}><td className='border px-2'>{documentTypeLabel(d)}</td><td className='border px-2'>{d.document_number || '-'}</td><td className='border px-2'>{d.issue_date || '-'}</td><td className='border px-2'>{d.expiry_date || '-'}</td><td className='border px-2'>{d.verification_status || 'pending'}</td><td className='border px-2'>{d.original_filename || '-'}</td></tr>) : <tr><td className='border px-2 py-3 text-center text-gray-500' colSpan={6}>Belum ada dokumen tersimpan.</td></tr>}</tbody>
     </table></div>
   </div>;
 }
