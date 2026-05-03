@@ -68,7 +68,7 @@ export default function ContactsTab({ data, vendor, onRefresh }) {
   return <div className='space-y-3'>
     <div className='flex justify-between items-center'>
       <h3 className='font-semibold'>Vendor Contacts</h3>
-      <button className='px-3 py-1 rounded bg-indigo-600 text-white text-sm' onClick={() => { if (showForm) { setEditingContactId(null); setForm(initialForm); } setShowForm((v) => !v); }}>
+      <button type='button' className='px-3 py-1 rounded bg-indigo-600 text-white text-sm' onClick={() => { if (showForm) { setEditingContactId(null); setForm(initialForm); } setShowForm((v) => !v); }}>
         {showForm ? 'Cancel' : 'Add Contact'}
       </button>
     </div>
@@ -95,8 +95,9 @@ export default function ContactsTab({ data, vendor, onRefresh }) {
           <input type='checkbox' checked={form.can_login} onChange={(e) => setField('can_login', e.target.checked)} />
           <span>Can login</span>
         </label>
-        <div className='md:col-span-2'>
+        <div className='md:col-span-2 flex items-center gap-2 relative z-10'>
           <button type='submit' className='px-3 py-1 rounded bg-indigo-600 text-white text-sm'>{editingContactId ? 'Update Contact' : 'Save Contact'}</button>
+          <button type='button' className='px-3 py-1 rounded border text-sm' onClick={() => { setEditingContactId(null); setForm(initialForm); setShowForm(false); }}>Cancel</button>
         </div>
       </form>
     )}
@@ -111,8 +112,8 @@ export default function ContactsTab({ data, vendor, onRefresh }) {
         {contacts.map(pc => <tr key={pc.id} className='border-b'>
           <td className='p-2'>{pc.contact?.full_name || '-'}</td><td className='p-2'>{pc.contact?.position_title || '-'}</td><td className='p-2'>{pc.contact?.email || '-'}</td><td className='p-2'>{pc.contact?.mobile || pc.contact?.phone || '-'}</td><td className='p-2'>{pc.status}</td>
           <td className='p-2 space-x-2'>
-            <button onClick={() => startEdit(pc)} className='text-xs text-indigo-600'>Edit</button>
-            <button onClick={() => router.delete(`/apps/procurement/vendors/${vendor.id}/party-contacts/${pc.id}`, {
+            <button type='button' onClick={() => startEdit(pc)} className='text-xs text-indigo-600'>Edit</button>
+            <button type='button' onClick={() => router.delete(`/apps/procurement/vendors/${vendor.id}/party-contacts/${pc.id}`, {
               preserveScroll: true,
               onSuccess: () => {
                 onRefresh?.();
