@@ -29,9 +29,7 @@ export default function ContactsTab({ data, vendor, onRefresh }) {
     const endpoint = editingContactId
       ? `/apps/procurement/vendors/${vendor.id}/party-contacts/${editingContactId}`
       : `/apps/procurement/vendors/${vendor.id}/party-contacts`;
-    const method = editingContactId ? router.put : router.post;
-
-    method(endpoint, form, {
+    const options = {
       preserveScroll: true,
       onSuccess: () => {
         setShowForm(false);
@@ -44,6 +42,31 @@ export default function ContactsTab({ data, vendor, onRefresh }) {
         const firstError = Object.values(errors || {})[0];
         toast.error(firstError || 'Gagal menyimpan contact. Periksa data yang diisi.');
       },
+    };
+
+    if (editingContactId) {
+      router.put(endpoint, form, options);
+      return;
+    }
+
+    router.post(endpoint, form, options);
+  };
+
+  const startEdit = (pc) => {
+    setEditingContactId(pc.id);
+    setShowForm(true);
+    setForm({
+      full_name: pc.contact?.full_name || '',
+      email: pc.contact?.email || '',
+      phone: pc.contact?.phone || '',
+      mobile: pc.contact?.mobile || '',
+      position_title: pc.contact?.position_title || '',
+      department: pc.contact?.department || '',
+      contact_role: pc.contact_role || '',
+      notes: pc.notes || '',
+      is_primary: !!pc.is_primary,
+      can_login: !!pc.can_login,
+      status: pc.status || 'active',
     });
   };
 
