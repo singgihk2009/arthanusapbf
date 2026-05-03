@@ -14,6 +14,7 @@ use App\Http\Controllers\Apps\MasterData\MinStockController;
 use App\Http\Controllers\Apps\MasterData\ItemPictureController;
 use App\Http\Controllers\Apps\MasterData\RegulatoryProductController;
 use App\Http\Controllers\Apps\MasterData\RegulatorySourceController;
+use App\Http\Controllers\Apps\MasterData\RegulatoryDocumentController;
 use App\Http\Controllers\Apps\Reports\InventoryReportPageController;
 use App\Http\Controllers\Apps\Inbound\ReceivingEntryController;
 use App\Http\Controllers\Apps\Outbound\InternalUsageController;
@@ -81,6 +82,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::redirect('/regulartory-products/import/excel', '/apps/master-data/regulatory-products/import/excel', 301);
 
         Route::resource('/regulatory-sources', RegulatorySourceController::class)->parameters(['regulatory-sources' => 'regulatorySource']);
+        Route::resource('/regulatory-documents', RegulatoryDocumentController::class)->parameters(['regulatory-documents' => 'regulatoryDocument']);
         Route::get('/regulatory-products/export/excel', [RegulatoryProductController::class, 'exportExcel'])->name('regulatory-products.export.excel');
         Route::get('/regulatory-products/search', [RegulatoryProductController::class, 'search'])->name('regulatory-products.search');
         Route::resource('/regulatory-products', RegulatoryProductController::class)->parameters(['regulatory-products' => 'regulatoryProduct']);
