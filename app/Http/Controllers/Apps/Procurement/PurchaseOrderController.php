@@ -158,6 +158,12 @@ class PurchaseOrderController extends Controller
         $vendorCode = Vendor::query()->whereKey($vendorId)->value('vendor_code');
         $supplierId = DB::table('suppliers')->where('code', $vendorCode)->value('id');
 
+        // Backward compatibility: after vendor migration, several datasets keep
+        // supplier rows keyed directly by vendor id and no longer by code.
+        if (!$supplierId) {
+            $supplierId = DB::table('suppliers')->where('id', $vendorId)->value('id');
+        }
+
         abort_if(!$supplierId, 422, 'Supplier untuk vendor terpilih tidak ditemukan.');
 
         return (int) $supplierId;
