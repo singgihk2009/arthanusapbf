@@ -61,7 +61,7 @@ export default function Menu() {
             permissions: true,
             details: [
                 { title: 'Vendors', href: '/apps/procurement/vendors', icon: <IconUsers size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/procurement/vendors'), permissions: true },
-                { title: 'Purchase Order', href: '/apps/procurement/purchase-orders', icon: <IconReceipt size={20} strokeWidth={1.5} />, active: false, permissions: true },
+                { title: 'Purchase Order', href: '/apps/procurement/purchase-orders', icon: <IconReceipt size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/procurement/purchase-orders'), permissions: true },
                 { title: 'Goods Receipt', href: '/apps/procurement/goods-receipts', icon: <IconPackageImport size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/procurement/goods-receipts'), permissions: true },
                 { title: 'Purchase Return', href: '/apps/dashboard', icon: <IconPackageExport size={20} strokeWidth={1.5} />, active: false, permissions: true },
                 { title: 'Vendor Invoice', href: '/apps/procurement/vendor-invoices', icon: <IconFileBarcode size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/procurement/vendor-invoices'), permissions: true },
