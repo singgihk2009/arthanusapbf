@@ -173,19 +173,23 @@ class VendorController extends Controller
     public function legal(Vendor $vendor)
     {
         $documents = $vendor->documents()->with('documentType')->get()->keyBy('document_type_id');
-        $requirements = app(VendorComplianceService::class)
-            ->getRequiredDocuments($vendor)
-            ->filter(fn ($req) => $req->is_required && strtolower((string) optional($req->documentType)->category) === 'regulatory')
+        $requirements = DocumentType::query()
+            ->where('is_active', true)
+            ->where('is_required', true)
+            ->whereRaw('LOWER(category) = ?', ['regulatory'])
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
             ->values()
             ->map(function ($req) use ($documents) {
-                $document = $documents->get($req->document_type_id);
+                $document = $documents->get($req->id);
                 return [
                     'requirement_id' => $req->id,
-                    'document_type_id' => $req->document_type_id,
-                    'document_type_name' => $req->documentType->name ?? $req->documentType->code ?? '-',
-                    'category' => $req->documentType->category ?? null,
-                    'is_requested' => (bool) $req->is_required,
-                    'verification_status' => $document->verification_status ?? 'pending',
+                    'document_type_id' => $req->id,
+                    'document_type_name' => $req->name ?? $req->code ?? '-',
+                    'category' => $req->category ?? null,
+                    'is_requested' => true,
+                    'verification_status' => $document?->verification_status ?? 'belum upload',
                     'document_number' => $document->document_number ?? null,
                     'issue_date' => $document->issue_date ?? null,
                     'expiry_date' => $document->expiry_date ?? null,
