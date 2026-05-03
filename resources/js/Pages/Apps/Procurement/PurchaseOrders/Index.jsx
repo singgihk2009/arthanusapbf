@@ -56,7 +56,7 @@ export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
                         {purchaseOrders.data.length ? purchaseOrders.data.map((po) => (
                             <tr key={po.id} className='hover:bg-gray-100 dark:hover:bg-gray-900'>
                                 <Table.Td>{po.po_number ?? '-'}</Table.Td>
-                                <Table.Td>{po.vendor?.name ?? '-'}</Table.Td>
+                                <Table.Td>{po.vendor_id ? <Link href={`/apps/procurement/vendors/${po.vendor_id}?tab=overview`} className='text-indigo-600 hover:underline'>{po.vendor?.name ?? '-'}</Link> : (po.vendor?.name ?? '-')}</Table.Td>
                                 <Table.Td>{po.po_date ?? '-'}</Table.Td>
                                 <Table.Td>{po.expected_delivery_date ?? '-'}</Table.Td>
                                 <Table.Td>{Number(po.grand_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Table.Td>
