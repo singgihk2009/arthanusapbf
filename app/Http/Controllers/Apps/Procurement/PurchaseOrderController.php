@@ -155,13 +155,29 @@ class PurchaseOrderController extends Controller
 
     private function resolveSupplierId(int $vendorId): int
     {
-        $vendorCode = Vendor::query()->whereKey($vendorId)->value('vendor_code');
+        $vendor = Vendor::query()->find($vendorId);
+        abort_if(!$vendor, 422, 'Vendor tidak ditemukan.');
+
+        $vendorCode = $vendor->vendor_code;
         $supplierId = DB::table('suppliers')->where('code', $vendorCode)->value('id');
 
         // Backward compatibility: after vendor migration, several datasets keep
         // supplier rows keyed directly by vendor id and no longer by code.
         if (!$supplierId) {
             $supplierId = DB::table('suppliers')->where('id', $vendorId)->value('id');
+        }
+
+        if (!$supplierId) {
+            $supplierId = DB::table('suppliers')->insertGetId([
+                'code' => $vendorCode ?: ('VENDOR-'.$vendor->id),
+                'name' => $vendor->vendor_name ?: $vendor->name ?: ('Vendor #'.$vendor->id),
+                'phone' => $vendor->phone,
+                'email' => $vendor->email,
+                'address' => $vendor->address,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
 
         abort_if(!$supplierId, 422, 'Supplier untuk vendor terpilih tidak ditemukan.');
