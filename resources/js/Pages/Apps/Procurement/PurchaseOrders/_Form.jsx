@@ -6,13 +6,14 @@ import { useMemo } from 'react';
 
 const emptyItem = { product_id: '', product_name: '', uom_id: '', qty_ordered: 1, unit_price: 0, discount_amount: 0, tax_amount: 0, line_total: 0, notes: '' };
 
-export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [] }) {
+export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], defaultVendorId = null, returnTo = '' }) {
     const isEdit = !!purchaseOrder;
     const { data, setData, post, put, processing, errors } = useForm({
-        vendor_id: purchaseOrder?.vendor_id || '',
+        vendor_id: purchaseOrder?.vendor_id || defaultVendorId || '',
         po_date: purchaseOrder?.po_date || '',
         expected_delivery_date: purchaseOrder?.expected_delivery_date || '',
         notes: purchaseOrder?.notes || '',
+        return_to: returnTo || '',
         items: purchaseOrder?.items?.length ? purchaseOrder.items : [emptyItem],
     });
 
