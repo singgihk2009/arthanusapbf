@@ -1,11 +1,36 @@
 import AppLayout from '@/Layouts/AppLayout';
-import { router } from '@inertiajs/react';
+import Card from '@/Components/Card';
+import Table from '@/Components/Table';
+import { Head, router } from '@inertiajs/react';
 
 export default function Show({ purchaseOrder }) {
-  const canCancel = purchaseOrder.items.every(i => +i.qty_received === 0);
-  const statusClass = {draft:'bg-gray-100',approved:'bg-blue-100',partially_received:'bg-amber-100',fully_received:'bg-green-100',closed:'bg-purple-100',cancelled:'bg-red-100'}[purchaseOrder.status] || 'bg-gray-100';
-  return <AppLayout><div className='p-6 space-y-4'><h1 className='text-xl font-semibold'>PO {purchaseOrder.po_number}</h1>
-    <div className='flex gap-3'><span className={`px-2 py-1 rounded ${statusClass}`}>{purchaseOrder.status}</span>{purchaseOrder.status==='draft'&&<button onClick={()=>router.post(`/apps/procurement/purchase-orders/${purchaseOrder.id}/approve`)} className='px-3 py-1 bg-blue-600 text-white rounded'>Approve</button>}{canCancel&&purchaseOrder.status!=='cancelled'&&<button onClick={()=>router.post(`/apps/procurement/purchase-orders/${purchaseOrder.id}/cancel`)} className='px-3 py-1 bg-red-600 text-white rounded'>Cancel</button>}</div>
-    <table className='min-w-full border'><thead><tr><th>Product</th><th>Qty Ordered</th><th>Qty Received</th><th>Remaining</th><th>Line Total</th></tr></thead><tbody>{purchaseOrder.items.map(i=><tr key={i.id} className='border-t'><td>{i.product?.name || i.product_name || '-'}</td><td>{i.qty_ordered}</td><td>{i.qty_received}</td><td>{(+i.qty_ordered)-(+i.qty_received)}</td><td>{i.line_total}</td></tr>)}</tbody></table>
-  </div></AppLayout>;
+    const canCancel = purchaseOrder.items.every((i) => +i.qty_received === 0);
+    const statusClass = { draft: 'bg-gray-100 text-gray-700', approved: 'bg-blue-100 text-blue-700', partially_received: 'bg-amber-100 text-amber-700', fully_received: 'bg-green-100 text-green-700', closed: 'bg-purple-100 text-purple-700', cancelled: 'bg-red-100 text-red-700' }[purchaseOrder.status] || 'bg-gray-100';
+
+    return (
+        <>
+            <Head title={`PO ${purchaseOrder.po_number}`} />
+            <Card title={`Purchase Order ${purchaseOrder.po_number}`}>
+                <div className='mb-4 flex flex-wrap items-center gap-2'>
+                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass}`}>{purchaseOrder.status}</span>
+                    {purchaseOrder.status === 'draft' && <button onClick={() => router.post(route('apps.procurement.purchase-orders.approve', purchaseOrder.id))} className='rounded-lg border border-blue-500 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50'>Approve</button>}
+                    {canCancel && purchaseOrder.status !== 'cancelled' && <button onClick={() => router.post(route('apps.procurement.purchase-orders.cancel', purchaseOrder.id))} className='rounded-lg border border-rose-500 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50'>Cancel</button>}
+                </div>
+
+                <div className='mb-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-2'>
+                    <div><span className='font-semibold'>Vendor:</span> {purchaseOrder.vendor?.name ?? '-'}</div>
+                    <div><span className='font-semibold'>PO Date:</span> {purchaseOrder.po_date}</div>
+                    <div><span className='font-semibold'>Expected Delivery:</span> {purchaseOrder.expected_delivery_date ?? '-'}</div>
+                    <div><span className='font-semibold'>Grand Total:</span> {Number(purchaseOrder.grand_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                </div>
+
+                <Table>
+                    <Table.Thead><tr><Table.Th>Product</Table.Th><Table.Th>Qty Ordered</Table.Th><Table.Th>Qty Received</Table.Th><Table.Th>Remaining Qty</Table.Th><Table.Th>Line Total</Table.Th></tr></Table.Thead>
+                    <Table.Tbody>{purchaseOrder.items.map((i) => <tr key={i.id}><Table.Td>{i.product?.name || i.product_name || '-'}</Table.Td><Table.Td>{i.qty_ordered}</Table.Td><Table.Td>{i.qty_received}</Table.Td><Table.Td>{(+i.qty_ordered) - (+i.qty_received)}</Table.Td><Table.Td>{Number(i.line_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Table.Td></tr>)}</Table.Tbody>
+                </Table>
+            </Card>
+        </>
+    );
 }
+
+Show.layout = (page) => <AppLayout children={page} />;
