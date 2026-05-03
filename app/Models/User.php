@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Core\Contact;
+use App\Models\Core\PartyUserAccess;
+
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -48,7 +51,12 @@ class User extends Authenticatable
         ];
     }
 
-     /**
+ 
+    public function contact(){ return $this->belongsTo(Contact::class); }
+
+    public function partyUserAccesses(){ return $this->hasMany(PartyUserAccess::class); }
+
+    /**
      * accessor avatar user
      */
     protected function avatar(): Attribute

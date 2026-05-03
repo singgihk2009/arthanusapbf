@@ -199,7 +199,12 @@ class VendorController extends Controller
 
         return response()->json(['documents' => $requirements]);
     }
-    public function contacts(Vendor $vendor) { return response()->json(['contacts' => $vendor->contacts()->orderBy('contact_type')->get()->groupBy('contact_type')]); }
+    public function contacts(Vendor $vendor) {
+        if ($vendor->party_id && $vendor->party) {
+            return response()->json(['contacts' => $vendor->party->partyContacts()->with('contact.user')->latest()->get()]);
+        }
+        return response()->json(['contacts' => $vendor->contacts()->orderBy('contact_type')->get()]);
+    }
     public function documents(Vendor $vendor) {
         $requirements = app(VendorComplianceService::class)->getRequiredDocuments($vendor);
         return response()->json(['documents' => $vendor->documents()->with('documentType')->latest()->get(), 'requirements'=>$requirements]);

@@ -2,6 +2,7 @@
 
 namespace App\Models\Procurement;
 
+use App\Models\Core\Party;
 use App\Services\VendorComplianceService;
 use Illuminate\Database\Eloquent\Model;
 
@@ -15,6 +16,8 @@ class Vendor extends Model
         'verified_at' => 'datetime',
         'cdakb_cpakb_certificate_expiry_date' => 'date',
     ];
+
+    public function party(){ return $this->belongsTo(Party::class); }
 
     public function purchaseOrders(){return $this->hasMany(PurchaseOrder::class);} public function vendorInvoices(){return $this->hasMany(VendorInvoice::class);} public function vendorPayments(){return $this->hasMany(VendorPayment::class);} public function vendorLedgers(){return $this->hasMany(VendorLedger::class);} public function contacts(){return $this->hasMany(VendorContact::class);} public function documents(){return $this->hasMany(VendorDocument::class);} public function bankAccounts(){return $this->hasMany(VendorBankAccount::class);} public function documentRequirements(){ return VendorDocumentRequirement::query()->where('is_active', true)->where(function($q){ $q->whereNull('vendor_type')->orWhere('vendor_type', $this->vendor_type); }); }
 

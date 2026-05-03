@@ -32,6 +32,7 @@ use App\Http\Controllers\Apps\Procurement\VendorPaymentController;
 use App\Http\Controllers\Apps\Procurement\VendorLedgerController;
 use App\Http\Controllers\Apps\Procurement\DocumentTypeController;
 use App\Http\Controllers\Apps\Procurement\VendorDocumentRequirementController;
+use App\Http\Controllers\Apps\Procurement\VendorContactController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -221,6 +222,14 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::delete('/vendors/{vendor}/profile', [VendorController::class, 'deleteProfile'])->name('vendors.profile.delete');
         Route::get('/vendors/{vendor}/legal', [VendorController::class, 'legal'])->name('vendors.legal');
         Route::get('/vendors/{vendor}/contacts', [VendorController::class, 'contacts'])->name('vendors.contacts');
+        Route::get('/vendors/{vendor}/party-contacts', [VendorContactController::class, 'index'])->name('vendors.party-contacts.index');
+        Route::post('/vendors/{vendor}/party-contacts', [VendorContactController::class, 'store'])->name('vendors.party-contacts.store');
+        Route::put('/vendors/{vendor}/party-contacts/{partyContact}', [VendorContactController::class, 'update'])->name('vendors.party-contacts.update');
+        Route::delete('/vendors/{vendor}/party-contacts/{partyContact}', [VendorContactController::class, 'destroy'])->name('vendors.party-contacts.destroy');
+        Route::post('/vendors/{vendor}/party-contacts/{partyContact}/set-primary', [VendorContactController::class, 'setPrimary'])->name('vendors.party-contacts.set-primary');
+        Route::post('/vendors/{vendor}/party-contacts/{partyContact}/toggle-status', [VendorContactController::class, 'toggleStatus'])->name('vendors.party-contacts.toggle-status');
+        Route::post('/vendors/{vendor}/party-contacts/{partyContact}/toggle-can-login', [VendorContactController::class, 'toggleCanLogin'])->name('vendors.party-contacts.toggle-can-login');
+        Route::post('/vendors/{vendor}/party-contacts/{partyContact}/create-user-login', [VendorContactController::class, 'createUserLogin'])->name('vendors.party-contacts.create-user-login');
         Route::get('/vendors/{vendor}/documents', [VendorController::class, 'documents'])->name('vendors.documents');
         Route::get('/vendors/{vendor}/purchase-orders', [VendorController::class, 'purchaseOrders'])->name('vendors.purchase-orders');
         Route::get('/vendors/{vendor}/receivings', [VendorController::class, 'receivings'])->name('vendors.receivings');
