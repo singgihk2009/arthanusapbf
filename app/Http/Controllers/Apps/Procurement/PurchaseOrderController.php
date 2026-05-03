@@ -33,12 +33,14 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
         return Inertia::render('Apps/Procurement/PurchaseOrders/Create', [
             'vendors' => Vendor::select('id','name')->where('qualification_status', 'qualified')->orderBy('name')->get(),
             'products' => Item::select('id','name','base_uom_id')->orderBy('name')->get(),
             'uoms' => Uom::select('id','name')->orderBy('name')->get(),
+            'defaultVendorId' => $request->integer('vendor_id') ?: null,
+            'returnTo' => $request->string('return_to')->toString(),
         ]);
     }
 
@@ -70,6 +72,10 @@ class PurchaseOrderController extends Controller
             }
             $po->recalculateTotals();
         });
+        $returnTo = (string) $request->input('return_to', '');
+        if ($returnTo !== '') {
+            return redirect($returnTo)->with('success', 'Purchase Order dibuat.');
+        }
         return to_route('apps.procurement.purchase-orders.index')->with('success', 'Purchase Order dibuat.');
     }
 
@@ -79,7 +85,7 @@ class PurchaseOrderController extends Controller
         return Inertia::render('Apps/Procurement/PurchaseOrders/Show', ['purchaseOrder' => $purchaseOrder]);
     }
 
-    public function edit(PurchaseOrder $purchaseOrder)
+    public function edit(Request $request, PurchaseOrder $purchaseOrder)
     {
         abort_unless($purchaseOrder->isEditable(), 422, 'PO hanya dapat diubah ketika draft.');
         $purchaseOrder->load('items');
@@ -88,6 +94,7 @@ class PurchaseOrderController extends Controller
             'vendors' => Vendor::select('id','name')->where('qualification_status', 'qualified')->orderBy('name')->get(),
             'products' => Item::select('id','name','base_uom_id')->orderBy('name')->get(),
             'uoms' => Uom::select('id','name')->orderBy('name')->get(),
+            'returnTo' => $request->string('return_to')->toString(),
         ]);
     }
 
@@ -113,6 +120,10 @@ class PurchaseOrderController extends Controller
             }
             $purchaseOrder->recalculateTotals();
         });
+        $returnTo = (string) $request->input('return_to', '');
+        if ($returnTo !== '') {
+            return redirect($returnTo)->with('success', 'Purchase Order diupdate.');
+        }
         return to_route('apps.procurement.purchase-orders.show', $purchaseOrder);
     }
 
