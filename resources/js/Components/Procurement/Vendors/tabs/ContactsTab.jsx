@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
+import toast from 'react-hot-toast';
 
 const initialForm = {
   full_name: '',
@@ -37,6 +38,11 @@ export default function ContactsTab({ data, vendor, onRefresh }) {
         setForm(initialForm);
         setEditingContactId(null);
         onRefresh?.();
+        toast.success(editingContactId ? 'Contact berhasil diperbarui.' : 'Contact berhasil ditambahkan.');
+      },
+      onError: (errors) => {
+        const firstError = Object.values(errors || {})[0];
+        toast.error(firstError || 'Gagal menyimpan contact. Periksa data yang diisi.');
       },
     });
   };
@@ -106,7 +112,17 @@ export default function ContactsTab({ data, vendor, onRefresh }) {
           <td className='p-2'>{pc.contact?.full_name || '-'}</td><td className='p-2'>{pc.contact?.position_title || '-'}</td><td className='p-2'>{pc.contact?.email || '-'}</td><td className='p-2'>{pc.contact?.mobile || pc.contact?.phone || '-'}</td><td className='p-2'>{pc.status}</td>
           <td className='p-2 space-x-2'>
             <button onClick={() => startEdit(pc)} className='text-xs text-indigo-600'>Edit</button>
-            <button onClick={() => router.delete(`/apps/procurement/vendors/${vendor.id}/party-contacts/${pc.id}`, { preserveScroll: true, onSuccess: () => onRefresh?.() })} className='text-xs text-red-600'>Remove</button>
+            <button onClick={() => router.delete(`/apps/procurement/vendors/${vendor.id}/party-contacts/${pc.id}`, {
+              preserveScroll: true,
+              onSuccess: () => {
+                onRefresh?.();
+                toast.success('Contact berhasil dihapus.');
+              },
+              onError: (errors) => {
+                const firstError = Object.values(errors || {})[0];
+                toast.error(firstError || 'Gagal menghapus contact.');
+              },
+            })} className='text-xs text-red-600'>Remove</button>
           </td>
         </tr>)}
         </tbody>
