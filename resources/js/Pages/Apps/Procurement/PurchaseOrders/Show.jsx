@@ -7,6 +7,14 @@ export default function Show({ purchaseOrder }) {
     const canCancel = purchaseOrder.items.every((i) => +i.qty_received === 0);
     const statusClass = { draft: 'bg-gray-100 text-gray-700', approved: 'bg-blue-100 text-blue-700', partially_received: 'bg-amber-100 text-amber-700', fully_received: 'bg-green-100 text-green-700', closed: 'bg-purple-100 text-purple-700', cancelled: 'bg-red-100 text-red-700' }[purchaseOrder.status] || 'bg-gray-100';
 
+    const handleCancelPo = () => {
+        const confirmed = window.confirm(`Yakin ingin membatalkan PO ${purchaseOrder.po_number}? Tindakan ini tidak bisa dibatalkan.`);
+
+        if (!confirmed) return;
+
+        router.post(route('apps.procurement.purchase-orders.cancel', purchaseOrder.id));
+    };
+
     return (
         <>
             <Head title={`PO ${purchaseOrder.po_number}`} />
@@ -14,7 +22,8 @@ export default function Show({ purchaseOrder }) {
                 <div className='mb-4 flex flex-wrap items-center gap-2'>
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass}`}>{purchaseOrder.status}</span>
                     {purchaseOrder.status === 'draft' && <button onClick={() => router.post(route('apps.procurement.purchase-orders.approve', purchaseOrder.id))} className='rounded-lg border border-blue-500 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50'>Approve</button>}
-                    {canCancel && purchaseOrder.status !== 'cancelled' && <button onClick={() => router.post(route('apps.procurement.purchase-orders.cancel', purchaseOrder.id))} className='rounded-lg border border-rose-500 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50'>Cancel</button>}
+                    <button onClick={() => router.get(route('apps.procurement.purchase-orders.index'))} className='rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50'>Close</button>
+                    {canCancel && purchaseOrder.status !== 'cancelled' && <button onClick={handleCancelPo} className='rounded-lg border border-rose-500 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50'>Cancel PO</button>}
                 </div>
 
                 <div className='mb-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-2'>
