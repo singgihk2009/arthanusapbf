@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Apps\Procurement;
 use App\Http\Controllers\Controller;
 use App\Models\Inventory\Item;
 use App\Models\Inventory\Uom;
+use App\Models\Inventory\Warehouse;
 use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\Vendor;
 use Illuminate\Http\Request;
@@ -45,10 +46,18 @@ class PurchaseOrderController extends Controller
     {
         $data = $this->validateData($request);
         DB::transaction(function () use ($data, $request) {
+            $poNumber = $this->generateNumber();
+            $warehouseId = Warehouse::query()->value('id');
+
             $po = PurchaseOrder::create([
-                'po_number' => $this->generateNumber(),
+                'number' => $poNumber,
+                'po_number' => $poNumber,
                 'vendor_id' => $data['vendor_id'],
+                'supplier_id' => $data['vendor_id'],
+                'warehouse_id' => $warehouseId,
+                'document_date' => $data['po_date'],
                 'po_date' => $data['po_date'],
+                'expected_date' => $data['expected_delivery_date'] ?? null,
                 'expected_delivery_date' => $data['expected_delivery_date'] ?? null,
                 'status' => 'draft',
                 'notes' => $data['notes'] ?? null,
@@ -86,7 +95,15 @@ class PurchaseOrderController extends Controller
         abort_unless($purchaseOrder->isEditable(), 422, 'PO hanya dapat diubah ketika draft.');
         $data = $this->validateData($request);
         DB::transaction(function () use ($purchaseOrder, $data) {
-            $purchaseOrder->update($data);
+            $purchaseOrder->update([
+                'vendor_id' => $data['vendor_id'],
+                'supplier_id' => $data['vendor_id'],
+                'po_date' => $data['po_date'],
+                'document_date' => $data['po_date'],
+                'expected_delivery_date' => $data['expected_delivery_date'] ?? null,
+                'expected_date' => $data['expected_delivery_date'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ]);
             $purchaseOrder->items()->delete();
             foreach ($data['items'] as $item) {
                 $lineBase = (float)$item['qty_ordered'] * (float)$item['unit_price'];
