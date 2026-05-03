@@ -1,10 +1,10 @@
 import { router } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 
-export default function DocumentsTab({ vendor }) {
+export default function DocumentsTab({ vendor, documentTypes = [] }) {
   const docs = vendor?.documents ?? [];
   const [notice, setNotice] = useState(null);
-  const [customForm, setCustomForm] = useState({ document_type: '', document_number: '', issue_date: '', expiry_date: '' });
+  const [customForm, setCustomForm] = useState({ document_type_id: '', document_number: '', issue_date: '', expiry_date: '' });
   const customFileInput = useRef(null);
 
   const documentTypeLabel = (doc) => {
@@ -35,8 +35,8 @@ export default function DocumentsTab({ vendor }) {
   };
 
   const submitCustomUpload = () => {
-    if (!customForm.document_type.trim()) return setNotice({ type: 'error', text: 'Upload gagal: Document Type wajib diisi.' });
-    submitUpload({ document_type: customForm.document_type, document_number: customForm.document_number || null, issue_date: customForm.issue_date || null, expiry_date: customForm.expiry_date || null }, customFileInput.current);
+    if (!customForm.document_type_id) return setNotice({ type: 'error', text: 'Upload gagal: Document Type wajib dipilih.' });
+    submitUpload({ document_type_id: customForm.document_type_id, document_number: customForm.document_number || null, issue_date: customForm.issue_date || null, expiry_date: customForm.expiry_date || null }, customFileInput.current);
   };
 
   const verifyDocument = (documentId, verificationStatus) => {
@@ -62,7 +62,10 @@ export default function DocumentsTab({ vendor }) {
     <div className='rounded border p-4'>
       <div className='mb-3 text-sm font-semibold'>Tambah Dokumen Baru</div>
       <div className='grid gap-3 md:grid-cols-5'>
-        <input value={customForm.document_type} onChange={(e) => setCustomForm((prev) => ({ ...prev, document_type: e.target.value }))} placeholder='Document Type (contoh: NIB)' className='rounded border px-2 py-2' />
+        <select value={customForm.document_type_id} onChange={(e) => setCustomForm((prev) => ({ ...prev, document_type_id: e.target.value }))} className='rounded border px-2 py-2'>
+          <option value=''>Pilih Document Type</option>
+          {documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name} ({type.code})</option>)}
+        </select>
         <input value={customForm.document_number} onChange={(e) => setCustomForm((prev) => ({ ...prev, document_number: e.target.value }))} placeholder='Document Number' className='rounded border px-2 py-2' />
         <input type='date' value={customForm.issue_date} onChange={(e) => setCustomForm((prev) => ({ ...prev, issue_date: e.target.value }))} className='rounded border px-2 py-2' />
         <input type='date' value={customForm.expiry_date} onChange={(e) => setCustomForm((prev) => ({ ...prev, expiry_date: e.target.value }))} className='rounded border px-2 py-2' />
