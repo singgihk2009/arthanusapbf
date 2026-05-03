@@ -29,7 +29,11 @@ export default function LegalTab({ data }) {
             <td className='border px-3 py-2'>{doc.verification_status || 'belum upload'}</td>
           </tr>) : <tr><td className='border px-3 py-3 text-center text-gray-500' colSpan={7}>Tidak ada dokumen yang wajib dilengkapi.</td></tr>}
         </tbody>
+
       </table>
+      <p className='mt-2 text-right text-sm text-gray-600'>
+        Note: Silahkan lengkapi dan upload dokumen pendukung dari menu Documents
+      </p>
     </div>
   </div>;
 }
