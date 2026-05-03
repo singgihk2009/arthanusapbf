@@ -21,9 +21,9 @@ export default function Show({ purchaseOrder }) {
             <Card title={`Purchase Order ${purchaseOrder.po_number}`}>
                 <div className='mb-4 flex flex-wrap items-center gap-2'>
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass}`}>{purchaseOrder.status}</span>
-                    {purchaseOrder.status === 'draft' && <button onClick={() => router.post(route('apps.procurement.purchase-orders.approve', purchaseOrder.id))} className='rounded-lg border border-blue-500 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50'>Approve</button>}
-                    <button onClick={() => router.get(route('apps.procurement.purchase-orders.index'))} className='rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50'>Close</button>
-                    {canCancel && purchaseOrder.status !== 'cancelled' && <button onClick={handleCancelPo} className='rounded-lg border border-rose-500 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50'>Cancel PO</button>}
+                    {purchaseOrder.status === 'draft' && <button type='button' onClick={() => router.post(route('apps.procurement.purchase-orders.approve', purchaseOrder.id))} className='rounded-lg border border-blue-500 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50'>Approve</button>}
+                    <button type='button' onClick={() => router.get(route('apps.procurement.purchase-orders.index'))} className='rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50'>Close</button>
+                    {canCancel && purchaseOrder.status !== 'cancelled' && <button type='button' onClick={handleCancelPo} className='rounded-lg border border-rose-500 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50'>Cancel PO</button>}
                 </div>
 
                 <div className='mb-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-2'>
