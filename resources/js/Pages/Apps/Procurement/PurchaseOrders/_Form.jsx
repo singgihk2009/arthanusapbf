@@ -1,14 +1,14 @@
 import AppLayout from '@/Layouts/AppLayout';
 import Button from '@/Components/Button';
 import Card from '@/Components/Card';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useMemo } from 'react';
 
 const emptyItem = { product_id: '', product_name: '', uom_id: '', qty_ordered: 1, unit_price: 0, discount_amount: 0, tax_amount: 0, line_total: 0, notes: '' };
 
 export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], defaultVendorId = null, returnTo = '' }) {
     const isEdit = !!purchaseOrder;
-    const { data, setData, post, put, processing, errors } = useForm({
+    const { data, setData, post, put, processing, errors, isDirty } = useForm({
         vendor_id: purchaseOrder?.vendor_id || defaultVendorId || '',
         po_date: purchaseOrder?.po_date || '',
         expected_delivery_date: purchaseOrder?.expected_delivery_date || '',
@@ -34,10 +34,26 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
 
     const totals = data.items.reduce((a, i) => ({ subtotal: a.subtotal + ((+i.qty_ordered || 0) * (+i.unit_price || 0)), discount: a.discount + (+i.discount_amount || 0), tax: a.tax + (+i.tax_amount || 0), grand: a.grand + (+i.line_total || 0) }), { subtotal: 0, discount: 0, tax: 0, grand: 0 });
     const submit = (e) => { e.preventDefault(); isEdit ? put(route('apps.procurement.purchase-orders.update', purchaseOrder.id)) : post(route('apps.procurement.purchase-orders.store')); };
+    const handleBack = () => {
+        const confirmLeave = window.confirm('Pastikan data sudah disimpan. Kembali sekarang dapat menyebabkan data yang belum disimpan hilang.');
+        if (!confirmLeave) return;
+
+        if (window.history.length > 1) {
+            window.history.back();
+            return;
+        }
+
+        if (returnTo) {
+            router.get(returnTo);
+            return;
+        }
+
+        router.get(route('apps.procurement.purchase-orders.index'));
+    };
 
     return <>
         <Head title={isEdit ? 'Edit Purchase Order' : 'Create Purchase Order'} />
-        <Card title={isEdit ? 'Edit Purchase Order' : 'Create Purchase Order'} form={submit} footer={<Button type='submit' label='Save Draft' disabled={processing} variant='gray' />}>
+        <Card title={isEdit ? 'Edit Purchase Order' : 'Create Purchase Order'} form={submit} footer={<div className='flex items-center gap-2'><Button type='submit' label='Save Draft' disabled={processing} variant='gray' /><button type='button' onClick={handleBack} className='rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50'>Back</button>{isDirty && <span className='text-xs text-amber-600'>Data belum disimpan.</span>}</div>}>
             <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Vendor</label><select value={data.vendor_id} onChange={(e) => setData('vendor_id', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300'><option value=''>-</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select>{errors.vendor_id && <small className='text-xs text-red-500'>{errors.vendor_id}</small>}</div>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>PO Date</label><input type='date' value={data.po_date} onChange={(e) => setData('po_date', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' />{errors.po_date && <small className='text-xs text-red-500'>{errors.po_date}</small>}</div>
