@@ -6,6 +6,7 @@ use App\Models\Core\Party;
 use App\Models\Core\PartyContact;
 use App\Models\Procurement\Vendor;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class VendorContactService
 {
@@ -35,7 +36,9 @@ class VendorContactService
         return DB::transaction(function () use ($party, $data) {
             if (($data['is_primary'] ?? false) === true) $party->partyContacts()->where('status', 'active')->update(['is_primary' => false]);
             $contact = Contact::create($data);
-            return PartyContact::create(['party_id' => $party->id, 'contact_id' => $contact->id, 'contact_role' => $data['contact_role'] ?? null, 'is_primary' => (bool)($data['is_primary'] ?? false), 'can_login' => (bool)($data['can_login'] ?? false), 'status' => $data['status'] ?? 'active', 'notes' => $data['notes'] ?? null]);
+            $payload = ['party_id' => $party->id, 'contact_id' => $contact->id, 'is_primary' => (bool)($data['is_primary'] ?? false), 'can_login' => (bool)($data['can_login'] ?? false), 'status' => $data['status'] ?? 'active', 'notes' => $data['notes'] ?? null];
+            if (Schema::hasColumn('party_contacts', 'contact_role')) $payload['contact_role'] = $data['contact_role'] ?? null;
+            return PartyContact::create($payload);
         });
     }
 }

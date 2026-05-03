@@ -6,6 +6,7 @@ use App\Http\Requests\Procurement\VendorContactRequest;
 use App\Models\Core\PartyContact;
 use App\Models\Procurement\Vendor;
 use App\Services\Procurement\VendorContactService;
+use Illuminate\Support\Facades\Schema;
 
 class VendorContactController extends Controller
 {
@@ -32,7 +33,9 @@ class VendorContactController extends Controller
         $data = $request->validated();
         if (($data['is_primary'] ?? false) === true) $party->partyContacts()->where('status', 'active')->update(['is_primary' => false]);
         $partyContact->contact->update($data);
-        $partyContact->update(['contact_role' => $data['contact_role'] ?? null, 'is_primary' => (bool)($data['is_primary'] ?? false), 'can_login' => (bool)($data['can_login'] ?? false), 'status' => $data['status'] ?? $partyContact->status, 'notes' => $data['notes'] ?? null]);
+        $payload = ['is_primary' => (bool)($data['is_primary'] ?? false), 'can_login' => (bool)($data['can_login'] ?? false), 'status' => $data['status'] ?? $partyContact->status, 'notes' => $data['notes'] ?? null];
+        if (Schema::hasColumn('party_contacts', 'contact_role')) $payload['contact_role'] = $data['contact_role'] ?? null;
+        $partyContact->update($payload);
         return back()->with('success', 'Contact updated');
     }
 
