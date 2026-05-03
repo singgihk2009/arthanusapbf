@@ -201,7 +201,7 @@ class VendorController extends Controller
     }
     public function contacts(Vendor $vendor) {
         if ($vendor->party_id && $vendor->party) {
-            return response()->json(['contacts' => $vendor->party->partyContacts()->with('contact.user')->latest()->get()]);
+            return response()->json(['contacts' => $vendor->party->partyContacts()->with('contact.user')->where('status', 'active')->latest()->get()]);
         }
         return response()->json(['contacts' => $vendor->contacts()->orderBy('contact_type')->get()]);
     }
