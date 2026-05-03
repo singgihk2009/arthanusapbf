@@ -6,7 +6,7 @@ export default function LegalTab({ data }) {
       <table className='min-w-full border text-sm'>
         <thead>
           <tr className='bg-gray-100'>
-            <th className='border px-3 py-2 text-left' colSpan={7}>Daftar Dokumen Regulatory (Requested = Yes)</th>
+            <th className='border px-3 py-2 text-left' colSpan={7}>Daftar dokumen yang harus di lengkapi</th>
           </tr>
           <tr className='bg-gray-50'>
             <th className='border px-3 py-2'>Document Type</th>
@@ -26,8 +26,8 @@ export default function LegalTab({ data }) {
             <td className='border px-3 py-2'>{doc.document_number || '-'}</td>
             <td className='border px-3 py-2'>{doc.issue_date || '-'}</td>
             <td className='border px-3 py-2'>{doc.expiry_date || '-'}</td>
-            <td className='border px-3 py-2'>{doc.verification_status || 'pending'}</td>
-          </tr>) : <tr><td className='border px-3 py-3 text-center text-gray-500' colSpan={7}>Tidak ada dokumen regulatory dengan status requested = Yes.</td></tr>}
+            <td className='border px-3 py-2'>{doc.verification_status || 'belum upload'}</td>
+          </tr>) : <tr><td className='border px-3 py-3 text-center text-gray-500' colSpan={7}>Tidak ada dokumen yang wajib dilengkapi.</td></tr>}
         </tbody>
       </table>
     </div>
