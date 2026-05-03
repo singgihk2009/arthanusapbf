@@ -101,6 +101,11 @@ class VendorController extends Controller
             'vendor' => $vendor,
             'currentTab' => $currentTab,
             'summary' => $this->summary($vendor),
+            'documentTypes' => DocumentType::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'code', 'name', 'category']),
         ]);
     }
 
@@ -165,7 +170,31 @@ class VendorController extends Controller
         return back();
     }
 
-    public function legal(Vendor $vendor) { return response()->json(['documents' => $vendor->documents()->get()]); }
+    public function legal(Vendor $vendor)
+    {
+        $documents = $vendor->documents()->with('documentType')->get()->keyBy('document_type_id');
+        $requirements = app(VendorComplianceService::class)
+            ->getRequiredDocuments($vendor)
+            ->filter(fn ($req) => $req->is_required && strtolower((string) optional($req->documentType)->category) === 'regulatory')
+            ->values()
+            ->map(function ($req) use ($documents) {
+                $document = $documents->get($req->document_type_id);
+                return [
+                    'requirement_id' => $req->id,
+                    'document_type_id' => $req->document_type_id,
+                    'document_type_name' => $req->documentType->name ?? $req->documentType->code ?? '-',
+                    'category' => $req->documentType->category ?? null,
+                    'is_requested' => (bool) $req->is_required,
+                    'verification_status' => $document->verification_status ?? 'pending',
+                    'document_number' => $document->document_number ?? null,
+                    'issue_date' => $document->issue_date ?? null,
+                    'expiry_date' => $document->expiry_date ?? null,
+                    'original_filename' => $document->original_filename ?? null,
+                ];
+            });
+
+        return response()->json(['documents' => $requirements]);
+    }
     public function contacts(Vendor $vendor) { return response()->json(['contacts' => $vendor->contacts()->orderBy('contact_type')->get()->groupBy('contact_type')]); }
     public function documents(Vendor $vendor) {
         $requirements = app(VendorComplianceService::class)->getRequiredDocuments($vendor);
