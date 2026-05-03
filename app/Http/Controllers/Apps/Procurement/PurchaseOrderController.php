@@ -35,8 +35,8 @@ class PurchaseOrderController extends Controller
     public function create()
     {
         return Inertia::render('Apps/Procurement/PurchaseOrders/Create', [
-            'vendors' => Vendor::select('id','name')->orderBy('name')->get(),
-            'products' => Item::select('id','name')->orderBy('name')->get(),
+            'vendors' => Vendor::select('id','name')->where('qualification_status', 'qualified')->orderBy('name')->get(),
+            'products' => Item::select('id','name','base_uom_id')->orderBy('name')->get(),
             'uoms' => Uom::select('id','name')->orderBy('name')->get(),
         ]);
     }
@@ -75,8 +75,8 @@ class PurchaseOrderController extends Controller
         $purchaseOrder->load('items');
         return Inertia::render('Apps/Procurement/PurchaseOrders/Edit', [
             'purchaseOrder' => $purchaseOrder,
-            'vendors' => Vendor::select('id','name')->orderBy('name')->get(),
-            'products' => Item::select('id','name')->orderBy('name')->get(),
+            'vendors' => Vendor::select('id','name')->where('qualification_status', 'qualified')->orderBy('name')->get(),
+            'products' => Item::select('id','name','base_uom_id')->orderBy('name')->get(),
             'uoms' => Uom::select('id','name')->orderBy('name')->get(),
         ]);
     }
