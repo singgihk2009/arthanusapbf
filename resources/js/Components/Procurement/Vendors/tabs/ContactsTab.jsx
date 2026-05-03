@@ -74,7 +74,7 @@ export default function ContactsTab({ data, vendor, onRefresh }) {
     </div>
 
     {showForm && (
-      <form onSubmit={submit} className='border rounded p-3 bg-gray-50 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm'>
+      <form onSubmit={submit} className='border rounded p-3 bg-gray-50 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-4'>
         <input className='border rounded p-2' placeholder='Full name *' value={form.full_name} onChange={(e) => setField('full_name', e.target.value)} required />
         <input className='border rounded p-2' placeholder='Email' type='email' value={form.email} onChange={(e) => setField('email', e.target.value)} />
         <input className='border rounded p-2' placeholder='Mobile' value={form.mobile} onChange={(e) => setField('mobile', e.target.value)} />
@@ -95,14 +95,14 @@ export default function ContactsTab({ data, vendor, onRefresh }) {
           <input type='checkbox' checked={form.can_login} onChange={(e) => setField('can_login', e.target.checked)} />
           <span>Can login</span>
         </label>
-        <div className='md:col-span-2 flex items-center gap-2 relative z-10'>
+        <div className='md:col-span-2 flex items-center gap-2'>
           <button type='submit' className='px-3 py-1 rounded bg-indigo-600 text-white text-sm'>{editingContactId ? 'Update Contact' : 'Save Contact'}</button>
           <button type='button' className='px-3 py-1 rounded border text-sm' onClick={() => { setEditingContactId(null); setForm(initialForm); setShowForm(false); }}>Cancel</button>
         </div>
       </form>
     )}
 
-    <div className='overflow-auto'>
+    <div className='overflow-auto mt-2'>
       <table className='min-w-full text-sm border'>
         <thead className='bg-gray-50'><tr>
           {['Full Name','Position','Email','Mobile/Phone','Status','Action'].map(h => <th key={h} className='text-left p-2 border-b'>{h}</th>)}
