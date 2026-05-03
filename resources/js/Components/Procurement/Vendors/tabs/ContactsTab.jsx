@@ -70,6 +70,24 @@ export default function ContactsTab({ data, vendor, onRefresh }) {
     });
   };
 
+  const startEdit = (pc) => {
+    setEditingContactId(pc.id);
+    setShowForm(true);
+    setForm({
+      full_name: pc.contact?.full_name || '',
+      email: pc.contact?.email || '',
+      phone: pc.contact?.phone || '',
+      mobile: pc.contact?.mobile || '',
+      position_title: pc.contact?.position_title || '',
+      department: pc.contact?.department || '',
+      contact_role: pc.contact_role || '',
+      notes: pc.notes || '',
+      is_primary: !!pc.is_primary,
+      can_login: !!pc.can_login,
+      status: pc.status || 'active',
+    });
+  };
+
   return <div className='space-y-3'>
     <div className='flex justify-between items-center'>
       <h3 className='font-semibold'>Vendor Contacts</h3>
