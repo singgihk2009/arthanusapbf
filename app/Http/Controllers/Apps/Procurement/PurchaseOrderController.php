@@ -48,12 +48,13 @@ class PurchaseOrderController extends Controller
         DB::transaction(function () use ($data, $request) {
             $poNumber = $this->generateNumber();
             $warehouseId = Warehouse::query()->value('id');
+            $supplierId = $this->resolveSupplierId((int) $data['vendor_id']);
 
             $po = PurchaseOrder::create([
                 'number' => $poNumber,
                 'po_number' => $poNumber,
                 'vendor_id' => $data['vendor_id'],
-                'supplier_id' => $data['vendor_id'],
+                'supplier_id' => $supplierId,
                 'warehouse_id' => $warehouseId,
                 'document_date' => $data['po_date'],
                 'po_date' => $data['po_date'],
@@ -95,9 +96,10 @@ class PurchaseOrderController extends Controller
         abort_unless($purchaseOrder->isEditable(), 422, 'PO hanya dapat diubah ketika draft.');
         $data = $this->validateData($request);
         DB::transaction(function () use ($purchaseOrder, $data) {
+            $supplierId = $this->resolveSupplierId((int) $data['vendor_id']);
             $purchaseOrder->update([
                 'vendor_id' => $data['vendor_id'],
-                'supplier_id' => $data['vendor_id'],
+                'supplier_id' => $supplierId,
                 'po_date' => $data['po_date'],
                 'document_date' => $data['po_date'],
                 'expected_delivery_date' => $data['expected_delivery_date'] ?? null,
@@ -149,5 +151,15 @@ class PurchaseOrderController extends Controller
         $last = PurchaseOrder::where('po_number','like',$prefix.'%')->orderByDesc('po_number')->value('po_number');
         $seq = $last ? ((int)substr($last, -4) + 1) : 1;
         return $prefix.str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
+    }
+
+    private function resolveSupplierId(int $vendorId): int
+    {
+        $vendorCode = Vendor::query()->whereKey($vendorId)->value('vendor_code');
+        $supplierId = DB::table('suppliers')->where('code', $vendorCode)->value('id');
+
+        abort_if(!$supplierId, 422, 'Supplier untuk vendor terpilih tidak ditemukan.');
+
+        return (int) $supplierId;
     }
 }
