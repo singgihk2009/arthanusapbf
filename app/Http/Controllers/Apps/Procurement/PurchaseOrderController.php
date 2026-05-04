@@ -132,7 +132,7 @@ class PurchaseOrderController extends Controller
 
     public function destroy(PurchaseOrder $purchaseOrder)
     {
-        abort_unless(in_array($purchaseOrder->status, ['draft','cancelled']), 422, 'Hanya draft/cancelled yang boleh dihapus.');
+        abort_unless(in_array(strtolower((string) $purchaseOrder->status), ['draft', 'cancelled'], true), 422, 'Hanya draft/cancelled yang boleh dihapus.');
         $purchaseOrder->delete();
         return to_route('apps.procurement.purchase-orders.index');
     }
