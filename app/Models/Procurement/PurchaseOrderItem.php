@@ -14,4 +14,5 @@ class PurchaseOrderItem extends Model
     public function purchaseOrder(){ return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id'); }
     public function product(){ return $this->belongsTo(Item::class, 'product_id'); }
     public function uom(){ return $this->belongsTo(Uom::class, 'uom_id'); }
+    public function goodsReceiptItems(){ return $this->hasMany(GoodsReceiptItem::class); }
 }

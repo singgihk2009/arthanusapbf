@@ -21,6 +21,8 @@ class PurchaseOrder extends Model
     ];
 
     public function items(){ return $this->hasMany(PurchaseOrderItem::class, 'purchase_order_id'); }
+    public function purchaseOrderItems(){ return $this->items(); }
+    public function goodsReceipts(){ return $this->hasMany(GoodsReceipt::class); }
     public function vendor(){ return $this->belongsTo(Vendor::class); }
     public function createdBy(){ return $this->belongsTo(User::class, 'created_by'); }
     public function approvedBy(){ return $this->belongsTo(User::class, 'approved_by'); }
@@ -62,7 +64,7 @@ class PurchaseOrder extends Model
         if ($total > 0 && $fully === $total) $status = 'fully_received';
         elseif ($has) $status = 'partially_received';
 
-        if ($status !== $this->status) $this->update(['status' => $status]);
+        if ($status !== $this->status) $this->update(['status' => $status, 'fulfillment_status' => $status]);
     }
 
     public function isEditable(): bool { return $this->status === 'draft'; }
