@@ -109,7 +109,7 @@ export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
                                     </div>
                                 </Table.Td>
                             </tr>
-                        ));
+                            );
                         }) : <Table.Empty colSpan={8} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>Data purchase order tidak ditemukan.</span></>} />}
                     </Table.Tbody>
                 </Table>
