@@ -80,10 +80,14 @@ export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
                         </tr>
                     </Table.Thead>
                     <Table.Tbody>
-                        {purchaseOrders.data.length ? purchaseOrders.data.map((po) => (
+                        {purchaseOrders.data.length ? purchaseOrders.data.map((po) => {
+                            const poStatus = String(po.status ?? '').toLowerCase();
+                            const isDraft = poStatus === 'draft';
+
+                            return (
                             <tr key={po.id} className='hover:bg-gray-100 dark:hover:bg-gray-900'>
                                 <Table.Td>
-                                    {po.status === 'draft' ? (
+                                    {isDraft ? (
                                         <input type='checkbox' checked={selectedDraftIds.includes(po.id)} onChange={() => toggleDraftSelection(po.id)} />
                                     ) : '-'}
                                 </Table.Td>
@@ -96,7 +100,7 @@ export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
                                 <Table.Td>
                                     <div className='flex flex-wrap gap-2'>
                                         <Link className='text-indigo-600 hover:underline' href={route('apps.procurement.purchase-orders.show', po.id)}>Detail</Link>
-                                        {po.status === 'draft' && (
+                                        {isDraft && (
                                             <>
                                                 <Link className='text-amber-600 hover:underline' href={route('apps.procurement.purchase-orders.edit', po.id)}>Edit</Link>
                                                 <button type='button' onClick={() => handleDeleteDraft(po.id)} className='text-rose-600 hover:underline'>Delete</button>
@@ -105,7 +109,8 @@ export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
                                     </div>
                                 </Table.Td>
                             </tr>
-                        )) : <Table.Empty colSpan={8} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>Data purchase order tidak ditemukan.</span></>} />}
+                        ));
+                        }) : <Table.Empty colSpan={8} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>Data purchase order tidak ditemukan.</span></>} />}
                     </Table.Tbody>
                 </Table>
             </Table.Card>
