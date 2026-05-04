@@ -10,6 +10,7 @@ use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\Vendor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 
 class PurchaseOrderController extends Controller
@@ -47,7 +48,12 @@ class PurchaseOrderController extends Controller
     public function store(Request $request)
     {
         $data = $this->validateData($request);
-        DB::transaction(function () use ($data, $request) {
+        $poDate = Carbon::parse($data['po_date'])->toDateString();
+        $expectedDeliveryDate = !empty($data['expected_delivery_date'])
+            ? Carbon::parse($data['expected_delivery_date'])->toDateString()
+            : null;
+
+        DB::transaction(function () use ($data, $request, $poDate, $expectedDeliveryDate) {
             $poNumber = $this->generateNumber();
             $warehouseId = Warehouse::query()->value('id');
             $supplierId = $this->resolveSupplierId((int) $data['vendor_id']);
@@ -58,10 +64,10 @@ class PurchaseOrderController extends Controller
                 'vendor_id' => $data['vendor_id'],
                 'supplier_id' => $supplierId,
                 'warehouse_id' => $warehouseId,
-                'document_date' => $data['po_date'],
-                'po_date' => $data['po_date'],
-                'expected_date' => $data['expected_delivery_date'] ?? null,
-                'expected_delivery_date' => $data['expected_delivery_date'] ?? null,
+                'document_date' => $poDate,
+                'po_date' => $poDate,
+                'expected_date' => $expectedDeliveryDate,
+                'expected_delivery_date' => $expectedDeliveryDate,
                 'status' => 'draft',
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $request->user()?->id,
@@ -102,15 +108,20 @@ class PurchaseOrderController extends Controller
     {
         abort_unless($purchaseOrder->isEditable(), 422, 'PO hanya dapat diubah ketika draft.');
         $data = $this->validateData($request);
-        DB::transaction(function () use ($purchaseOrder, $data) {
+        $poDate = Carbon::parse($data['po_date'])->toDateString();
+        $expectedDeliveryDate = !empty($data['expected_delivery_date'])
+            ? Carbon::parse($data['expected_delivery_date'])->toDateString()
+            : null;
+
+        DB::transaction(function () use ($purchaseOrder, $data, $poDate, $expectedDeliveryDate) {
             $supplierId = $this->resolveSupplierId((int) $data['vendor_id']);
             $purchaseOrder->update([
                 'vendor_id' => $data['vendor_id'],
                 'supplier_id' => $supplierId,
-                'po_date' => $data['po_date'],
-                'document_date' => $data['po_date'],
-                'expected_delivery_date' => $data['expected_delivery_date'] ?? null,
-                'expected_date' => $data['expected_delivery_date'] ?? null,
+                'po_date' => $poDate,
+                'document_date' => $poDate,
+                'expected_delivery_date' => $expectedDeliveryDate,
+                'expected_date' => $expectedDeliveryDate,
                 'notes' => $data['notes'] ?? null,
             ]);
             $purchaseOrder->items()->delete();
