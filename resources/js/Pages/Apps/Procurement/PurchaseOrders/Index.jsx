@@ -99,12 +99,20 @@ export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
                                 <Table.Td><span className='rounded-full bg-gray-100 px-2 py-1 text-xs dark:bg-gray-800'>{po.status}</span></Table.Td>
                                 <Table.Td>
                                     <div className='flex flex-wrap gap-2'>
-                                        <Link className='text-indigo-600 hover:underline' href={route('apps.procurement.purchase-orders.show', po.id)}>Detail</Link>
+                                        <Link className='rounded-lg border border-indigo-500 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50' href={route('apps.procurement.purchase-orders.show', po.id)}>Detail</Link>
                                         {isDraft && (
                                             <>
-                                                <Link className='text-amber-600 hover:underline' href={route('apps.procurement.purchase-orders.edit', po.id)}>Edit</Link>
-                                                <button type='button' onClick={() => handleDeleteDraft(po.id)} className='text-rose-600 hover:underline'>Delete</button>
+                                                <Link className='rounded-lg border border-amber-500 px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50' href={route('apps.procurement.purchase-orders.edit', po.id)}>Edit</Link>
+                                                <button type='button' onClick={() => handleDeleteDraft(po.id)} className='rounded-lg border border-rose-500 px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50'>Delete</button>
                                             </>
+                                        )}
+                                        {poStatus === 'approved' && (
+                                            <Link
+                                                className='rounded-lg border border-emerald-500 px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50'
+                                                href={route('apps.procurement.goods-receipts.create-from-po', po.id)}
+                                            >
+                                                Create Goods Receiving
+                                            </Link>
                                         )}
                                     </div>
                                 </Table.Td>
