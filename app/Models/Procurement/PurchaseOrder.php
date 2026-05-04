@@ -44,7 +44,7 @@ class PurchaseOrder extends Model
 
     public function approve(?int $userId = null): void
     {
-        if ($this->status !== 'draft') abort(422, 'Hanya PO draft yang dapat di-approve.');
+        if (!$this->isEditable()) abort(422, 'Hanya PO draft yang dapat di-approve.');
         $this->update(['status' => 'approved', 'approved_by' => $userId, 'approved_at' => now()]);
     }
 
@@ -67,5 +67,8 @@ class PurchaseOrder extends Model
         if ($status !== $this->status) $this->update(['status' => $status, 'fulfillment_status' => $status]);
     }
 
-    public function isEditable(): bool { return $this->status === 'draft'; }
+    public function isEditable(): bool
+    {
+        return strtolower((string) $this->status) === 'draft';
+    }
 }
