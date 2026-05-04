@@ -242,6 +242,8 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::resource('/purchase-orders', PurchaseOrderController::class);
         Route::post('/purchase-orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->name('purchase-orders.approve');
         Route::post('/purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
+        Route::get('/purchase-orders/{purchaseOrder}/goods-receipts/create', [GoodsReceiptController::class, 'createFromPO'])->name('goods-receipts.create-from-po');
+        Route::post('/goods-receipts/{goodsReceipt}/post', [GoodsReceiptController::class, 'post'])->name('goods-receipts.post');
         Route::resource('/goods-receipts', GoodsReceiptController::class);
         Route::resource('/vendor-invoices', VendorInvoiceController::class);
         Route::resource('/vendor-payments', VendorPaymentController::class);

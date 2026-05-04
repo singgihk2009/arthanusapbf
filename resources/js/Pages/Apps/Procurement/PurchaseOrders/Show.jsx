@@ -32,6 +32,10 @@ export default function Show({ purchaseOrder }) {
                 <div className='mb-4 flex flex-wrap items-center gap-2'>
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass}`}>{purchaseOrder.status}</span>
                     {purchaseOrder.status === 'draft' && <button type='button' onClick={() => router.post(route('apps.procurement.purchase-orders.approve', purchaseOrder.id))} className='rounded-lg border border-blue-500 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50'>Approve</button>}
+
+                    {(purchaseOrder.fulfillment_status === 'open' || purchaseOrder.fulfillment_status === 'partially_received') && !['closed','cancelled'].includes(purchaseOrder.status) && (
+                        <button type='button' onClick={() => router.get(route('apps.procurement.goods-receipts.create-from-po', purchaseOrder.id))} className='rounded-lg border border-emerald-500 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50'>Create Goods Receiving</button>
+                    )}
                     <button type='button' onClick={handleBack} className='rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50'>Back</button>
                     {canCancel && purchaseOrder.status !== 'cancelled' && <button type='button' onClick={handleCancelPo} className='rounded-lg border border-rose-500 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50'>Cancel PO</button>}
                 </div>
@@ -42,6 +46,13 @@ export default function Show({ purchaseOrder }) {
                     <div><span className='font-semibold'>Expected Delivery:</span> {purchaseOrder.expected_delivery_date ?? '-'}</div>
                     <div><span className='font-semibold'>Grand Total:</span> {Number(purchaseOrder.grand_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
+
+
+                <h3 className='mt-6 mb-2 text-sm font-semibold'>Receiving History</h3>
+                <Table>
+                    <Table.Thead><tr><Table.Th>GR Number</Table.Th><Table.Th>Date</Table.Th><Table.Th>Status</Table.Th><Table.Th>Received Qty</Table.Th><Table.Th>Total Value</Table.Th></tr></Table.Thead>
+                    <Table.Tbody>{(purchaseOrder.goods_receipts || []).map((gr) => <tr key={gr.id}><Table.Td>{gr.gr_number}</Table.Td><Table.Td>{gr.received_date}</Table.Td><Table.Td>{gr.status}</Table.Td><Table.Td>{gr.total_qty ?? '-'}</Table.Td><Table.Td>{Number(gr.total_value ?? 0).toLocaleString('id-ID')}</Table.Td></tr>)}</Table.Tbody>
+                </Table>
 
                 <Table>
                     <Table.Thead><tr><Table.Th>Product</Table.Th><Table.Th>Qty Ordered</Table.Th><Table.Th>Qty Received</Table.Th><Table.Th>Remaining Qty</Table.Th><Table.Th>Line Total</Table.Th></tr></Table.Thead>
