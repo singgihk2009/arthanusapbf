@@ -170,9 +170,20 @@ class PurchaseOrderController extends Controller
     private function generateNumber(): string
     {
         $prefix = 'PO-'.now()->format('Ym').'-';
-        $last = PurchaseOrder::where('po_number','like',$prefix.'%')->orderByDesc('po_number')->value('po_number');
-        $seq = $last ? ((int)substr($last, -4) + 1) : 1;
-        return $prefix.str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
+        $last = PurchaseOrder::withTrashed()
+            ->where('po_number', 'like', $prefix.'%')
+            ->orderByDesc('po_number')
+            ->value('po_number');
+
+        $seq = $last ? ((int) substr($last, -4) + 1) : 1;
+
+        do {
+            $number = $prefix.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+            $exists = PurchaseOrder::withTrashed()->where('po_number', $number)->exists();
+            $seq++;
+        } while ($exists);
+
+        return $number;
     }
 
     private function resolveSupplierId(int $vendorId): int
