@@ -1,0 +1,4 @@
+<?php
+namespace App\Models\Concerns;
+use App\Models\Document;use App\Services\RequiredDocumentService;
+trait HasDocuments { public function documents(){ return $this->hasMany(Document::class,'owner_id')->where('owner_type',$this->documentOwnerType()); } public function activeDocuments(){ return $this->documents()->active(); } public function verifiedDocuments(){ return $this->documents()->verified(); } public function requiredDocumentsStatus(){ return app(RequiredDocumentService::class)->getCompletionPercentage($this->documentOwnerType(),$this->id); } public function missingRequiredDocuments(){ return app(RequiredDocumentService::class)->getMissingDocuments($this->documentOwnerType(),$this->id); } public function documentOwnerType(){ return property_exists($this,'documentOwnerType')?$this->documentOwnerType:'vendor'; }}

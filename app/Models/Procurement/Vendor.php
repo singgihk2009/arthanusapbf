@@ -3,11 +3,15 @@
 namespace App\Models\Procurement;
 
 use App\Models\Core\Party;
+use App\Models\Concerns\HasDocuments;
 use App\Services\VendorComplianceService;
 use Illuminate\Database\Eloquent\Model;
 
 class Vendor extends Model
 {
+    use HasDocuments;
+
+    protected string $documentOwnerType = 'vendor';
     protected $guarded = [];
 
     protected $casts = [
@@ -19,7 +23,7 @@ class Vendor extends Model
 
     public function party(){ return $this->belongsTo(Party::class); }
 
-    public function purchaseOrders(){return $this->hasMany(PurchaseOrder::class);} public function vendorInvoices(){return $this->hasMany(VendorInvoice::class);} public function vendorPayments(){return $this->hasMany(VendorPayment::class);} public function vendorLedgers(){return $this->hasMany(VendorLedger::class);} public function contacts(){return $this->hasMany(VendorContact::class);} public function documents(){return $this->hasMany(VendorDocument::class);} public function bankAccounts(){return $this->hasMany(VendorBankAccount::class);} public function documentRequirements(){ return VendorDocumentRequirement::query()->where('is_active', true)->where(function($q){ $q->whereNull('vendor_type')->orWhere('vendor_type', $this->vendor_type); }); }
+    public function purchaseOrders(){return $this->hasMany(PurchaseOrder::class);} public function vendorInvoices(){return $this->hasMany(VendorInvoice::class);} public function vendorPayments(){return $this->hasMany(VendorPayment::class);} public function vendorLedgers(){return $this->hasMany(VendorLedger::class);} public function contacts(){return $this->hasMany(VendorContact::class);}  public function bankAccounts(){return $this->hasMany(VendorBankAccount::class);} public function documentRequirements(){ return VendorDocumentRequirement::query()->where('is_active', true)->where(function($q){ $q->whereNull('vendor_type')->orWhere('vendor_type', $this->vendor_type); }); }
 
     public function companyDirector(){ return $this->hasOne(VendorContact::class)->where('contact_type', 'company_director'); }
     public function technicalResponsiblePerson(){ return $this->hasOne(VendorContact::class)->where('contact_type', 'technical_responsible_person'); }

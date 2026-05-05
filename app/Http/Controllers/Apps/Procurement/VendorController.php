@@ -9,7 +9,7 @@ use App\Models\Procurement\GoodsReceipt;
 use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\Vendor;
 use App\Models\Procurement\DocumentType;
-use App\Models\Procurement\VendorDocument;
+use App\Models\Document;
 use App\Services\VendorComplianceService;
 use App\Models\Procurement\VendorInvoice;
 use App\Models\Procurement\VendorLedger;
@@ -189,11 +189,11 @@ class VendorController extends Controller
                     'document_type_name' => $req->name ?? $req->code ?? '-',
                     'category' => $req->category ?? null,
                     'is_requested' => true,
-                    'verification_status' => $document?->verification_status ?? 'belum upload',
+                    'verification_status' => $document?->status ?? 'belum upload',
                     'document_number' => $document->document_number ?? null,
                     'issue_date' => $document->issue_date ?? null,
                     'expiry_date' => $document->expiry_date ?? null,
-                    'original_filename' => $document->original_filename ?? null,
+                    'original_file_name' => $document->original_filename ?? null,
                 ];
             });
 
@@ -222,7 +222,7 @@ class VendorController extends Controller
     public function update(UpdateVendorRequest $request, Vendor $vendor){ DB::transaction(function () use ($request, $vendor) { $validated = $request->validated(); $vendorPayload = Arr::except($validated, ['company_director', 'technical_responsible_person', 'documents']); $vendorPayload['status'] = $this->normalizeStatus($vendorPayload['status'] ?? null); $vendorPayload['name'] = $vendorPayload['vendor_name'] ?? ($vendorPayload['name'] ?? $vendorPayload['vendor_code'] ?? 'UNKNOWN'); $vendor->update(array_merge($vendorPayload, ['updated_by' => auth()->id()])); $this->upsertContacts($vendor, $validated); }); return redirect('/apps/procurement/vendors'); }
 
     public function submitQualification(Vendor $vendor){ $vendor->update(['qualification_status' => 'submitted', 'submitted_by' => auth()->id(), 'submitted_at' => now()]); return back(); }
-    public function approveQualification(Vendor $vendor){ $invalid = $vendor->documents()->whereIn('verification_status', ['invalid', 'need_revision'])->exists(); if ($invalid) return back()->withErrors(['qualification' => 'Dokumen invalid / need revision harus diselesaikan.']); $vendor->update(['qualification_status' => 'qualified', 'qualification_date' => now(), 'approved_by' => auth()->id(), 'approved_at' => now()]); return back(); }
+    public function approveQualification(Vendor $vendor){ $invalid = $vendor->documents()->whereIn('status', ['rejected'])->exists(); if ($invalid) return back()->withErrors(['qualification' => 'Dokumen invalid / need revision harus diselesaikan.']); $vendor->update(['qualification_status' => 'qualified', 'qualification_date' => now(), 'approved_by' => auth()->id(), 'approved_at' => now()]); return back(); }
     public function rejectQualification(Request $request, Vendor $vendor){ $vendor->update(['qualification_status' => 'rejected', 'rejected_by' => auth()->id(), 'rejected_at' => now(), 'notes' => $request->input('notes')]); return back(); }
 
     public function uploadDocument(Request $request, Vendor $vendor)
@@ -234,13 +234,13 @@ class VendorController extends Controller
             $docType = DocumentType::firstOrCreate(['code' => strtoupper($data['document_type'])], ['name' => strtoupper($data['document_type'])]);
             $docTypeId = $docType->id;
         }
-        VendorDocument::updateOrCreate(['vendor_id' => $vendor->id, 'document_type_id' => $docTypeId], ['document_type' => $data['document_type'] ?? null, 'file_path' => $path, 'original_filename' => $request->file('file')->getClientOriginalName(), 'mime_type' => $request->file('file')->getClientMimeType(), 'file_size' => $request->file('file')->getSize(), 'document_number' => $data['document_number'] ?? null, 'issue_date' => $data['issue_date'] ?? null, 'expiry_date' => $data['expiry_date'] ?? null, 'created_by' => auth()->id(), 'updated_by' => auth()->id()]);
+        Document::updateOrCreate(['owner_type' => 'vendor', 'owner_id' => $vendor->id, 'document_type_id' => $docTypeId], ['document_type' => $data['document_type'] ?? null, 'file_path' => $path, 'original_file_name' => $request->file('file')->getClientOriginalName(), 'mime_type' => $request->file('file')->getClientMimeType(), 'file_size' => $request->file('file')->getSize(), 'document_number' => $data['document_number'] ?? null, 'issue_date' => $data['issue_date'] ?? null, 'expiry_date' => $data['expiry_date'] ?? null, 'created_by' => auth()->id(), 'updated_by' => auth()->id()]);
         return back();
     }
 
-    public function deleteDocument(Vendor $vendor, VendorDocument $document){ if ($document->file_path) Storage::delete($document->file_path); $document->delete(); return back(); }
-    public function verifyDocument(Request $request, Vendor $vendor, VendorDocument $document){ $request->validate(['verification_status' => ['required', 'in:pending,valid,invalid,expired,need_revision']]); $document->update(['verification_status' => $request->verification_status, 'verified_by' => auth()->id(), 'verified_at' => now(), 'notes' => $request->notes]); return back(); }
-    public function downloadDocument(Vendor $vendor, VendorDocument $document){ return Storage::download($document->file_path, $document->original_filename); }
+    public function deleteDocument(Vendor $vendor, Document $document){ if ($document->file_path) Storage::delete($document->file_path); $document->delete(); return back(); }
+    public function verifyDocument(Request $request, Vendor $vendor, Document $document){ $request->validate(['verification_status' => ['required', 'in:pending,valid,invalid,expired,need_revision']]); $document->update(['status' => $request->verification_status === 'valid' ? 'verified' : ($request->verification_status === 'invalid' ? 'rejected' : 'pending_review'), 'verified_by' => auth()->id(), 'verified_at' => now(), 'notes' => $request->notes]); return back(); }
+    public function downloadDocument(Vendor $vendor, Document $document){ return Storage::download($document->file_path, $document->original_file_name ?? 'document'); }
     public function qualificationReport(){ $vendors = Vendor::with(['technicalResponsiblePerson', 'documents'])->get(); return Inertia::render('Apps/Procurement/Vendors/QualificationReport', compact('vendors')); }
     public function destroy(string $id){ $ids = explode(',', $id); Vendor::query()->whereIn('id', $ids)->delete(); return back(); }
 
