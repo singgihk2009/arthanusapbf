@@ -1,16 +1,30 @@
 import { router } from '@inertiajs/react';
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export default function DocumentsTab({ vendor, documentTypes = [] }) {
   const docs = vendor?.documents ?? [];
   const [notice, setNotice] = useState(null);
+  const [completion, setCompletion] = useState(null);
   const [customForm, setCustomForm] = useState({ document_type_id: '', document_number: '', issue_date: '', expiry_date: '' });
   const customFileInput = useRef(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/apps/documents/owners/vendor/${vendor.id}/completion`)
+      .then((r) => r.json())
+      .then((data) => { if (!cancelled) setCompletion(data); })
+      .catch(() => { if (!cancelled) setCompletion(null); });
+    return () => { cancelled = true; };
+  }, [vendor.id]);
+
+  const allowedTypes = useMemo(() => {
+    const requirementTypes = completion?.requirements_with_status?.map((item) => item?.requirement?.document_type).filter(Boolean) ?? [];
+    return requirementTypes.length ? requirementTypes : documentTypes;
+  }, [completion, documentTypes]);
+
   const documentTypeLabel = (doc) => {
     if (!doc) return '-';
-    if (typeof doc.document_type === 'string' && doc.document_type.trim()) return doc.document_type;
-    if (doc.document_type && typeof doc.document_type === 'object') return doc.document_type.name || doc.document_type.code || '-';
+    if (doc.document_type?.name) return doc.document_type.name;
     if (doc.document_type_label) return doc.document_type_label;
     if (doc.document_type_id) return `TYPE #${doc.document_type_id}`;
     return '-';
@@ -18,19 +32,11 @@ export default function DocumentsTab({ vendor, documentTypes = [] }) {
 
   const submitUpload = (payload, fileInput) => {
     if (!fileInput?.files?.[0]) return setNotice({ type: 'error', text: 'Upload gagal: pilih file terlebih dahulu.' });
-
     setNotice({ type: 'info', text: 'Sedang upload dokumen...' });
     router.post(route('apps.procurement.vendors.documents.upload', vendor.id), { ...payload, file: fileInput.files[0] }, {
-      forceFormData: true,
-      preserveScroll: true,
-      onSuccess: () => {
-        fileInput.value = '';
-        setNotice({ type: 'success', text: 'Dokumen berhasil diupload.' });
-      },
-      onError: (errors) => {
-        const firstError = Object.values(errors ?? {}).flat().find(Boolean);
-        setNotice({ type: 'error', text: `Upload gagal${firstError ? `: ${firstError}` : '.'}` });
-      },
+      forceFormData: true, preserveScroll: true,
+      onSuccess: () => { fileInput.value = ''; setNotice({ type: 'success', text: 'Dokumen berhasil diupload.' }); router.reload({ only: ['vendor'] }); },
+      onError: (errors) => { const firstError = Object.values(errors ?? {}).flat().find(Boolean); setNotice({ type: 'error', text: `Upload gagal${firstError ? `: ${firstError}` : '.'}` }); },
     });
   };
 
@@ -39,24 +45,12 @@ export default function DocumentsTab({ vendor, documentTypes = [] }) {
     submitUpload({ document_type_id: customForm.document_type_id, document_number: customForm.document_number || null, issue_date: customForm.issue_date || null, expiry_date: customForm.expiry_date || null }, customFileInput.current);
   };
 
-  const verifyDocument = (documentId, verificationStatus) => {
-    router.post(route('apps.procurement.vendors.documents.verify', [vendor.id, documentId]), { verification_status: verificationStatus }, {
-      preserveScroll: true,
-      onSuccess: () => setNotice({ type: 'success', text: 'Status verifikasi dokumen berhasil diperbarui.' }),
-      onError: () => setNotice({ type: 'error', text: 'Gagal memperbarui status verifikasi dokumen.' }),
-    });
-  };
-
-  const deleteDocument = (documentId) => {
-    if (!window.confirm('Hapus dokumen ini?')) return;
-    router.delete(route('apps.procurement.vendors.documents.delete', [vendor.id, documentId]), {
-      preserveScroll: true,
-      onSuccess: () => setNotice({ type: 'success', text: 'Dokumen berhasil dihapus.' }),
-      onError: () => setNotice({ type: 'error', text: 'Gagal menghapus dokumen.' }),
-    });
-  };
-
   return <div className='space-y-5'>
+    {completion && <div className='rounded border bg-blue-50 p-3 text-sm'>
+      <div className='font-semibold'>Completion: {completion.completion_percentage ?? 0}%</div>
+      {(completion.missing_documents?.length ?? 0) > 0 && <ul className='mt-2 list-disc pl-5 text-red-700'>{completion.missing_documents.map((m) => <li key={m.id}>{m.document_type?.name || m.document_type?.code || '-'}</li>)}</ul>}
+    </div>}
+
     {notice && <div className={`rounded border px-3 py-2 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : notice.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>{notice.text}</div>}
 
     <div className='rounded border p-4'>
@@ -64,36 +58,18 @@ export default function DocumentsTab({ vendor, documentTypes = [] }) {
       <div className='grid gap-3 md:grid-cols-5'>
         <select value={customForm.document_type_id} onChange={(e) => setCustomForm((prev) => ({ ...prev, document_type_id: e.target.value }))} className='rounded border px-2 py-2'>
           <option value=''>Pilih Document Type</option>
-          {documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name} ({type.code})</option>)}
+          {allowedTypes.map((type) => <option key={type.id} value={type.id}>{type.name} ({type.code})</option>)}
         </select>
         <input value={customForm.document_number} onChange={(e) => setCustomForm((prev) => ({ ...prev, document_number: e.target.value }))} placeholder='Document Number' className='rounded border px-2 py-2' />
         <input type='date' value={customForm.issue_date} onChange={(e) => setCustomForm((prev) => ({ ...prev, issue_date: e.target.value }))} className='rounded border px-2 py-2' />
         <input type='date' value={customForm.expiry_date} onChange={(e) => setCustomForm((prev) => ({ ...prev, expiry_date: e.target.value }))} className='rounded border px-2 py-2' />
-        <div className='flex items-center gap-2'>
-          <input ref={customFileInput} type='file' accept='.pdf,.jpg,.jpeg,.png' className='w-full rounded border px-2 py-2' />
-          <button type='button' onClick={submitCustomUpload} className='shrink-0 rounded border border-blue-300 px-3 py-2 text-xs text-blue-700'>Upload</button>
-        </div>
+        <div className='flex items-center gap-2'><input ref={customFileInput} type='file' accept='.pdf,.jpg,.jpeg,.png' className='w-full rounded border px-2 py-2' /><button type='button' onClick={submitCustomUpload} className='shrink-0 rounded border border-blue-300 px-3 py-2 text-xs text-blue-700'>Upload</button></div>
       </div>
     </div>
 
     <div className='overflow-auto rounded border p-3'>
-      <table className='min-w-full text-sm border'>
-        <thead>
-          <tr className='bg-gray-100'><th className='px-3 py-2 border text-left' colSpan={7}>Daftar Dokumen Vendor</th></tr>
-          <tr className='bg-gray-50'>
-            <th className='px-3 py-2 border'>Document Type</th><th className='px-3 py-2 border'>Document Number</th><th className='px-3 py-2 border'>Issue Date</th><th className='px-3 py-2 border'>Expiry Date</th><th className='px-3 py-2 border'>Verification</th><th className='px-3 py-2 border'>File</th><th className='px-3 py-2 border'>Action</th>
-          </tr>
-        </thead>
-        <tbody>{docs.length ? docs.map((d) => <tr key={d.id}>
-          <td className='border px-3 py-2'>{documentTypeLabel(d)}</td><td className='border px-3 py-2'>{d.document_number || '-'}</td><td className='border px-3 py-2'>{d.issue_date || '-'}</td><td className='border px-3 py-2'>{d.expiry_date || '-'}</td><td className='border px-3 py-2'>{d.verification_status || 'pending'}</td><td className='border px-3 py-2'>{d.original_filename || '-'}</td>
-          <td className='border px-3 py-2'>
-            <div className='flex flex-wrap gap-2'>
-              <a href={route('apps.procurement.vendors.documents.download', [vendor.id, d.id])} target='_blank' className='rounded border border-gray-300 px-2 py-1 text-xs'>View</a>
-              <button type='button' onClick={() => deleteDocument(d.id)} className='rounded border border-red-300 px-2 py-1 text-xs text-red-700'>Delete</button>
-              <label className='inline-flex items-center gap-1 text-xs'><input type='checkbox' checked={d.verification_status === 'valid'} onChange={(e) => verifyDocument(d.id, e.target.checked ? 'valid' : 'pending')} />Approve</label>
-            </div>
-          </td>
-        </tr>) : <tr><td className='border px-2 py-3 text-center text-gray-500' colSpan={7}>Belum ada dokumen tersimpan.</td></tr>}</tbody>
+      <table className='min-w-full text-sm border'><thead><tr className='bg-gray-100'><th className='px-3 py-2 border text-left' colSpan={6}>Daftar Dokumen Vendor</th></tr></thead>
+        <tbody>{docs.length ? docs.map((d) => <tr key={d.id}><td className='border px-3 py-2'>{documentTypeLabel(d)}</td><td className='border px-3 py-2'>{d.document_number || '-'}</td><td className='border px-3 py-2'>{d.issue_date || '-'}</td><td className='border px-3 py-2'>{d.expiry_date || '-'}</td><td className='border px-3 py-2'>{d.status || 'pending'}</td><td className='border px-3 py-2'><a href={route('apps.procurement.vendors.documents.download', [vendor.id, d.id])} target='_blank' className='rounded border border-gray-300 px-2 py-1 text-xs'>View</a></td></tr>) : <tr><td className='border px-2 py-3 text-center text-gray-500' colSpan={6}>Belum ada dokumen tersimpan.</td></tr>}</tbody>
       </table>
     </div>
   </div>;

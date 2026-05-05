@@ -33,6 +33,8 @@ use App\Http\Controllers\Apps\Procurement\VendorLedgerController;
 use App\Http\Controllers\Apps\Procurement\DocumentTypeController;
 use App\Http\Controllers\Apps\Procurement\VendorDocumentRequirementController;
 use App\Http\Controllers\Apps\Procurement\VendorContactController;
+use App\Http\Controllers\Apps\DocumentRequirementController;
+use App\Http\Controllers\Apps\DocumentMonitoringController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -188,6 +190,22 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::get('/expired-soon', [InventoryReportController::class, 'expiredSoon'])->name('expired-soon');
         Route::get('/minimum-stock-alerts', [InventoryReportController::class, 'minimumStockAlerts'])->name('minimum-stock-alerts');
     });
+
+    Route::prefix('document-center')->name('document-center.')->group(function () {
+        Route::get('/requirement-setup', [DocumentRequirementController::class, 'setupPage'])->name('requirements.setup');
+        Route::get('/requirements', [DocumentRequirementController::class, 'index'])->name('requirements.index');
+        Route::post('/requirements', [DocumentRequirementController::class, 'store'])->name('requirements.store');
+        Route::put('/requirements/{requirement}', [DocumentRequirementController::class, 'update'])->name('requirements.update');
+        Route::delete('/requirements/{requirement}', [DocumentRequirementController::class, 'destroy'])->name('requirements.destroy');
+        Route::post('/requirements/bulk-save', [DocumentRequirementController::class, 'bulkSave'])->name('requirements.bulk-save');
+        Route::get('/requirements/owner-types', [DocumentRequirementController::class, 'ownerTypes'])->name('requirements.owner-types');
+        Route::get('/requirements/{ownerType}/matrix', [DocumentRequirementController::class, 'matrix'])->name('requirements.matrix');
+    });
+    Route::get('/documents/owners/{ownerType}/{ownerId}/completion', [DocumentRequirementController::class, 'completion'])->name('documents.owner.completion');
+    Route::get('/document-center/expiry-monitoring', [DocumentMonitoringController::class, 'expiryPage'])->name('document-center.expiry-page');
+    Route::get('/document-center/missing-required-documents', [DocumentMonitoringController::class, 'missingPage'])->name('document-center.missing-page');
+    Route::get('/document-center/expiring-soon', [DocumentMonitoringController::class, 'expiringSoon'])->name('document-center.expiring-soon');
+    Route::get('/document-center/missing-required', [DocumentMonitoringController::class, 'missingRequired'])->name('document-center.missing-required');
 
     // Backward-compatible aliases under /apps prefix (old/typo procurement URLs)
     Route::redirect('/procureme', '/apps/procurement/vendors', 301);
