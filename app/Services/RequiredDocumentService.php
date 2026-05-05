@@ -1,0 +1,4 @@
+<?php
+namespace App\Services;
+use App\Models\Document;use App\Models\DocumentType;
+class RequiredDocumentService { public function getRequiredTypesForOwner(string $ownerType){ return DocumentType::where('is_required',true)->where(function($q)use($ownerType){$q->whereNull('applicable_owner_types')->orWhereJsonContains('applicable_owner_types',$ownerType);})->get(); } public function getMissingDocuments(string $ownerType,int $ownerId){ return $this->getRequiredTypesForOwner($ownerType)->filter(fn($t)=>!Document::forOwner($ownerType,$ownerId)->where('document_type_id',$t->id)->active()->exists())->values(); } public function getCompletionPercentage(string $ownerType,int $ownerId){ $req=$this->getRequiredTypesForOwner($ownerType); if($req->count()===0)return 100; $missing=$this->getMissingDocuments($ownerType,$ownerId)->count(); return (int)round((($req->count()-$missing)/$req->count())*100); }}
