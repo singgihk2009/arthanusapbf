@@ -59,15 +59,19 @@ export default function DocumentsTab({ vendor, documentTypes = [] }) {
     if (!normalizedReason) return;
     if (normalizedReason.length < 5) return setNotice({ type: 'error', text: 'Alasan reject minimal 5 karakter.' });
 
+    setNotice({ type: 'info', text: 'Sedang memproses reject dokumen...' });
     router.post(route('apps.procurement.vendors.documents.reject', [vendor.id, docId]), { rejected_reason: normalizedReason }, {
       preserveScroll: true,
+      preserveState: false,
       onSuccess: () => {
         setNotice({ type: 'success', text: 'Document rejected successfully.' });
-        router.reload({ only: ['vendor'] });
       },
       onError: (errors) => {
         const firstError = Object.values(errors ?? {}).flat().find(Boolean);
         setNotice({ type: 'error', text: `Reject gagal${firstError ? `: ${firstError}` : '.'}` });
+      },
+      onFinish: () => {
+        router.reload({ only: ['vendor'] });
       },
     });
   };
