@@ -85,6 +85,11 @@ class PermissionTableSeeder extends Seeder
             'kek.report.view',
             'kek.report.export',
             'facility_document.manage',
+            'document.view',
+            'document.download',
+            'document.verify',
+            'document.reject',
+            'document.audit.view',
         ];
 
         foreach ($permissions as $permission) {
