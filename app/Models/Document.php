@@ -8,12 +8,13 @@ class Document extends Model
 {
     use SoftDeletes;
     protected $guarded = [];
-    protected $casts = ['issue_date'=>'date','expiry_date'=>'date','verified_at'=>'datetime','metadata'=>'array','is_current'=>'boolean'];
+    protected $casts = ['issue_date'=>'date','expiry_date'=>'date','verified_at'=>'datetime','rejected_at'=>'datetime','metadata'=>'array','is_current'=>'boolean'];
     public function category(){ return $this->belongsTo(DocumentCategory::class,'document_category_id'); }
     public function type(){ return $this->belongsTo(DocumentType::class,'document_type_id'); }
     public function documentType(){ return $this->belongsTo(DocumentType::class,'document_type_id'); }
     public function uploadedBy(){ return $this->belongsTo(User::class,'uploaded_by'); }
     public function verifiedBy(){ return $this->belongsTo(User::class,'verified_by'); }
+    public function rejectedBy(){ return $this->belongsTo(User::class,'rejected_by'); }
     public function auditLogs(){ return $this->hasMany(DocumentAuditLog::class); }
 
     public function parent(){ return $this->belongsTo(Document::class,'parent_document_id'); }

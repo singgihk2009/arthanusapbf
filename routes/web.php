@@ -211,6 +211,13 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     Route::post('/document-center/documents/{document}/revision', [DocumentCenterDocumentController::class, 'revision'])->name('document-center.documents.revision');
     Route::post('/document-center/documents/{document}/renewal', [DocumentCenterDocumentController::class, 'renewal'])->name('document-center.documents.renewal');
     Route::get('/document-center/documents/{document}/versions', [DocumentCenterDocumentController::class, 'versions'])->name('document-center.documents.versions');
+    Route::get('/document-center/documents/pending-review', [DocumentCenterDocumentController::class, 'pendingReviewPage'])->name('document-center.documents.pending-review.page');
+    Route::get('/document-center/documents/pending-review/list', [DocumentCenterDocumentController::class, 'pendingReviewList'])->name('document-center.documents.pending-review.list');
+    Route::get('/document-center/documents/{document}', [DocumentCenterDocumentController::class, 'show'])->name('document-center.documents.show');
+    Route::get('/document-center/documents/{document}/download', [DocumentCenterDocumentController::class, 'download'])->name('document-center.documents.download');
+    Route::get('/document-center/documents/{document}/audit-logs', [DocumentCenterDocumentController::class, 'auditLogs'])->name('document-center.documents.audit-logs');
+    Route::post('/document-center/documents/{document}/verify', [DocumentCenterDocumentController::class, 'verify'])->name('document-center.documents.verify');
+    Route::post('/document-center/documents/{document}/reject', [DocumentCenterDocumentController::class, 'reject'])->name('document-center.documents.reject');
 
     // Backward-compatible aliases under /apps prefix (old/typo procurement URLs)
     Route::redirect('/procureme', '/apps/procurement/vendors', 301);
