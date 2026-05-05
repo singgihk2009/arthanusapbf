@@ -35,6 +35,7 @@ use App\Http\Controllers\Apps\Procurement\VendorDocumentRequirementController;
 use App\Http\Controllers\Apps\Procurement\VendorContactController;
 use App\Http\Controllers\Apps\DocumentRequirementController;
 use App\Http\Controllers\Apps\DocumentMonitoringController;
+use App\Http\Controllers\Apps\DocumentCenterDocumentController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -206,6 +207,10 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     Route::get('/document-center/missing-required-documents', [DocumentMonitoringController::class, 'missingPage'])->name('document-center.missing-page');
     Route::get('/document-center/expiring-soon', [DocumentMonitoringController::class, 'expiringSoon'])->name('document-center.expiring-soon');
     Route::get('/document-center/missing-required', [DocumentMonitoringController::class, 'missingRequired'])->name('document-center.missing-required');
+    Route::post('/document-center/documents', [DocumentCenterDocumentController::class, 'store'])->name('document-center.documents.store');
+    Route::post('/document-center/documents/{document}/revision', [DocumentCenterDocumentController::class, 'revision'])->name('document-center.documents.revision');
+    Route::post('/document-center/documents/{document}/renewal', [DocumentCenterDocumentController::class, 'renewal'])->name('document-center.documents.renewal');
+    Route::get('/document-center/documents/{document}/versions', [DocumentCenterDocumentController::class, 'versions'])->name('document-center.documents.versions');
 
     // Backward-compatible aliases under /apps prefix (old/typo procurement URLs)
     Route::redirect('/procureme', '/apps/procurement/vendors', 301);
