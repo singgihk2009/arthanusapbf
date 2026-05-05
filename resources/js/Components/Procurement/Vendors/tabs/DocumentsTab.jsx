@@ -45,6 +45,18 @@ export default function DocumentsTab({ vendor, documentTypes = [] }) {
     submitUpload({ document_type_id: customForm.document_type_id, document_number: customForm.document_number || null, issue_date: customForm.issue_date || null, expiry_date: customForm.expiry_date || null }, customFileInput.current);
   };
 
+  const statusBadge = (status) => {
+    const map = {
+      draft: 'bg-gray-100 text-gray-700',
+      pending_review: 'bg-yellow-100 text-yellow-800',
+      verified: 'bg-green-100 text-green-700',
+      rejected: 'bg-red-100 text-red-700',
+      expired: 'bg-orange-100 text-orange-700',
+      archived: 'bg-gray-300 text-gray-800',
+    };
+    return map[status] || 'bg-gray-100 text-gray-600';
+  };
+
   return <div className='space-y-5'>
     {completion && <div className='rounded border bg-blue-50 p-3 text-sm'>
       <div className='font-semibold'>Completion: {completion.completion_percentage ?? 0}%</div>
@@ -69,7 +81,7 @@ export default function DocumentsTab({ vendor, documentTypes = [] }) {
 
     <div className='overflow-auto rounded border p-3'>
       <table className='min-w-full text-sm border'><thead><tr className='bg-gray-100'><th className='px-3 py-2 border text-left' colSpan={6}>Daftar Dokumen Vendor</th></tr></thead>
-        <tbody>{docs.length ? docs.map((d) => <tr key={d.id}><td className='border px-3 py-2'>{documentTypeLabel(d)}</td><td className='border px-3 py-2'>{d.document_number || '-'}</td><td className='border px-3 py-2'>{d.issue_date || '-'}</td><td className='border px-3 py-2'>{d.expiry_date || '-'}</td><td className='border px-3 py-2'>{d.status || 'pending'}</td><td className='border px-3 py-2'><a href={route('apps.procurement.vendors.documents.download', [vendor.id, d.id])} target='_blank' className='rounded border border-gray-300 px-2 py-1 text-xs'>View</a></td></tr>) : <tr><td className='border px-2 py-3 text-center text-gray-500' colSpan={6}>Belum ada dokumen tersimpan.</td></tr>}</tbody>
+        <tbody>{docs.length ? docs.map((d) => <tr key={d.id}><td className='border px-3 py-2'>{documentTypeLabel(d)}</td><td className='border px-3 py-2'>{d.document_number || '-'}</td><td className='border px-3 py-2'>{d.issue_date || '-'}</td><td className='border px-3 py-2'>{d.expiry_date || '-'}</td><td className='border px-3 py-2'><span className={`inline-flex rounded px-2 py-1 text-xs font-medium ${statusBadge(d.status)}`}>{d.status || 'draft'}</span></td><td className='border px-3 py-2'><a href={route('apps.procurement.vendors.documents.download', [vendor.id, d.id])} target='_blank' className='rounded border border-gray-300 px-2 py-1 text-xs'>View</a></td></tr>) : <tr><td className='border px-2 py-3 text-center text-gray-500' colSpan={6}>Belum ada dokumen tersimpan.</td></tr>}</tbody>
       </table>
     </div>
   </div>;

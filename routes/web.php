@@ -233,6 +233,10 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::post('/vendors/{vendor}/documents', [VendorController::class, 'uploadDocument'])->name('vendors.documents.upload');
         Route::delete('/vendors/{vendor}/documents/{document}', [VendorController::class, 'deleteDocument'])->name('vendors.documents.delete');
         Route::post('/vendors/{vendor}/documents/{document}/verify', [VendorController::class, 'verifyDocument'])->name('vendors.documents.verify');
+        Route::post('/vendors/{vendor}/documents/{document}/submit', [VendorController::class, 'submitDocument'])->name('vendors.documents.submit');
+        Route::post('/vendors/{vendor}/documents/{document}/reject', [VendorController::class, 'rejectDocument'])->name('vendors.documents.reject');
+        Route::post('/vendors/{vendor}/documents/{document}/archive', [VendorController::class, 'archiveDocument'])->name('vendors.documents.archive');
+        Route::post('/vendors/{vendor}/documents/{document}/restore', [VendorController::class, 'restoreDocument'])->name('vendors.documents.restore');
         Route::get('/vendors/{vendor}/documents/{document}/download', [VendorController::class, 'downloadDocument'])->name('vendors.documents.download');
         Route::get('/vendors/{vendor}/overview', [VendorController::class, 'overview'])->name('vendors.overview');
         Route::get('/vendors/{vendor}/profile', [VendorController::class, 'profile'])->name('vendors.profile');
