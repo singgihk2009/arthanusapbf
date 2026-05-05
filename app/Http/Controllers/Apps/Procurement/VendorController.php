@@ -234,7 +234,13 @@ class VendorController extends Controller
             $docType = DocumentType::firstOrCreate(['code' => strtoupper($data['document_type'])], ['name' => strtoupper($data['document_type'])]);
             $docTypeId = $docType->id;
         }
-        Document::updateOrCreate(['owner_type' => 'vendor', 'owner_id' => $vendor->id, 'document_type_id' => $docTypeId], ['file_path' => $path, 'original_file_name' => $request->file('file')->getClientOriginalName(), 'mime_type' => $request->file('file')->getClientMimeType(), 'file_size' => $request->file('file')->getSize(), 'document_number' => $data['document_number'] ?? null, 'issue_date' => $data['issue_date'] ?? null, 'expiry_date' => $data['expiry_date'] ?? null, 'uploaded_by' => auth()->id()]);
+        $originalFileName = $request->file('file')->getClientOriginalName();
+        $docTypeName = !empty($data['document_type'])
+            ? strtoupper($data['document_type'])
+            : ($docTypeId ? DocumentType::query()->whereKey($docTypeId)->value('name') : null);
+        $title = $docTypeName ?: pathinfo($originalFileName, PATHINFO_FILENAME);
+
+        Document::updateOrCreate(['owner_type' => 'vendor', 'owner_id' => $vendor->id, 'document_type_id' => $docTypeId], ['title' => $title, 'file_path' => $path, 'original_file_name' => $originalFileName, 'mime_type' => $request->file('file')->getClientMimeType(), 'file_size' => $request->file('file')->getSize(), 'document_number' => $data['document_number'] ?? null, 'issue_date' => $data['issue_date'] ?? null, 'expiry_date' => $data['expiry_date'] ?? null, 'uploaded_by' => auth()->id()]);
         return back();
     }
 
