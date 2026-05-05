@@ -11,6 +11,7 @@ class Document extends Model
     protected $casts = ['issue_date'=>'date','expiry_date'=>'date','verified_at'=>'datetime','metadata'=>'array'];
     public function category(){ return $this->belongsTo(DocumentCategory::class,'document_category_id'); }
     public function type(){ return $this->belongsTo(DocumentType::class,'document_type_id'); }
+    public function documentType(){ return $this->belongsTo(DocumentType::class,'document_type_id'); }
     public function uploadedBy(){ return $this->belongsTo(User::class,'uploaded_by'); }
     public function verifiedBy(){ return $this->belongsTo(User::class,'verified_by'); }
     public function auditLogs(){ return $this->hasMany(DocumentAuditLog::class); }
