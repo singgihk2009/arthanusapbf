@@ -54,8 +54,26 @@ export default function DocumentsTab({ vendor, documentTypes = [] }) {
 
   const doReject = (docId) => {
     const reason = prompt('Masukkan alasan reject (minimal 5 karakter)');
-    if (!reason || reason.length < 5) return setNotice({ type: 'error', text: 'Alasan reject minimal 5 karakter.' });
-    router.post(route('apps.procurement.vendors.documents.reject', [vendor.id, docId]), { rejected_reason: reason }, { preserveScroll: true, onSuccess: () => { setNotice({ type: 'success', text: 'Document rejected successfully.' }); router.reload({ only: ['vendor'] }); } });
+    const normalizedReason = reason?.trim();
+
+    if (!normalizedReason) return;
+    if (normalizedReason.length < 5) return setNotice({ type: 'error', text: 'Alasan reject minimal 5 karakter.' });
+
+    setNotice({ type: 'info', text: 'Sedang memproses reject dokumen...' });
+    router.post(route('apps.procurement.vendors.documents.reject', [vendor.id, docId]), { rejected_reason: normalizedReason }, {
+      preserveScroll: true,
+      preserveState: false,
+      onSuccess: () => {
+        setNotice({ type: 'success', text: 'Document rejected successfully.' });
+      },
+      onError: (errors) => {
+        const firstError = Object.values(errors ?? {}).flat().find(Boolean);
+        setNotice({ type: 'error', text: `Reject gagal${firstError ? `: ${firstError}` : '.'}` });
+      },
+      onFinish: () => {
+        router.reload({ only: ['vendor'] });
+      },
+    });
   };
 
   const statusBadge = (status) => {
@@ -93,7 +111,7 @@ export default function DocumentsTab({ vendor, documentTypes = [] }) {
     </div>
 
     <div className='overflow-auto rounded border p-3'>
-      <table className='min-w-full text-sm border'><thead><tr className='bg-gray-100'><th className='px-3 py-2 border text-left' colSpan={8}>Daftar Dokumen Vendor</th></tr></thead>
+      <table className='min-w-full text-sm border'><thead><tr className='bg-gray-100'><th className='px-3 py-2 border text-left' colSpan={8}>Daftar Dokumen Vendor</th></tr><tr className='bg-gray-50'><th className='border px-3 py-2 text-left font-medium'>Document Type</th><th className='border px-3 py-2 text-left font-medium'>Document Number</th><th className='border px-3 py-2 text-left font-medium'>Issue Date</th><th className='border px-3 py-2 text-left font-medium'>Expiry Date</th><th className='border px-3 py-2 text-left font-medium'>Status</th><th className='border px-3 py-2 text-left font-medium'>Reject Reason</th><th className='border px-3 py-2 text-left font-medium'>File</th><th className='border px-3 py-2 text-left font-medium'>Action</th></tr></thead>
         <tbody>{docs.length ? docs.map((d) => <tr key={d.id}><td className='border px-3 py-2'>{documentTypeLabel(d)}</td><td className='border px-3 py-2'>{d.document_number || '-'}</td><td className='border px-3 py-2'>{formatDate(d.issue_date)}</td><td className='border px-3 py-2'>{formatDate(d.expiry_date)}</td><td className='border px-3 py-2'><span className={`inline-flex rounded px-2 py-1 text-xs font-medium ${statusBadge(d.status)}`}>{d.status || 'draft'}</span></td><td className='border px-3 py-2'>{d.rejected_reason ? <span className='text-xs text-red-700'>{d.rejected_reason}</span> : '-'}</td><td className='border px-3 py-2'><a href={route('apps.procurement.vendors.documents.download', [vendor.id, d.id])} target='_blank' className='rounded border border-gray-300 px-2 py-1 text-xs'>View</a></td><td className='border px-3 py-2 space-x-2'>{d.status === 'pending_review' && <><button type='button' onClick={() => doVerify(d.id)} className='rounded border border-green-300 px-2 py-1 text-xs text-green-700'>Accept</button><button type='button' onClick={() => doReject(d.id)} className='rounded border border-red-300 px-2 py-1 text-xs text-red-700'>Reject</button></>}</td></tr>) : <tr><td className='border px-2 py-3 text-center text-gray-500' colSpan={8}>Belum ada dokumen tersimpan.</td></tr>}</tbody>
       </table>
     </div>
