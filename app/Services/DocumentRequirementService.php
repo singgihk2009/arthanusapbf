@@ -108,7 +108,7 @@ class DocumentRequirementService
             ->where('owner_type', $ownerType)
             ->where('owner_id', $ownerId)
             ->where('document_type_id', $requirement->document_type_id)
-            ->where('status', 'verified');
+            ->where('is_current', true)->where('status', 'verified');
 
         if ($requirement->is_expirable) {
             $query->whereNotNull('expiry_date')
