@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 
 class DocumentRequirementService
 {
-    private const VALID_STATUSES = ['uploaded', 'pending_review', 'verified'];
+    private const VALID_STATUSES = ['verified'];
 
     public function getRequirementsForOwnerType(string $ownerType, ?int $businessId = null): Collection
     {
@@ -66,7 +66,7 @@ class DocumentRequirementService
         return Document::query()
             ->with('documentType')
             ->when($ownerType, fn ($q) => $q->where('owner_type', $ownerType))
-            ->whereIn('status', self::VALID_STATUSES)
+            ->where('status', 'verified')
             ->whereNotNull('expiry_date')
             ->get()
             ->filter(function (Document $document) use ($today, $days) {
@@ -108,12 +108,11 @@ class DocumentRequirementService
             ->where('owner_type', $ownerType)
             ->where('owner_id', $ownerId)
             ->where('document_type_id', $requirement->document_type_id)
-            ->whereIn('status', self::VALID_STATUSES);
+            ->where('status', 'verified');
 
         if ($requirement->is_expirable) {
-            $query->where(function ($q) {
-                $q->whereNull('expiry_date')->orWhereDate('expiry_date', '>=', now()->toDateString());
-            });
+            $query->whereNotNull('expiry_date')
+                ->whereDate('expiry_date', '>=', now()->toDateString());
         }
 
         return $query->exists();
