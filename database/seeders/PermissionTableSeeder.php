@@ -75,6 +75,16 @@ class PermissionTableSeeder extends Seeder
             'integration-access',
             'integration-outbox-read',
             'integration-outbox-retry',
+
+            // industry module permissions
+            'modules.manage',
+            'pbf.view',
+            'pbf.manage',
+            'kek.view',
+            'kek.manage',
+            'kek.report.view',
+            'kek.report.export',
+            'facility_document.manage',
         ];
 
         foreach ($permissions as $permission) {

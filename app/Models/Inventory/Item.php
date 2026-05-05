@@ -18,6 +18,13 @@ class Item extends Model
         'sku',
         'name',
         'nie',
+        'product_type',
+        'regulatory_category',
+        'regulatory_source_id',
+        'regulatory_product_id',
+        'is_batch_tracked',
+        'is_expiry_tracked',
+        'requires_fefo',
         'category_id',
         'base_uom_id',
         'default_barcode',
@@ -43,6 +50,9 @@ class Item extends Model
             'is_active' => 'bool',
             'requires_batch_tracking' => 'bool',
             'requires_expiry_tracking' => 'bool',
+            'is_batch_tracked' => 'bool',
+            'is_expiry_tracked' => 'bool',
+            'requires_fefo' => 'bool',
         ];
     }
 
