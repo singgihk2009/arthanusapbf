@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Apps\Procurement;
 
 use App\Http\Controllers\Controller;
 use App\Models\Inventory\StockMovement;
+use App\Services\Procurement\FacilityInheritanceService;
 use App\Models\Procurement\GoodsReceipt;
 use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\PurchaseOrderItem;
@@ -15,6 +16,9 @@ use Inertia\Response;
 
 class GoodsReceiptController extends Controller
 {
+    public function __construct(private readonly FacilityInheritanceService $facilityInheritanceService)
+    {
+    }
     public function index(Request $request): Response
     {
         $query = GoodsReceipt::with(['purchaseOrder:id,po_number', 'vendor:id,name'])
@@ -75,15 +79,19 @@ class GoodsReceiptController extends Controller
             $receive = (float)($item['received_qty'] ?? 0);
             if ($receive <= 0) continue;
             abort_if($receive > $remaining, 422, 'Qty receive melebihi remaining qty.');
+            $product = $poi->product()->first();
+            if (($product?->is_expiry_tracked || $product?->requires_expiry_tracking) && empty($item['expired_date'])) abort(422, 'Expiry date wajib untuk produk expiry tracked.');
+            if (($product?->is_batch_tracked || $product?->requires_batch_tracking) && empty($item['batch_number'])) abort(422, 'Batch number wajib untuk produk batch tracked.');
+
             $stored++;
-            $gr->items()->create([
+            $gr->items()->create(array_merge([
                 'purchase_order_item_id' => $poi->id, 'product_id' => $poi->product_id, 'warehouse_id' => $item['warehouse_id'] ?? ($data['warehouse_id'] ?? null),
                 'ordered_qty' => $poi->qty_ordered, 'previously_received_qty' => $poi->received_qty, 'received_qty' => $receive,
                 'remaining_qty' => $remaining - $receive, 'uom_id' => $poi->uom_id, 'po_unit_price' => $poi->unit_price,
                 'inventory_unit_cost' => $poi->unit_price, 'inventory_total_cost' => $receive * (float)$poi->unit_price,
                 'batch_number' => $item['batch_number'] ?? null, 'expired_date' => $item['expired_date'] ?? null,
                 'condition_status' => $item['condition_status'] ?? 'good', 'notes' => $item['notes'] ?? null,
-            ]);
+            ], $this->facilityInheritanceService->mapFromPoLine($poi)));
         }
         abort_if($stored === 0, 422, 'Minimal 1 item dengan qty > 0.');
         return redirect()->route('apps.procurement.goods-receipts.show', $gr->id)->with('success', 'Draft GR tersimpan.');
@@ -112,7 +120,9 @@ class GoodsReceiptController extends Controller
                 StockMovement::create(['business_id' => $gr->business_id ?? 1, 'product_id' => $item->product_id, 'warehouse_id' => $item->warehouse_id ?? $gr->warehouse_id,
                     'reference_type' => 'goods_receipt', 'reference_id' => $gr->id, 'reference_item_id' => $item->id, 'movement_date' => $gr->received_date,
                     'direction' => 'in', 'qty' => $item->received_qty, 'unit_cost' => $item->po_unit_price, 'total_cost' => $item->received_qty * $item->po_unit_price,
-                    'batch_number' => $item->batch_number, 'expired_date' => $item->expired_date, 'notes' => $item->notes, 'created_by' => auth()->id()]);
+                    'batch_number' => $item->batch_number, 'expired_date' => $item->expired_date, 'notes' => $item->notes, 'created_by' => auth()->id(),
+                    'is_facility_item' => $item->is_facility_item, 'facility_type' => $item->facility_type, 'facility_document_id' => $item->facility_document_id,
+                    'facility_reference_no' => $item->facility_reference_no, 'kek_classification' => $item->kek_classification, 'facility_status' => 'active', 'facility_notes' => $item->notes]);
             }
             $gr->update(['status' => 'posted', 'posted_at' => now()]);
             $po = PurchaseOrder::with('items')->findOrFail($gr->purchase_order_id);
