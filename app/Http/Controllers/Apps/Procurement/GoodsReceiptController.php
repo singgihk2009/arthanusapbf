@@ -57,18 +57,38 @@ class GoodsReceiptController extends Controller
                 'suggested_received_qty' => $i->remaining_qty ?? ($i->qty_ordered - $i->received_qty),
             ]);
 
-        return Inertia::render('Apps/Procurement/GoodsReceipts/CreateFromPO', ['purchaseOrder' => $purchaseOrder, 'items' => $items]);
+        $warehouses = DB::table('warehouses')
+            ->select(['id', 'code', 'name'])
+            ->orderBy('name')
+            ->get();
+
+        return Inertia::render('Apps/Procurement/GoodsReceipts/CreateFromPO', [
+            'purchaseOrder' => $purchaseOrder,
+            'items' => $items,
+            'warehouses' => $warehouses,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate(['purchase_order_id' => 'required|exists:purchase_orders,id', 'received_date' => 'required|date', 'warehouse_id' => 'nullable|integer', 'notes' => 'nullable|string', 'items' => 'required|array|min:1']);
+        $data = $request->validate([
+            'purchase_order_id' => 'required|exists:purchase_orders,id',
+            'received_date' => 'required|date',
+            'warehouse_id' => 'required|integer|exists:warehouses,id',
+            'notes' => 'nullable|string',
+            'items' => 'required|array|min:1',
+            'items.*.warehouse_id' => 'nullable|integer|exists:warehouses,id',
+        ]);
         $po = PurchaseOrder::with('items')->findOrFail($data['purchase_order_id']);
         abort_if(in_array($po->status, ['cancelled', 'closed', 'fully_received']), 422, 'PO sudah ditutup/dibatalkan.');
 
+        $grNumber = $this->nextNumber();
+
         $gr = GoodsReceipt::create([
-            'business_id' => 1, 'purchase_order_id' => $po->id, 'vendor_id' => $po->vendor_id, 'warehouse_id' => $data['warehouse_id'] ?? null,
-            'gr_number' => $this->nextNumber(), 'received_date' => $data['received_date'], 'status' => 'draft', 'notes' => $data['notes'] ?? null, 'created_by' => $request->user()?->id,
+            'business_id' => 1, 'purchase_order_id' => $po->id, 'vendor_id' => $po->vendor_id, 'warehouse_id' => $data['warehouse_id'],
+            'number' => $grNumber, 'gr_number' => $grNumber, 'received_date' => $data['received_date'],
+            'document_date' => $data['received_date'],
+            'status' => 'draft', 'notes' => $data['notes'] ?? null, 'created_by' => $request->user()?->id,
         ]);
 
         $stored = 0;
@@ -85,7 +105,7 @@ class GoodsReceiptController extends Controller
 
             $stored++;
             $gr->items()->create(array_merge([
-                'purchase_order_item_id' => $poi->id, 'product_id' => $poi->product_id, 'warehouse_id' => $item['warehouse_id'] ?? ($data['warehouse_id'] ?? null),
+                'purchase_order_item_id' => $poi->id, 'product_id' => $poi->product_id, 'warehouse_id' => $item['warehouse_id'] ?? $data['warehouse_id'],
                 'ordered_qty' => $poi->qty_ordered, 'previously_received_qty' => $poi->received_qty, 'received_qty' => $receive,
                 'remaining_qty' => $remaining - $receive, 'uom_id' => $poi->uom_id, 'po_unit_price' => $poi->unit_price,
                 'inventory_unit_cost' => $poi->unit_price, 'inventory_total_cost' => $receive * (float)$poi->unit_price,
@@ -146,7 +166,17 @@ class GoodsReceiptController extends Controller
     private function nextNumber(): string
     {
         $prefix = 'GR-'.now()->format('Ym').'-';
-        $last = GoodsReceipt::where('gr_number', 'like', $prefix.'%')->orderByDesc('gr_number')->value('gr_number');
+        $last = GoodsReceipt::query()
+            ->where(function ($query) use ($prefix) {
+                $query->where('number', 'like', $prefix.'%')
+                    ->orWhere('gr_number', 'like', $prefix.'%');
+            })
+            ->orderByDesc('number')
+            ->orderByDesc('gr_number')
+            ->value('number');
+        if (! $last) {
+            $last = GoodsReceipt::where('gr_number', 'like', $prefix.'%')->orderByDesc('gr_number')->value('gr_number');
+        }
         $seq = $last ? ((int) substr($last, -4)) + 1 : 1;
         return $prefix.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
     }
