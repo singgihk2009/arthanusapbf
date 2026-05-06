@@ -2,8 +2,9 @@ import AppLayout from '@/Layouts/AppLayout';
 import Button from '@/Components/Button';
 import Pagination from '@/Components/Pagination';
 import Table from '@/Components/Table';
-import { Head, Link, router } from '@inertiajs/react';
-import { IconCirclePlus, IconDatabaseOff, IconRefresh } from '@tabler/icons-react';
+import PurchaseOrderTable from '@/Components/Procurement/PurchaseOrders/PurchaseOrderTable';
+import { Head, router } from '@inertiajs/react';
+import { IconCirclePlus, IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 
 export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
@@ -31,11 +32,6 @@ export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
         await Promise.all(selectedDraftIds.map((id) => window.axios.post(route('apps.procurement.purchase-orders.approve', id))));
         setSelectedDraftIds([]);
         router.reload({ only: ['purchaseOrders'] });
-    };
-
-    const handleDeleteDraft = (id) => {
-        if (!window.confirm('Hapus PO draft ini?')) return;
-        router.delete(route('apps.procurement.purchase-orders.destroy', id));
     };
 
     return (
@@ -73,54 +69,7 @@ export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
             </div>
 
             <Table.Card title='Data Purchase Order'>
-                <Table>
-                    <Table.Thead>
-                        <tr>
-                            <Table.Th>Approve</Table.Th><Table.Th>PO Number</Table.Th><Table.Th>Vendor</Table.Th><Table.Th>PO Date</Table.Th><Table.Th>Expected Date</Table.Th><Table.Th>Grand Total</Table.Th><Table.Th>Status</Table.Th><Table.Th>Action</Table.Th>
-                        </tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                        {purchaseOrders.data.length ? purchaseOrders.data.map((po) => {
-                            const poStatus = String(po.status ?? '').toLowerCase();
-                            const isDraft = poStatus === 'draft';
-
-                            return (
-                            <tr key={po.id} className='hover:bg-gray-100 dark:hover:bg-gray-900'>
-                                <Table.Td>
-                                    {isDraft ? (
-                                        <input type='checkbox' checked={selectedDraftIds.includes(po.id)} onChange={() => toggleDraftSelection(po.id)} />
-                                    ) : '-'}
-                                </Table.Td>
-                                <Table.Td>{po.po_number ?? '-'}</Table.Td>
-                                <Table.Td>{po.vendor_id ? <Link href={`/apps/procurement/vendors/${po.vendor_id}?tab=overview`} className='text-indigo-600 hover:underline'>{po.vendor?.name ?? '-'}</Link> : (po.vendor?.name ?? '-')}</Table.Td>
-                                <Table.Td>{po.po_date ?? '-'}</Table.Td>
-                                <Table.Td>{po.expected_delivery_date ?? '-'}</Table.Td>
-                                <Table.Td>{Number(po.grand_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Table.Td>
-                                <Table.Td><span className='rounded-full bg-gray-100 px-2 py-1 text-xs dark:bg-gray-800'>{po.status}</span></Table.Td>
-                                <Table.Td>
-                                    <div className='flex flex-wrap gap-2'>
-                                        <Link className='rounded-lg border border-indigo-500 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50' href={route('apps.procurement.purchase-orders.show', po.id)}>Detail</Link>
-                                        {isDraft && (
-                                            <>
-                                                <Link className='rounded-lg border border-amber-500 px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50' href={route('apps.procurement.purchase-orders.edit', po.id)}>Edit</Link>
-                                                <button type='button' onClick={() => handleDeleteDraft(po.id)} className='rounded-lg border border-rose-500 px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50'>Delete</button>
-                                            </>
-                                        )}
-                                        {poStatus === 'approved' && (
-                                            <Link
-                                                className='rounded-lg border border-emerald-500 px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50'
-                                                href={route('apps.procurement.goods-receipts.create-from-po', po.id)}
-                                            >
-                                                Create Goods Receiving
-                                            </Link>
-                                        )}
-                                    </div>
-                                </Table.Td>
-                            </tr>
-                            );
-                        }) : <Table.Empty colSpan={8} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>Data purchase order tidak ditemukan.</span></>} />}
-                    </Table.Tbody>
-                </Table>
+                <PurchaseOrderTable purchaseOrders={purchaseOrders} showVendor={true} selectedDraftIds={selectedDraftIds} onToggleDraftSelection={toggleDraftSelection} emptyMessage='Data purchase order tidak ditemukan.' />
             </Table.Card>
 
             {purchaseOrders.last_page !== 1 && <Pagination links={purchaseOrders.links} />}

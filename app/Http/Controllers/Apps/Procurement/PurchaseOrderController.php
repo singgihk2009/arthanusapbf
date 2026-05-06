@@ -17,7 +17,7 @@ class PurchaseOrderController extends Controller
 {
     public function index(Request $request)
     {
-        $query = PurchaseOrder::with('vendor:id,name')->latest();
+        $query = PurchaseOrder::with('vendor:id,name')->latest('document_date');
         if ($request->filled('status')) $query->where('status', $request->string('status'));
         if ($request->filled('search')) {
             $search = $request->string('search');
