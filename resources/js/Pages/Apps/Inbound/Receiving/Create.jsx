@@ -24,6 +24,9 @@ export default function Create() {
         reference: prefill?.reference || '',
         vendor_name: prefill?.vendor_name || '',
         notes: '',
+        source_type: prefill?.source_type || null,
+        source_id: prefill?.source_id || null,
+        vendor_id: prefill?.vendor_id || null,
         lines: prefill?.lines?.length ? prefill.lines : [{ ...emptyLine }],
     });
     const [errors, setErrors] = useState({});
@@ -56,7 +59,7 @@ export default function Create() {
         });
     };
 
-    const addLine = () => setForm((prev) => ({ ...prev, lines: [...prev.lines, { ...emptyLine }] }));
+    const addLine = () => { if (form.source_type === 'purchase_order') return; setForm((prev) => ({ ...prev, lines: [...prev.lines, { ...emptyLine }] })); };
 
     const removeLine = (index) => {
         setForm((prev) => ({
@@ -163,25 +166,25 @@ export default function Create() {
                                         return (
                                             <tr key={index} className="text-gray-800 dark:text-gray-100">
                                                 <td className="p-2">
-                                                    <select value={line.item_id} onChange={(e) => updateLine(index, 'item_id', e.target.value)} className={`w-56 ${lineInputClassName}`}>
+                                                    <select disabled={form.source_type === 'purchase_order'} value={line.item_id} onChange={(e) => updateLine(index, 'item_id', e.target.value)} className={`w-56 ${lineInputClassName}`}>
                                                         <option value="">Pilih Item</option>
                                                         {items.map((item) => <option key={item.id} value={item.id}>{item.sku} - {item.name}</option>)}
                                                     </select>
                                                     {errors[`lines.${index}.item_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.item_id`][0]}</p>}
                                                 </td>
                                                 <td className="p-2">
-                                                    <input type="number" min="0" step="0.000001" value={line.qty} onChange={(e) => updateLine(index, 'qty', e.target.value)} className={`w-28 ${lineInputClassName}`} />
+                                                    <input type="number" min="0" max={line.max_qty || undefined} step="0.000001" value={line.qty} onChange={(e) => updateLine(index, 'qty', e.target.value)} className={`w-28 ${lineInputClassName}`} />
                                                     {errors[`lines.${index}.qty`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.qty`][0]}</p>}
                                                 </td>
                                                 <td className="p-2">
-                                                    <select value={line.uom_id} onChange={(e) => updateLine(index, 'uom_id', e.target.value)} className={`w-36 ${lineInputClassName}`}>
+                                                    <select disabled={form.source_type === 'purchase_order'} value={line.uom_id} onChange={(e) => updateLine(index, 'uom_id', e.target.value)} className={`w-36 ${lineInputClassName}`}>
                                                         <option value="">UOM</option>
                                                         {uoms.map((uom) => <option key={uom.id} value={uom.id}>{uom.code}</option>)}
                                                     </select>
                                                     {errors[`lines.${index}.uom_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.uom_id`][0]}</p>}
                                                 </td>
                                                 <td className="p-2">
-                                                    <input type="number" min="0" step="0.000001" value={line.price} onChange={(e) => updateLine(index, 'price', e.target.value)} className={`w-36 ${lineInputClassName}`} />
+                                                    <input readOnly={form.source_type === 'purchase_order'} type="number" min="0" step="0.000001" value={line.price} onChange={(e) => updateLine(index, 'price', e.target.value)} className={`w-36 ${lineInputClassName}`} />
                                                     {errors[`lines.${index}.price`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.price`][0]}</p>}
                                                 </td>
                                                 <td className="p-2 font-medium text-gray-900 dark:text-gray-100">{value.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -197,7 +200,7 @@ export default function Create() {
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                            <button type="button" onClick={addLine} className="rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:text-gray-100">+ Tambah Line</button>
+                            {form.source_type !== 'purchase_order' && <button type="button" onClick={addLine} className="rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:text-gray-100">+ Tambah Line</button>}
                             <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">Total Value: {totalValue.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </div>
 
