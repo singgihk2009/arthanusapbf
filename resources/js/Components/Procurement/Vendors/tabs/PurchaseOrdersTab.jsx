@@ -1,24 +1,9 @@
 import PurchaseOrderTable from '@/Components/Procurement/PurchaseOrders/PurchaseOrderTable';
 import { Link } from '@inertiajs/react';
-import { useState } from 'react';
 
 export default function PurchaseOrdersTab({ data, vendor, onRefresh }) {
     const purchaseOrders = data?.purchase_orders ?? data?.purchase_orders?.data ?? [];
     const vendorTabUrl = `/apps/procurement/vendors/${vendor.id}?tab=purchase-orders`;
-    const [selectedDraftIds, setSelectedDraftIds] = useState([]);
-
-    const toggleDraftSelection = (id) => {
-        setSelectedDraftIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
-    };
-
-    const approveSelectedDrafts = async () => {
-        if (!selectedDraftIds.length) return;
-        if (!window.confirm(`Approve ${selectedDraftIds.length} PO draft terpilih?`)) return;
-
-        await Promise.all(selectedDraftIds.map((id) => window.axios.post(route('apps.procurement.purchase-orders.approve', id))));
-        setSelectedDraftIds([]);
-        onRefresh?.();
-    };
 
     return (
         <div className='space-y-3'>
@@ -32,9 +17,8 @@ export default function PurchaseOrdersTab({ data, vendor, onRefresh }) {
                 purchaseOrders={purchaseOrders}
                 showVendor={false}
                 compact={true}
-                selectedDraftIds={selectedDraftIds}
-                onToggleDraftSelection={toggleDraftSelection}
                 emptyMessage='Belum ada PO terkait vendor ini.'
+                onApproved={() => onRefresh?.()}
             />
         </div>
     );
