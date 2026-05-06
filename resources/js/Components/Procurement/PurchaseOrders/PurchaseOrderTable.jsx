@@ -22,6 +22,8 @@ const formatDate = (po) => po?.po_date ?? po?.document_date ?? '-';
 
 export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, compact = false, loading = false, emptyMessage = 'No purchase orders found', selectedDraftIds = [], onToggleDraftSelection = null }) {
     const rows = toRows(purchaseOrders);
+    const safeSelectedDraftIds = Array.isArray(selectedDraftIds) ? selectedDraftIds : [];
+    const handleToggleDraftSelection = typeof onToggleDraftSelection === 'function' ? onToggleDraftSelection : () => {};
 
     const handleDeleteDraft = (id) => {
         if (!window.confirm('Hapus PO draft ini?')) return;
@@ -53,7 +55,7 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
 
                     return (
                         <tr key={po.id} className='hover:bg-gray-100 dark:hover:bg-gray-900'>
-                            <Table.Td className={compact ? 'p-3 text-xs' : ''}>{isDraft ? <input type='checkbox' checked={selectedDraftIds.includes(po.id)} onChange={() => onToggleDraftSelection?.(po.id)} /> : '-'}</Table.Td>
+                            <Table.Td className={compact ? 'p-3 text-xs' : ''}>{isDraft ? <input type='checkbox' checked={safeSelectedDraftIds.includes(po.id)} onChange={() => handleToggleDraftSelection(po.id)} /> : '-'}</Table.Td>
                             <Table.Td className={compact ? 'p-3 text-xs' : ''}>{po.po_number ?? po.number ?? '-'}</Table.Td>
                             {showVendor && <Table.Td className={compact ? 'p-3 text-xs' : ''}>{po.vendor_id ? <Link href={`/apps/procurement/vendors/${po.vendor_id}?tab=overview`} className='text-indigo-600 hover:underline'>{vendorName}</Link> : vendorName}</Table.Td>}
                             <Table.Td className={compact ? 'p-3 text-xs' : ''}>{formatDate(po)}</Table.Td>
