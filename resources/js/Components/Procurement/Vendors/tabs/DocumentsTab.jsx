@@ -68,7 +68,7 @@ export default function DocumentsTab({ vendor, documentTypes = [] }) {
     if (normalizedReason.length < 5) return setNotice({ type: 'error', text: 'Alasan reject minimal 5 karakter.' });
 
     setNotice({ type: 'info', text: 'Sedang memproses reject dokumen...' });
-    router.post(route('procurement.vendors.documents.reject', [vendor.id, docId]), { rejected_reason: normalizedReason }, {
+    router.post(`/apps/procurement/vendors/${vendor.id}/documents/${docId}/reject`, { rejected_reason: normalizedReason }, {
       preserveScroll: true,
       onSuccess: () => {
         setNotice({ type: 'success', text: 'Document rejected successfully.' });
