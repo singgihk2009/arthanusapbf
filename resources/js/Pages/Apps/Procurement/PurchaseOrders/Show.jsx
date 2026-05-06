@@ -8,6 +8,8 @@ export default function Show({ purchaseOrder }) {
     const statusClass = { draft: 'bg-gray-100 text-gray-700', approved: 'bg-blue-100 text-blue-700', partially_received: 'bg-amber-100 text-amber-700', fully_received: 'bg-green-100 text-green-700', closed: 'bg-purple-100 text-purple-700', cancelled: 'bg-red-100 text-red-700' }[purchaseOrder.status] || 'bg-gray-100';
 
 
+    const canCreateGoodsReceiving = ['approved', 'partially_received'].includes(purchaseOrder.status) && (purchaseOrder.fulfillment_status === 'open' || purchaseOrder.fulfillment_status === 'partially_received');
+
     const handleBack = () => {
         if (window.history.length > 1) {
             window.history.back();
@@ -33,7 +35,7 @@ export default function Show({ purchaseOrder }) {
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass}`}>{purchaseOrder.status}</span>
                     {purchaseOrder.status === 'draft' && <button type='button' onClick={() => router.post(route('apps.procurement.purchase-orders.approve', purchaseOrder.id))} className='rounded-lg border border-blue-500 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50'>Approve</button>}
 
-                    {(purchaseOrder.fulfillment_status === 'open' || purchaseOrder.fulfillment_status === 'partially_received') && !['closed','cancelled'].includes(purchaseOrder.status) && (
+                    {canCreateGoodsReceiving && (
                         <button type='button' onClick={() => router.get(route('apps.procurement.goods-receipts.create-from-po', purchaseOrder.id))} className='rounded-lg border border-emerald-500 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50'>Create Goods Receiving</button>
                     )}
                     <button type='button' onClick={handleBack} className='rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50'>Back</button>
