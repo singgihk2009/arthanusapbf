@@ -254,8 +254,37 @@ class VendorController extends Controller
 
     public function deleteDocument(Vendor $vendor, Document $document){ if ($document->file_path) Storage::delete($document->file_path); $document->delete(); return back(); }
     public function submitDocument(Vendor $vendor, Document $document){ if ($document->status === 'draft') { $document->update(['status' => 'pending_review']); } return back(); }
-    public function verifyDocument(Request $request, Vendor $vendor, Document $document){ $request->validate(['notes' => ['nullable', 'string']]); if ($document->status === 'pending_review') { $document->update(['status' => 'verified', 'verified_by' => auth()->id(), 'verified_at' => now(), 'rejected_reason' => null, 'rejected_by' => null, 'rejected_at' => null, 'notes' => $request->notes]); } return back(); }
-    public function rejectDocument(Request $request, Vendor $vendor, Document $document){ $request->validate(['rejected_reason' => ['required', 'string', 'min:5']]); if ($document->status === 'pending_review') { $document->update(['status' => 'rejected', 'rejected_reason' => $request->rejected_reason, 'verified_by' => null, 'verified_at' => null, 'rejected_by' => auth()->id(), 'rejected_at' => now()]); } return back(); }
+    public function verifyDocument(Request $request, Vendor $vendor, Document $document){
+        $request->validate(['notes' => ['nullable', 'string']]);
+
+        if ((int) $document->owner_id !== (int) $vendor->id || $document->owner_type !== 'vendor') {
+            return back()->withErrors(['document' => 'Dokumen tidak terdaftar pada vendor ini.']);
+        }
+
+        if ($document->status !== 'pending_review') {
+            return back()->withErrors(['document' => 'Hanya dokumen dengan status pending review yang dapat di-accept.']);
+        }
+
+        $document->update(['status' => 'verified', 'verified_by' => auth()->id(), 'verified_at' => now(), 'rejected_reason' => null, 'rejected_by' => null, 'rejected_at' => null, 'notes' => $request->notes]);
+
+        return back();
+    }
+
+    public function rejectDocument(Request $request, Vendor $vendor, Document $document){
+        $request->validate(['rejected_reason' => ['required', 'string', 'min:5']]);
+
+        if ((int) $document->owner_id !== (int) $vendor->id || $document->owner_type !== 'vendor') {
+            return back()->withErrors(['document' => 'Dokumen tidak terdaftar pada vendor ini.']);
+        }
+
+        if ($document->status !== 'pending_review') {
+            return back()->withErrors(['document' => 'Hanya dokumen dengan status pending review yang dapat di-reject.']);
+        }
+
+        $document->update(['status' => 'rejected', 'rejected_reason' => $request->rejected_reason, 'verified_by' => null, 'verified_at' => null, 'rejected_by' => auth()->id(), 'rejected_at' => now()]);
+
+        return back();
+    }
     public function archiveDocument(Vendor $vendor, Document $document){ $document->update(['status' => 'archived']); return back(); }
     public function restoreDocument(Request $request, Vendor $vendor, Document $document){ if ($document->status === 'archived') { $document->update(['status' => $request->boolean('as_draft') ? 'draft' : 'pending_review']); } return back(); }
     public function downloadDocument(Vendor $vendor, Document $document){ return Storage::download($document->file_path, $document->original_file_name ?? 'document'); }
