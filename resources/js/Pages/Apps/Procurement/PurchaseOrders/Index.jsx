@@ -20,6 +20,19 @@ export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
         router.get(route('apps.procurement.purchase-orders.index'), {}, { preserveState: true, preserveScroll: true });
     };
 
+    const toggleDraftSelection = (id) => {
+        setSelectedDraftIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
+    };
+
+    const approveSelectedDrafts = async () => {
+        if (!selectedDraftIds.length) return;
+        if (!window.confirm(`Approve ${selectedDraftIds.length} PO draft terpilih?`)) return;
+
+        await Promise.all(selectedDraftIds.map((id) => window.axios.post(route('apps.procurement.purchase-orders.approve', id))));
+        setSelectedDraftIds([]);
+        router.reload({ only: ['purchaseOrders'] });
+    };
+
     return (
         <>
             <Head title='Purchase Orders' />
@@ -47,7 +60,7 @@ export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
             </div>
 
             <Table.Card title='Data Purchase Order'>
-                <PurchaseOrderTable purchaseOrders={purchaseOrders} showVendor={true} emptyMessage='Data purchase order tidak ditemukan.' />
+                <PurchaseOrderTable purchaseOrders={purchaseOrders} showVendor={true} selectedDraftIds={selectedDraftIds} onToggleDraftSelection={toggleDraftSelection} emptyMessage='Data purchase order tidak ditemukan.' />
             </Table.Card>
 
             {purchaseOrders.last_page !== 1 && <Pagination links={purchaseOrders.links} />}

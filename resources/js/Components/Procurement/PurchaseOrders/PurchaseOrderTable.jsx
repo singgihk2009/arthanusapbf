@@ -20,7 +20,7 @@ const toRows = (purchaseOrders) => {
 const formatCurrency = (value) => Number(value ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const formatDate = (po) => po?.po_date ?? po?.document_date ?? '-';
 
-export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, compact = false, loading = false, emptyMessage = 'No purchase orders found' }) {
+export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, compact = false, loading = false, emptyMessage = 'No purchase orders found', selectedDraftIds = [], onToggleDraftSelection = null }) {
     const rows = toRows(purchaseOrders);
 
     const handleDeleteDraft = (id) => {
@@ -32,6 +32,7 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
         <Table>
             <Table.Thead>
                 <tr>
+                    <Table.Th className={compact ? 'text-xs' : ''}>Approve</Table.Th>
                     <Table.Th className={compact ? 'text-xs' : ''}>PO Number</Table.Th>
                     {showVendor && <Table.Th className={compact ? 'text-xs' : ''}>Vendor</Table.Th>}
                     <Table.Th className={compact ? 'text-xs' : ''}>PO Date</Table.Th>
@@ -43,14 +44,16 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
             </Table.Thead>
             <Table.Tbody>
                 {loading ? (
-                    <tr><Table.Td colSpan={showVendor ? 7 : 6}>Loading...</Table.Td></tr>
+                    <tr><Table.Td colSpan={showVendor ? 8 : 7}>Loading...</Table.Td></tr>
                 ) : rows.length ? rows.map((po) => {
                     const status = String(po.status ?? '').toLowerCase();
                     const badgeClass = STATUS_STYLES[status] || STATUS_STYLES.draft;
                     const vendorName = po.vendor?.name ?? po.vendor_name ?? '-';
+                    const isDraft = status === 'draft';
 
                     return (
                         <tr key={po.id} className='hover:bg-gray-100 dark:hover:bg-gray-900'>
+                            <Table.Td className={compact ? 'p-3 text-xs' : ''}>{isDraft ? <input type='checkbox' checked={selectedDraftIds.includes(po.id)} onChange={() => onToggleDraftSelection?.(po.id)} /> : '-'}</Table.Td>
                             <Table.Td className={compact ? 'p-3 text-xs' : ''}>{po.po_number ?? po.number ?? '-'}</Table.Td>
                             {showVendor && <Table.Td className={compact ? 'p-3 text-xs' : ''}>{po.vendor_id ? <Link href={`/apps/procurement/vendors/${po.vendor_id}?tab=overview`} className='text-indigo-600 hover:underline'>{vendorName}</Link> : vendorName}</Table.Td>}
                             <Table.Td className={compact ? 'p-3 text-xs' : ''}>{formatDate(po)}</Table.Td>
@@ -67,7 +70,7 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
                             </Table.Td>
                         </tr>
                     );
-                }) : <Table.Empty colSpan={showVendor ? 7 : 6} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>{emptyMessage}</span></>} />}
+                }) : <Table.Empty colSpan={showVendor ? 8 : 7} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>{emptyMessage}</span></>} />}
             </Table.Tbody>
         </Table>
     );
