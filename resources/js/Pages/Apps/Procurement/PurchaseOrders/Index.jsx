@@ -9,7 +9,6 @@ import { useState } from 'react';
 
 export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
     const [form, setForm] = useState({ search: filters.search || '', status: filters.status || '' });
-    const [selectedDraftIds, setSelectedDraftIds] = useState([]);
 
     const applyFilter = (e) => {
         e.preventDefault();
@@ -57,14 +56,6 @@ export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
             </form>
 
             <div className='mb-5 flex items-center justify-end gap-2'>
-                <button
-                    type='button'
-                    onClick={approveSelectedDrafts}
-                    disabled={!selectedDraftIds.length}
-                    className='rounded-lg border border-blue-500 px-3 py-2 text-sm font-medium text-blue-600 enabled:hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50'
-                >
-                    Approve Selected ({selectedDraftIds.length})
-                </button>
                 <Button type='link' href={route('apps.procurement.purchase-orders.create')} icon={<IconCirclePlus size={20} strokeWidth={1.5} />} variant='gray' label='Create PO' />
             </div>
 
