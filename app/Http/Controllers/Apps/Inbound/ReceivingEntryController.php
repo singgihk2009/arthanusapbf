@@ -44,11 +44,20 @@ class ReceivingEntryController extends Controller
                 ->find($poId);
 
             if ($purchaseOrder) {
+                $poStatus = strtolower((string) ($purchaseOrder->status ?? ''));
+                $isFullyReceived = strtolower((string) ($purchaseOrder->fulfillment_status ?? '')) === 'fully_received' || $poStatus === 'fully_received';
+                abort_if(in_array($poStatus, ['cancelled', 'closed'], true) || $isFullyReceived, 422, 'PO tidak bisa direceiving lagi.');
+
                 $prefillLines = $purchaseOrder->items
-                    ->filter(fn ($line) => (float) ($line->remaining_qty ?? ($line->qty_ordered - $line->qty_received)) > 0)
+                    ->filter(fn ($line) => (float) ($line->remaining_qty ?? ($line->qty_ordered - ($line->received_qty ?? $line->qty_received ?? 0))) > 0)
                     ->map(fn ($line): array => [
+                        'source_item_id' => (string) $line->id,
                         'item_id' => (string) $line->product_id,
-                        'qty' => (string) ($line->remaining_qty ?? ($line->qty_ordered - $line->qty_received)),
+                        'ordered_qty' => (string) $line->qty_ordered,
+                        'previously_received_qty' => (string) ($line->received_qty ?? $line->qty_received ?? 0),
+                        'remaining_qty' => (string) ($line->remaining_qty ?? ($line->qty_ordered - ($line->received_qty ?? $line->qty_received ?? 0))),
+                        'max_qty' => (string) ($line->remaining_qty ?? ($line->qty_ordered - ($line->received_qty ?? $line->qty_received ?? 0))),
+                        'qty' => (string) ($line->remaining_qty ?? ($line->qty_ordered - ($line->received_qty ?? $line->qty_received ?? 0))),
                         'uom_id' => (string) ($line->uom_id ?? $line->product?->base_uom_id ?? ''),
                         'price' => (string) $line->unit_price,
                         'batch_number' => '',
@@ -57,10 +66,15 @@ class ReceivingEntryController extends Controller
                     ])
                     ->values();
 
+                abort_if($prefillLines->isEmpty(), 422, 'Semua item PO sudah diterima.');
+
                 $prefill = [
                     'transaction_code' => 'PEMBELIAN',
+                    'source_type' => 'purchase_order',
+                    'source_id' => (string) $purchaseOrder->id,
                     'reference' => (string) ($purchaseOrder->po_number ?? ''),
                     'vendor_name' => (string) ($purchaseOrder->vendor?->name ?? ''),
+                    'vendor_id' => $purchaseOrder->vendor_id,
                     'lines' => $prefillLines,
                 ];
             }
@@ -82,7 +96,7 @@ class ReceivingEntryController extends Controller
 
         DB::transaction(function () use ($validated, $userId): void {
             $entryId = $this->insertEntryHeader($validated, $userId);
-            $this->replaceEntryLines($entryId, $validated['lines']);
+            $this->replaceEntryLines($entryId, $validated['lines'], $validated);
         });
 
         if ($request->expectsJson()) {
@@ -147,6 +161,9 @@ class ReceivingEntryController extends Controller
                 'transaction_code' => $validated['transaction_code'],
                 'reference' => $validated['reference'] ?? null,
                 'vendor_name' => $validated['vendor_name'] ?? null,
+            'vendor_id' => $validated['vendor_id'] ?? null,
+            'source_type' => $validated['source_type'] ?? null,
+            'source_id' => $validated['source_id'] ?? null,
                 'notes' => $validated['notes'] ?? null,
                 'updated_at' => now(),
             ];
@@ -160,7 +177,7 @@ class ReceivingEntryController extends Controller
                 ->where('id', $receivingEntry)
                 ->update($this->filterColumns('receiving_entries', $headerPayload));
 
-            $this->replaceEntryLines($receivingEntry, $validated['lines']);
+            $this->replaceEntryLines($receivingEntry, $validated['lines'], $validated);
         });
 
         if ($request->expectsJson()) {
@@ -229,6 +246,9 @@ class ReceivingEntryController extends Controller
             'transaction_code' => $validated['transaction_code'],
             'reference' => $validated['reference'] ?? null,
             'vendor_name' => $validated['vendor_name'] ?? null,
+            'vendor_id' => $validated['vendor_id'] ?? null,
+            'source_type' => $validated['source_type'] ?? null,
+            'source_id' => $validated['source_id'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'total_value' => 0,
             'status' => 'DRAFT',
@@ -245,7 +265,7 @@ class ReceivingEntryController extends Controller
         return DB::table('receiving_entries')->insertGetId($this->filterColumns('receiving_entries', $entryPayload));
     }
 
-    private function replaceEntryLines(int $entryId, array $lines): void
+    private function replaceEntryLines(int $entryId, array $lines, array $header = []): void
     {
         $lineForeignKey = $this->resolveLineForeignKeyColumn();
         $batchColumn = $this->resolveBatchColumn();
@@ -253,18 +273,50 @@ class ReceivingEntryController extends Controller
         DB::table('receiving_entry_lines')->where($lineForeignKey, $entryId)->delete();
 
         $totalValue = 0;
+        $isPoSource = ($header['source_type'] ?? null) === 'purchase_order';
+        $poItemsById = collect();
+        if ($isPoSource) {
+            abort_unless(! empty($header['source_id']), 422, 'source_id wajib untuk receiving dari PO.');
+            $poItemsById = DB::table('purchase_order_items')->where('purchase_order_id', $header['source_id'])->get()->keyBy('id');
+        }
+
         foreach ($lines as $line) {
-            $qty = (float) $line['qty'];
-            $price = (float) $line['price'];
+            $sourceItemId = null;
+            $previouslyReceived = 0;
+            $remainingQty = null;
+
+            if ($isPoSource) {
+                $sourceItemId = (int) ($line['source_item_id'] ?? 0);
+                abort_if($sourceItemId <= 0, 422, 'source_item_id wajib untuk setiap item PO.');
+                $poItem = $poItemsById->get($sourceItemId);
+                abort_if(! $poItem, 422, 'Item PO tidak valid untuk source yang dipilih.');
+                abort_if((int) $line['item_id'] !== (int) $poItem->product_id, 422, 'Produk receiving harus sama dengan produk PO item.');
+
+                $orderedQty = (float) $poItem->qty_ordered;
+                $previouslyReceived = (float) ($poItem->received_qty ?? $poItem->qty_received ?? 0);
+                $remainingQty = max(0, $orderedQty - $previouslyReceived);
+                $qty = (float) $line['qty'];
+                abort_if($qty <= 0 || $qty > $remainingQty, 422, 'Qty receiving melebihi sisa qty PO.');
+                $price = (float) $poItem->unit_price;
+            } else {
+                $qty = (float) $line['qty'];
+                $price = (float) $line['price'];
+            }
+
             $value = round($qty * $price, 6);
             $totalValue += $value;
 
             $linePayload = [
                 $lineForeignKey => $entryId,
+                'source_item_id' => $sourceItemId,
                 'item_id' => $line['item_id'],
                 'uom_id' => $line['uom_id'],
                 'qty' => $qty,
                 'price' => $price,
+                'previously_received_qty' => $previouslyReceived,
+                'remaining_qty' => $remainingQty,
+                'inventory_unit_cost' => $price,
+                'inventory_total_cost' => $value,
                 'value' => $value,
                 $batchColumn => $line['batch_number'] ?? null,
                 'expired_date' => $line['expired_date'] ?? null,
