@@ -284,7 +284,6 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 $fulfillmentStatus = $allDone ? 'fully_received' : ($hasReceived ? 'partially_received' : 'open');
                 DB::table('purchase_orders')->where('id', $header->source_id)->update([
                     'fulfillment_status' => $fulfillmentStatus,
-                    'status' => $fulfillmentStatus,
                     'updated_at' => now(),
                 ]);
             }
