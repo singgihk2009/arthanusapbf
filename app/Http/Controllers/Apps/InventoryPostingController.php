@@ -212,7 +212,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
         DB::transaction(function () use ($receivingEntry, $lineForeignKey, $batchColumn, $request): void {
             $header = DB::table('receiving_entries')->where('id', $receivingEntry)->lockForUpdate()->first();
             abort_unless($header, 404, 'Receiving entry not found');
-            abort_if(($header->status ?? null) === 'POSTED', 422, 'Receiving sudah posted dan tidak bisa diposting ulang.');
+            abort_if(strtolower((string) ($header->status ?? '')) === 'posted', 422, 'Receiving sudah posted dan tidak bisa diposting ulang.');
 
             $warehouseId = $this->resolveWarehouseId($header);
             abort_if(! $warehouseId, 422, 'Warehouse receiving entry tidak valid.');
@@ -248,13 +248,15 @@ class InventoryPostingController extends Controller implements HasMiddleware
                     abort_if($sourceItemId <= 0, 422, 'source_item_id wajib untuk receiving PO.');
                     $poItem = DB::table('purchase_order_items')->where('id', $sourceItemId)->lockForUpdate()->first();
                     abort_if(! $poItem || (int) $poItem->purchase_order_id !== (int) $header->source_id, 422, 'Item PO tidak valid.');
-                    $latestRemaining = max(0, (float) $poItem->qty_ordered - (float) ($poItem->received_qty ?? $poItem->qty_received ?? 0));
+                    $latestReceived = (float) ($poItem->received_qty ?? $poItem->qty_received ?? 0);
+                    $latestRemaining = max(0, (float) $poItem->qty_ordered - $latestReceived);
                     abort_if((float) $line->qty > $latestRemaining, 422, 'Qty receiving melebihi sisa qty PO terbaru.');
 
-                    $newReceived = (float) ($poItem->received_qty ?? $poItem->qty_received ?? 0) + (float) $line->qty;
+                    $newReceived = $latestReceived + (float) $line->qty;
                     $newRemaining = max(0, (float) $poItem->qty_ordered - $newReceived);
                     DB::table('purchase_order_items')->where('id', $sourceItemId)->update([
                         'received_qty' => $newReceived,
+                        'qty_received' => $newReceived,
                         'remaining_qty' => $newRemaining,
                         'updated_at' => now(),
                     ]);
@@ -280,11 +282,15 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 $hasReceived = $poItems->contains(fn ($item) => (float) ($item->received_qty ?? $item->qty_received ?? 0) > 0);
                 $allDone = $poItems->every(fn ($item) => ((float) ($item->remaining_qty ?? ((float) $item->qty_ordered - (float) ($item->received_qty ?? $item->qty_received ?? 0))) <= 0) || (bool) ($item->is_closed ?? false));
                 $fulfillmentStatus = $allDone ? 'fully_received' : ($hasReceived ? 'partially_received' : 'open');
-                DB::table('purchase_orders')->where('id', $header->source_id)->update(['fulfillment_status' => $fulfillmentStatus, 'updated_at' => now()]);
+                DB::table('purchase_orders')->where('id', $header->source_id)->update([
+                    'fulfillment_status' => $fulfillmentStatus,
+                    'status' => $fulfillmentStatus,
+                    'updated_at' => now(),
+                ]);
             }
 
             DB::table('receiving_entries')->where('id', $receivingEntry)->update($this->filterColumns('receiving_entries', [
-                'status' => 'POSTED',
+                'status' => 'posted',
                 'posted_at' => now(),
                 'posted_by' => $request->user()?->id,
                 'updated_at' => now(),
