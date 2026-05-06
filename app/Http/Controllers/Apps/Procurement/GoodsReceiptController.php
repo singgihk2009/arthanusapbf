@@ -87,6 +87,7 @@ class GoodsReceiptController extends Controller
         $gr = GoodsReceipt::create([
             'business_id' => 1, 'purchase_order_id' => $po->id, 'vendor_id' => $po->vendor_id, 'warehouse_id' => $data['warehouse_id'],
             'number' => $grNumber, 'gr_number' => $grNumber, 'received_date' => $data['received_date'],
+            'document_date' => $data['received_date'],
             'status' => 'draft', 'notes' => $data['notes'] ?? null, 'created_by' => $request->user()?->id,
         ]);
 
