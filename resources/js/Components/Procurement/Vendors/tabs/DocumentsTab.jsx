@@ -49,7 +49,15 @@ export default function DocumentsTab({ vendor, documentTypes = [] }) {
 
   const doVerify = (docId) => {
     if (!confirm('Are you sure you want to verify this document?')) return;
-    router.post(route('apps.procurement.vendors.documents.verify', [vendor.id, docId]), {}, { preserveScroll: true, onSuccess: () => { setNotice({ type: 'success', text: 'Document verified successfully.' }); router.reload({ only: ['vendor'] }); } });
+    router.post(route('apps.procurement.vendors.documents.verify', [vendor.id, docId]), {}, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setNotice({ type: 'success', text: 'Document verified successfully.' });
+      },
+      onFinish: () => {
+        router.reload({ preserveScroll: true });
+      },
+    });
   };
 
   const doReject = (docId) => {
@@ -62,7 +70,6 @@ export default function DocumentsTab({ vendor, documentTypes = [] }) {
     setNotice({ type: 'info', text: 'Sedang memproses reject dokumen...' });
     router.post(route('apps.procurement.vendors.documents.reject', [vendor.id, docId]), { rejected_reason: normalizedReason }, {
       preserveScroll: true,
-      preserveState: false,
       onSuccess: () => {
         setNotice({ type: 'success', text: 'Document rejected successfully.' });
       },
@@ -71,7 +78,7 @@ export default function DocumentsTab({ vendor, documentTypes = [] }) {
         setNotice({ type: 'error', text: `Reject gagal${firstError ? `: ${firstError}` : '.'}` });
       },
       onFinish: () => {
-        router.reload({ only: ['vendor'] });
+        router.reload({ preserveScroll: true });
       },
     });
   };
