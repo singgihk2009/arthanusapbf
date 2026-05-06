@@ -11,6 +11,7 @@ use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\Vendor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 
@@ -106,11 +107,46 @@ class PurchaseOrderController extends Controller
             ->latest('received_date')
             ->get();
 
+        if ($goodsReceipts->isEmpty()) {
+            $receivingEntries = DB::table('receiving_entries')
+                ->where(function ($query) use ($purchaseOrder) {
+                    $query->where(function ($q) use ($purchaseOrder) {
+                        $q->where('source_type', 'purchase_order')
+                            ->where('source_id', $purchaseOrder->id);
+                    })->orWhere('reference', $purchaseOrder->po_number);
+                })
+                ->latest('transaction_date')
+                ->get()
+                ->map(function (object $entry): object {
+                    $lineForeignKey = Schema::hasColumn('receiving_entry_lines', 'receiving_entry_id')
+                        ? 'receiving_entry_id'
+                        : (Schema::hasColumn('receiving_entry_lines', 'entry_id') ? 'entry_id' : 'receiving_id');
+
+                    $totals = DB::table('receiving_entry_lines')
+                        ->where($lineForeignKey, $entry->id)
+                        ->selectRaw('COALESCE(SUM(qty), 0) as total_qty')
+                        ->selectRaw('COALESCE(SUM(qty * price), 0) as total_value')
+                        ->first();
+
+                    $entry->gr_number = $entry->number ?? null;
+                    $entry->received_date = $entry->transaction_date ?? null;
+                    $entry->status = $entry->status ?? 'posted';
+                    $entry->total_qty = (float) ($totals->total_qty ?? 0);
+                    $entry->total_value = (float) ($totals->total_value ?? 0);
+
+                    return $entry;
+                });
+
+            $goodsReceipts = $receivingEntries;
+        }
+
         $purchaseOrder->setRelation('goodsReceipts', $goodsReceipts);
 
         $purchaseOrder->goodsReceipts->each(function ($gr) {
-            $gr->total_qty = $gr->items()->sum('received_qty');
-            $gr->total_value = $gr->items()->sum('inventory_total_cost');
+            if ($gr instanceof GoodsReceipt) {
+                $gr->total_qty = $gr->items()->sum('received_qty');
+                $gr->total_value = $gr->items()->sum('inventory_total_cost');
+            }
         });
         return Inertia::render('Apps/Procurement/PurchaseOrders/Show', ['purchaseOrder' => $purchaseOrder]);
     }
