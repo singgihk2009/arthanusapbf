@@ -153,7 +153,7 @@ class ReceivingEntryController extends Controller
         DB::transaction(function () use ($validated, $receivingEntry): void {
             $entry = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
             abort_if(! $entry, 404);
-            abort_if(($entry->status ?? null) === 'POSTED', 422, 'Dokumen POSTED tidak dapat diubah.');
+            abort_if(strtolower((string) ($entry->status ?? '')) === 'posted', 422, 'Dokumen POSTED tidak dapat diubah.');
 
             $warehouse = DB::table('warehouses')->where('id', $validated['warehouse_id'])->first(['id', 'code']);
             $headerPayload = [
@@ -192,7 +192,7 @@ class ReceivingEntryController extends Controller
         DB::transaction(function () use ($receivingEntry): void {
             $entry = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
             abort_if(! $entry, 404);
-            abort_if(($entry->status ?? null) === 'POSTED', 422, 'Dokumen POSTED tidak dapat dihapus.');
+            abort_if(strtolower((string) ($entry->status ?? '')) === 'posted', 422, 'Dokumen POSTED tidak dapat dihapus.');
 
             DB::table('stock_ledgers')
                 ->where('trx_type', 'RCV_IN')

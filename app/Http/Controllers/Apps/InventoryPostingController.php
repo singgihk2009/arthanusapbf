@@ -303,12 +303,12 @@ class InventoryPostingController extends Controller implements HasMiddleware
     {
         $header = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
         abort_unless($header, 404, 'Receiving entry not found');
-        abort_if(($header->status ?? null) !== 'POSTED', 422, 'Receiving entry belum diposting');
+        abort_if(strtolower((string) ($header->status ?? '')) !== 'posted', 422, 'Receiving entry belum diposting');
 
         $this->createReversalStockLedgers(['RCV_IN'], $receivingEntry, $request->user()?->id);
 
         DB::table('receiving_entries')->where('id', $receivingEntry)->update($this->filterColumns('receiving_entries', [
-            'status' => 'DRAFT',
+            'status' => 'draft',
             'posted_at' => null,
             'posted_by' => null,
             'updated_at' => now(),
