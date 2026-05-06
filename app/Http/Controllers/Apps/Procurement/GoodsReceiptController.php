@@ -44,18 +44,18 @@ class GoodsReceiptController extends Controller
         abort_if(in_array($purchaseOrder->status, ['cancelled', 'closed', 'fully_received']), 422, 'PO tidak valid untuk receiving.');
         $purchaseOrder->load(['vendor:id,name', 'items.product:id,name', 'items.uom:id,name']);
 
-        $items = $purchaseOrder->items->filter(fn ($i) => (float)($i->remaining_qty ?? ($i->qty_ordered - $i->received_qty)) > 0 && ! $i->is_closed)
+        $items = $purchaseOrder->items->filter(fn ($i) => (float)($i->remaining_qty ?? ($i->qty_ordered - $i->qty_received)) > 0 && ! $i->is_closed)
             ->values()->map(fn ($i) => [
                 'purchase_order_item_id' => $i->id,
                 'product_id' => $i->product_id,
                 'product_name' => $i->product?->name,
                 'ordered_qty' => $i->qty_ordered,
-                'received_qty' => $i->received_qty,
-                'remaining_qty' => $i->remaining_qty ?? ($i->qty_ordered - $i->received_qty),
+                'received_qty' => $i->qty_received,
+                'remaining_qty' => $i->remaining_qty ?? ($i->qty_ordered - $i->qty_received),
                 'uom' => $i->uom?->name,
                 'uom_id' => $i->uom_id,
                 'po_unit_price' => $i->unit_price,
-                'suggested_received_qty' => $i->remaining_qty ?? ($i->qty_ordered - $i->received_qty),
+                'suggested_received_qty' => $i->remaining_qty ?? ($i->qty_ordered - $i->qty_received),
                 'requires_expiry_tracking' => (bool) ($i->product?->is_expiry_tracked || $i->product?->requires_expiry_tracking),
                 'requires_batch_tracking' => (bool) ($i->product?->is_batch_tracked || $i->product?->requires_batch_tracking),
             ]);
@@ -106,7 +106,7 @@ class GoodsReceiptController extends Controller
                     'items' => 'Item tidak sesuai PO.',
                 ]);
             }
-            $remaining = (float)($poi->remaining_qty ?? ($poi->qty_ordered - $poi->received_qty));
+            $remaining = (float)($poi->remaining_qty ?? ($poi->qty_ordered - $poi->qty_received));
             $receive = (float)($item['received_qty'] ?? 0);
             if ($receive <= 0) continue;
             if ($receive > $remaining) {
@@ -129,7 +129,7 @@ class GoodsReceiptController extends Controller
             $stored++;
             $gr->items()->create(array_merge([
                 'purchase_order_item_id' => $poi->id, 'product_id' => $poi->product_id, 'warehouse_id' => $item['warehouse_id'] ?? $data['warehouse_id'],
-                'ordered_qty' => $poi->qty_ordered, 'previously_received_qty' => $poi->received_qty, 'received_qty' => $receive,
+                'ordered_qty' => $poi->qty_ordered, 'previously_received_qty' => $poi->qty_received, 'received_qty' => $receive,
                 'remaining_qty' => $remaining - $receive, 'uom_id' => $poi->uom_id, 'po_unit_price' => $poi->unit_price,
                 'inventory_unit_cost' => $poi->unit_price, 'inventory_total_cost' => $receive * (float)$poi->unit_price,
                 'batch_number' => $item['batch_number'] ?? null, 'expired_date' => $item['expired_date'] ?? null,
@@ -158,10 +158,10 @@ class GoodsReceiptController extends Controller
             abort_if($gr->status !== 'draft', 422, 'GR sudah diposting.');
             foreach ($gr->items as $item) {
                 $poi = PurchaseOrderItem::lockForUpdate()->findOrFail($item->purchase_order_item_id);
-                $remaining = (float)($poi->remaining_qty ?? ($poi->qty_ordered - $poi->received_qty));
+                $remaining = (float)($poi->remaining_qty ?? ($poi->qty_ordered - $poi->qty_received));
                 abort_if((float)$item->received_qty > $remaining, 422, 'Qty melebihi remaining terbaru.');
-                $poi->received_qty += $item->received_qty;
-                $poi->remaining_qty = max(0, (float)$poi->qty_ordered - (float)$poi->received_qty);
+                $poi->qty_received += $item->received_qty;
+                $poi->remaining_qty = max(0, (float)$poi->qty_ordered - (float)$poi->qty_received);
                 $poi->save();
 
                 StockMovement::create(['business_id' => $gr->business_id ?? 1, 'product_id' => $item->product_id, 'warehouse_id' => $item->warehouse_id ?? $gr->warehouse_id,
@@ -173,11 +173,7 @@ class GoodsReceiptController extends Controller
             }
             $gr->update(['status' => 'posted', 'posted_at' => now()]);
             $po = PurchaseOrder::with('items')->findOrFail($gr->purchase_order_id);
-            $total = $po->items->count();
-            $done = $po->items->filter(fn ($i) => (float)($i->remaining_qty ?? 0) <= 0 || $i->is_closed)->count();
-            $has = $po->items->contains(fn ($i) => (float)$i->received_qty > 0);
-            $po->fulfillment_status = $done === $total && $total > 0 ? 'fully_received' : ($has ? 'partially_received' : 'open');
-            $po->save();
+            $po->updateReceivingStatus();
         });
 
         return back()->with('success', 'GR berhasil diposting.');
