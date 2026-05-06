@@ -48,6 +48,8 @@ export default function CreateFromPO({ purchaseOrder, items, warehouses = [] }) 
 
     const totalQty = data.items.reduce((sum, item) => sum + (Number(item.received_qty) || 0), 0);
     const totalValue = data.items.reduce((sum, item) => sum + ((Number(item.received_qty) || 0) * (Number(item.po_unit_price) || 0)), 0);
+    const hasBatchTrackedItem = data.items.some((item) => item.requires_batch_tracking);
+    const hasExpiryTrackedItem = data.items.some((item) => item.requires_expiry_tracking);
 
     return (
         <>
@@ -97,6 +99,8 @@ export default function CreateFromPO({ purchaseOrder, items, warehouses = [] }) 
                                 <th className='px-4 py-3 text-left font-semibold'>Product</th>
                                 <th className='px-4 py-3 text-right font-semibold'>Remaining Qty</th>
                                 <th className='px-4 py-3 text-right font-semibold'>Received Qty</th>
+                                {hasBatchTrackedItem && <th className='px-4 py-3 text-left font-semibold'>Batch Number</th>}
+                                {hasExpiryTrackedItem && <th className='px-4 py-3 text-left font-semibold'>Expired Date</th>}
                                 <th className='px-4 py-3 text-right font-semibold'>Unit Price</th>
                                 <th className='px-4 py-3 text-right font-semibold'>Line Total</th>
                             </tr>
@@ -119,6 +123,44 @@ export default function CreateFromPO({ purchaseOrder, items, warehouses = [] }) 
                                             <small className='mt-1 block text-xs text-red-500'>{errors[`items.${index}.received_qty`]}</small>
                                         )}
                                     </td>
+                                    {hasBatchTrackedItem && (
+                                        <td className='px-4 py-3'>
+                                            {item.requires_batch_tracking ? (
+                                                <>
+                                                    <input
+                                                        type='text'
+                                                        value={item.batch_number || ''}
+                                                        onChange={(e) => {
+                                                            const rows = [...data.items];
+                                                            rows[index].batch_number = e.target.value;
+                                                            setData('items', rows);
+                                                        }}
+                                                        className='w-40 rounded-md border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300'
+                                                    />
+                                                    {errors[`items.${index}.batch_number`] && <small className='mt-1 block text-xs text-red-500'>{errors[`items.${index}.batch_number`]}</small>}
+                                                </>
+                                            ) : <span className='text-xs text-gray-400'>-</span>}
+                                        </td>
+                                    )}
+                                    {hasExpiryTrackedItem && (
+                                        <td className='px-4 py-3'>
+                                            {item.requires_expiry_tracking ? (
+                                                <>
+                                                    <input
+                                                        type='date'
+                                                        value={item.expired_date || ''}
+                                                        onChange={(e) => {
+                                                            const rows = [...data.items];
+                                                            rows[index].expired_date = e.target.value;
+                                                            setData('items', rows);
+                                                        }}
+                                                        className='w-40 rounded-md border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300'
+                                                    />
+                                                    {errors[`items.${index}.expired_date`] && <small className='mt-1 block text-xs text-red-500'>{errors[`items.${index}.expired_date`]}</small>}
+                                                </>
+                                            ) : <span className='text-xs text-gray-400'>-</span>}
+                                        </td>
+                                    )}
                                     <td className='px-4 py-3 text-right text-gray-700 dark:text-gray-300'>{Number(item.po_unit_price || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                     <td className='px-4 py-3 text-right font-medium text-gray-700 dark:text-gray-300'>{((Number(item.received_qty) || 0) * (Number(item.po_unit_price) || 0)).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 </tr>

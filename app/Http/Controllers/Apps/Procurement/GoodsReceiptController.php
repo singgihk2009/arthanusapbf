@@ -56,6 +56,8 @@ class GoodsReceiptController extends Controller
                 'uom_id' => $i->uom_id,
                 'po_unit_price' => $i->unit_price,
                 'suggested_received_qty' => $i->remaining_qty ?? ($i->qty_ordered - $i->received_qty),
+                'requires_expiry_tracking' => (bool) ($i->product?->is_expiry_tracked || $i->product?->requires_expiry_tracking),
+                'requires_batch_tracking' => (bool) ($i->product?->is_batch_tracked || $i->product?->requires_batch_tracking),
             ]);
 
         $warehouses = DB::table('warehouses')
@@ -89,8 +91,6 @@ class GoodsReceiptController extends Controller
 
         $grNumber = $this->nextNumber();
 
-        $grNumber = $this->nextNumber();
-
         $gr = GoodsReceipt::create([
             'business_id' => 1, 'purchase_order_id' => $po->id, 'vendor_id' => $po->vendor_id, 'warehouse_id' => $data['warehouse_id'],
             'number' => $grNumber, 'gr_number' => $grNumber, 'received_date' => $data['received_date'],
@@ -99,7 +99,7 @@ class GoodsReceiptController extends Controller
         ]);
 
         $stored = 0;
-        foreach ($request->input('items', []) as $item) {
+        foreach ($request->input('items', []) as $index => $item) {
             $poi = PurchaseOrderItem::findOrFail($item['purchase_order_item_id']);
             if ((int) $poi->purchase_order_id !== (int) $po->id || (int) $poi->product_id !== (int) $item['product_id']) {
                 throw ValidationException::withMessages([
@@ -111,18 +111,18 @@ class GoodsReceiptController extends Controller
             if ($receive <= 0) continue;
             if ($receive > $remaining) {
                 throw ValidationException::withMessages([
-                    'items' => 'Qty receive melebihi remaining qty.',
+                    "items.{$index}.received_qty" => 'Qty receive melebihi remaining qty.',
                 ]);
             }
             $product = $poi->product()->first();
             if (($product?->is_expiry_tracked || $product?->requires_expiry_tracking) && empty($item['expired_date'])) {
                 throw ValidationException::withMessages([
-                    'items' => 'Expiry date wajib untuk produk expiry tracked.',
+                    "items.{$index}.expired_date" => 'Expiry date wajib untuk produk expiry tracked.',
                 ]);
             }
             if (($product?->is_batch_tracked || $product?->requires_batch_tracking) && empty($item['batch_number'])) {
                 throw ValidationException::withMessages([
-                    'items' => 'Batch number wajib untuk produk batch tracked.',
+                    "items.{$index}.batch_number" => 'Batch number wajib untuk produk batch tracked.',
                 ]);
             }
 
