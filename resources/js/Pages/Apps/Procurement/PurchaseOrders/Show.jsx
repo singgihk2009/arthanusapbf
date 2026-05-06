@@ -5,10 +5,11 @@ import { Head, router } from '@inertiajs/react';
 
 export default function Show({ purchaseOrder }) {
     const canCancel = purchaseOrder.items.every((i) => +i.qty_received === 0);
-    const statusClass = { draft: 'bg-gray-100 text-gray-700', approved: 'bg-blue-100 text-blue-700', partially_received: 'bg-amber-100 text-amber-700', fully_received: 'bg-green-100 text-green-700', closed: 'bg-purple-100 text-purple-700', cancelled: 'bg-red-100 text-red-700' }[purchaseOrder.status] || 'bg-gray-100';
+    const poStatus = String(purchaseOrder.status || '').toLowerCase();
+    const statusClass = { draft: 'bg-gray-100 text-gray-700', approved: 'bg-blue-100 text-blue-700', partially_received: 'bg-amber-100 text-amber-700', fully_received: 'bg-green-100 text-green-700', closed: 'bg-purple-100 text-purple-700', cancelled: 'bg-red-100 text-red-700' }[poStatus] || 'bg-gray-100';
 
 
-    const canCreateGoodsReceiving = ['approved', 'partially_received'].includes(purchaseOrder.status) && (purchaseOrder.fulfillment_status === 'open' || purchaseOrder.fulfillment_status === 'partially_received');
+    const canCreateGoodsReceiving = ['approved', 'partially_received'].includes(poStatus);
 
     const handleBack = () => {
         if (window.history.length > 1) {
@@ -32,14 +33,14 @@ export default function Show({ purchaseOrder }) {
             <Head title={`PO ${purchaseOrder.po_number}`} />
             <Card title={`Purchase Order ${purchaseOrder.po_number}`}>
                 <div className='mb-4 flex flex-wrap items-center gap-2'>
-                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass}`}>{purchaseOrder.status}</span>
-                    {purchaseOrder.status === 'draft' && <button type='button' onClick={() => router.post(route('apps.procurement.purchase-orders.approve', purchaseOrder.id))} className='rounded-lg border border-blue-500 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50'>Approve</button>}
+                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass}`}>{poStatus}</span>
+                    {poStatus === 'draft' && <button type='button' onClick={() => router.post(route('apps.procurement.purchase-orders.approve', purchaseOrder.id))} className='rounded-lg border border-blue-500 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50'>Approve</button>}
 
                     {canCreateGoodsReceiving && (
                         <button type='button' onClick={() => router.get(route('apps.procurement.goods-receipts.create-from-po', purchaseOrder.id))} className='rounded-lg border border-emerald-500 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50'>Create Goods Receiving</button>
                     )}
                     <button type='button' onClick={handleBack} className='rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50'>Back</button>
-                    {canCancel && purchaseOrder.status !== 'cancelled' && <button type='button' onClick={handleCancelPo} className='rounded-lg border border-rose-500 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50'>Cancel PO</button>}
+                    {canCancel && poStatus !== 'cancelled' && <button type='button' onClick={handleCancelPo} className='rounded-lg border border-rose-500 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50'>Cancel PO</button>}
                 </div>
 
                 <div className='mb-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-2'>
