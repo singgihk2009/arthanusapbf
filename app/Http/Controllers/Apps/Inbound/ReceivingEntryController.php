@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Apps\Inbound;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\ReceivingEntryRequest;
+use App\Models\Procurement\PurchaseOrder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
@@ -33,13 +34,44 @@ class ReceivingEntryController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(\Illuminate\Http\Request $request): Response
     {
+        $prefill = null;
+        $poId = (int) $request->integer('po_id');
+
+        if ($poId > 0) {
+            $purchaseOrder = PurchaseOrder::with(['vendor:id,name', 'items.product:id,base_uom_id', 'items.uom:id'])
+                ->find($poId);
+
+            if ($purchaseOrder) {
+                $prefillLines = $purchaseOrder->items
+                    ->filter(fn ($line) => (float) ($line->remaining_qty ?? ($line->qty_ordered - $line->qty_received)) > 0)
+                    ->map(fn ($line): array => [
+                        'item_id' => (string) $line->product_id,
+                        'qty' => (string) ($line->remaining_qty ?? ($line->qty_ordered - $line->qty_received)),
+                        'uom_id' => (string) ($line->uom_id ?? $line->product?->base_uom_id ?? ''),
+                        'price' => (string) $line->unit_price,
+                        'batch_number' => '',
+                        'expired_date' => '',
+                        'notes' => '',
+                    ])
+                    ->values();
+
+                $prefill = [
+                    'transaction_code' => 'PEMBELIAN',
+                    'reference' => (string) ($purchaseOrder->po_number ?? ''),
+                    'vendor_name' => (string) ($purchaseOrder->vendor?->name ?? ''),
+                    'lines' => $prefillLines,
+                ];
+            }
+        }
+
         return Inertia::render('Apps/Inbound/Receiving/Create', [
             'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
             'transactionCodes' => ['PEMBELIAN', 'RETUR', 'ADJUSTMENT'],
+            'prefill' => $prefill,
         ]);
     }
 
