@@ -11,6 +11,7 @@ use App\Models\Procurement\PurchaseOrderItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,21 +23,38 @@ class GoodsReceiptController extends Controller
     }
     public function index(Request $request): Response
     {
-        $query = GoodsReceipt::with(['purchaseOrder:id,po_number', 'vendor:id,name'])
+        $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
+
+        $goodsReceipts = DB::table('receiving_entries')
+            ->where('source_type', 'purchase_order')
             ->when($request->status, fn ($q, $v) => $q->where('status', $v))
             ->when($request->vendor_id, fn ($q, $v) => $q->where('vendor_id', $v))
-            ->when($request->purchase_order_id, fn ($q, $v) => $q->where('purchase_order_id', $v))
-            ->when($request->date_from, fn ($q, $v) => $q->whereDate('received_date', '>=', $v))
-            ->when($request->date_to, fn ($q, $v) => $q->whereDate('received_date', '<=', $v))
-            ->latest();
+            ->when($request->date_from, fn ($q, $v) => $q->whereDate('transaction_date', '>=', $v))
+            ->when($request->date_to, fn ($q, $v) => $q->whereDate('transaction_date', '<=', $v))
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->through(function (object $entry) use ($warehouseCodes): object {
+                $entry->warehouse_label = $this->resolveEntryWarehouseLabel($entry, $warehouseCodes);
 
-        $goodsReceipts = $query->paginate(10)->through(function ($gr) {
-            $gr->total_qty = $gr->items()->sum('received_qty');
-            $gr->total_value = $gr->items()->sum('inventory_total_cost');
-            return $gr;
-        });
+                return $entry;
+            });
 
         return Inertia::render('Apps/Procurement/GoodsReceipts/Index', ['goodsReceipts' => $goodsReceipts]);
+    }
+
+    private function resolveEntryWarehouseLabel(object $entry, Collection $warehouseCodes): string
+    {
+        $warehouseId = $entry->warehouse_id ?? $entry->warehouse ?? null;
+        if (! $warehouseId) {
+            return '-';
+        }
+
+        $mappedCode = $warehouseCodes->get((int) $warehouseId);
+        if ($mappedCode) {
+            return (string) $mappedCode;
+        }
+
+        return (string) $warehouseId;
     }
 
     public function createFromPO(PurchaseOrder $purchaseOrder): Response
