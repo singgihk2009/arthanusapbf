@@ -207,63 +207,89 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
     public function postReceivingEntry(Request $request, int $receivingEntry): JsonResponse
     {
-        $header = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
-        abort_unless($header, 404, 'Receiving entry not found');
-        abort_if(($header->status ?? null) === 'POSTED', 422, 'Receiving entry already posted');
-
         $lineForeignKey = $this->resolveColumn('receiving_entry_lines', ['receiving_entry_id', 'receiving_id', 'entry_id', 'header_id']) ?? 'receiving_entry_id';
         $batchColumn = $this->resolveColumn('receiving_entry_lines', ['batch_number', 'batch_no', 'no_batch']) ?? 'batch_number';
-        $warehouseId = $this->resolveWarehouseId($header);
+        DB::transaction(function () use ($receivingEntry, $lineForeignKey, $batchColumn, $request): void {
+            $header = DB::table('receiving_entries')->where('id', $receivingEntry)->lockForUpdate()->first();
+            abort_unless($header, 404, 'Receiving entry not found');
+            abort_if(($header->status ?? null) === 'POSTED', 422, 'Receiving sudah posted dan tidak bisa diposting ulang.');
 
-        abort_if(! $warehouseId, 422, 'Warehouse receiving entry tidak valid.');
+            $warehouseId = $this->resolveWarehouseId($header);
+            abort_if(! $warehouseId, 422, 'Warehouse receiving entry tidak valid.');
 
-        $lines = DB::table('receiving_entry_lines')->where($lineForeignKey, $receivingEntry)->get();
+            $lines = DB::table('receiving_entry_lines')->where($lineForeignKey, $receivingEntry)->get();
 
-        foreach ($lines as $line) {
-            $qtyBase = $this->resolveQtyBase((int) $line->item_id, (int) $line->uom_id, (float) $line->qty, 0);
-            $unitCostBase = $this->resolveUnitCostPerBase((float) $line->price, (float) $line->qty, $qtyBase);
-            $batchId = null;
-            $batchNumber = $line->{$batchColumn} ?? null;
+            foreach ($lines as $line) {
+                $qtyBase = $this->resolveQtyBase((int) $line->item_id, (int) $line->uom_id, (float) $line->qty, 0);
+                $unitCostBase = $this->resolveUnitCostPerBase((float) $line->price, (float) $line->qty, $qtyBase);
+                $batchId = null;
+                $batchNumber = $line->{$batchColumn} ?? null;
 
-            if (! empty($batchNumber)) {
-                $batchId = DB::table('item_batches')
-                    ->where('item_id', $line->item_id)
-                    ->where('batch_no', $batchNumber)
-                    ->where('expired_date', $line->expired_date)
-                    ->value('id');
+                if (! empty($batchNumber)) {
+                    $batchId = DB::table('item_batches')
+                        ->where('item_id', $line->item_id)
+                        ->where('batch_no', $batchNumber)
+                        ->where('expired_date', $line->expired_date)
+                        ->value('id');
 
-                if (! $batchId) {
-                    $batchId = DB::table('item_batches')->insertGetId([
-                        'item_id' => $line->item_id,
-                        'batch_no' => $batchNumber,
-                        'expired_date' => $line->expired_date,
-                        'created_at' => now(),
+                    if (! $batchId) {
+                        $batchId = DB::table('item_batches')->insertGetId([
+                            'item_id' => $line->item_id,
+                            'batch_no' => $batchNumber,
+                            'expired_date' => $line->expired_date,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+
+                if (($header->source_type ?? null) === 'purchase_order') {
+                    $sourceItemId = (int) ($line->source_item_id ?? 0);
+                    abort_if($sourceItemId <= 0, 422, 'source_item_id wajib untuk receiving PO.');
+                    $poItem = DB::table('purchase_order_items')->where('id', $sourceItemId)->lockForUpdate()->first();
+                    abort_if(! $poItem || (int) $poItem->purchase_order_id !== (int) $header->source_id, 422, 'Item PO tidak valid.');
+                    $latestRemaining = max(0, (float) $poItem->qty_ordered - (float) ($poItem->received_qty ?? $poItem->qty_received ?? 0));
+                    abort_if((float) $line->qty > $latestRemaining, 422, 'Qty receiving melebihi sisa qty PO terbaru.');
+
+                    $newReceived = (float) ($poItem->received_qty ?? $poItem->qty_received ?? 0) + (float) $line->qty;
+                    $newRemaining = max(0, (float) $poItem->qty_ordered - $newReceived);
+                    DB::table('purchase_order_items')->where('id', $sourceItemId)->update([
+                        'received_qty' => $newReceived,
+                        'remaining_qty' => $newRemaining,
                         'updated_at' => now(),
                     ]);
                 }
+
+                $this->stockService->postMutation([
+                    'trx_type' => 'RCV_IN',
+                    'trx_id' => $receivingEntry,
+                    'trx_line_id' => $line->id,
+                    'warehouse_id' => $warehouseId,
+                    'item_id' => $line->item_id,
+                    'batch_id' => $batchId,
+                    'qty_base' => $qtyBase,
+                    'uom_id' => $line->uom_id,
+                    'qty_input' => $line->qty,
+                    'unit_cost' => $unitCostBase,
+                    'created_by' => $request->user()?->id,
+                ]);
             }
 
-            $this->stockService->postMutation([
-                'trx_type' => 'RCV_IN',
-                'trx_id' => $receivingEntry,
-                'trx_line_id' => $line->id,
-                'warehouse_id' => $warehouseId,
-                'item_id' => $line->item_id,
-                'batch_id' => $batchId,
-                'qty_base' => $qtyBase,
-                'uom_id' => $line->uom_id,
-                'qty_input' => $line->qty,
-                'unit_cost' => $unitCostBase,
-                'created_by' => $request->user()?->id,
-            ]);
-        }
+            if (($header->source_type ?? null) === 'purchase_order') {
+                $poItems = DB::table('purchase_order_items')->where('purchase_order_id', $header->source_id)->get();
+                $hasReceived = $poItems->contains(fn ($item) => (float) ($item->received_qty ?? $item->qty_received ?? 0) > 0);
+                $allDone = $poItems->every(fn ($item) => ((float) ($item->remaining_qty ?? ((float) $item->qty_ordered - (float) ($item->received_qty ?? $item->qty_received ?? 0))) <= 0) || (bool) ($item->is_closed ?? false));
+                $fulfillmentStatus = $allDone ? 'fully_received' : ($hasReceived ? 'partially_received' : 'open');
+                DB::table('purchase_orders')->where('id', $header->source_id)->update(['fulfillment_status' => $fulfillmentStatus, 'updated_at' => now()]);
+            }
 
-        DB::table('receiving_entries')->where('id', $receivingEntry)->update($this->filterColumns('receiving_entries', [
-            'status' => 'POSTED',
-            'posted_at' => now(),
-            'posted_by' => $request->user()?->id,
-            'updated_at' => now(),
-        ]));
+            DB::table('receiving_entries')->where('id', $receivingEntry)->update($this->filterColumns('receiving_entries', [
+                'status' => 'POSTED',
+                'posted_at' => now(),
+                'posted_by' => $request->user()?->id,
+                'updated_at' => now(),
+            ]));
+        });
 
         return response()->json(['message' => 'Receiving entry posted', 'id' => $receivingEntry]);
     }
