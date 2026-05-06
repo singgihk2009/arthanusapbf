@@ -11,6 +11,7 @@ use App\Models\Procurement\PurchaseOrderItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -80,7 +81,13 @@ class GoodsReceiptController extends Controller
             'items.*.warehouse_id' => 'nullable|integer|exists:warehouses,id',
         ]);
         $po = PurchaseOrder::with('items')->findOrFail($data['purchase_order_id']);
-        abort_if(in_array($po->status, ['cancelled', 'closed', 'fully_received']), 422, 'PO sudah ditutup/dibatalkan.');
+        if (in_array($po->status, ['cancelled', 'closed', 'fully_received'])) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'PO sudah ditutup/dibatalkan.',
+            ]);
+        }
+
+        $grNumber = $this->nextNumber();
 
         $grNumber = $this->nextNumber();
 
@@ -94,14 +101,30 @@ class GoodsReceiptController extends Controller
         $stored = 0;
         foreach ($request->input('items', []) as $item) {
             $poi = PurchaseOrderItem::findOrFail($item['purchase_order_item_id']);
-            if ((int)$poi->purchase_order_id !== (int)$po->id || (int)$poi->product_id !== (int)$item['product_id']) abort(422, 'Item tidak sesuai PO.');
+            if ((int) $poi->purchase_order_id !== (int) $po->id || (int) $poi->product_id !== (int) $item['product_id']) {
+                throw ValidationException::withMessages([
+                    'items' => 'Item tidak sesuai PO.',
+                ]);
+            }
             $remaining = (float)($poi->remaining_qty ?? ($poi->qty_ordered - $poi->received_qty));
             $receive = (float)($item['received_qty'] ?? 0);
             if ($receive <= 0) continue;
-            abort_if($receive > $remaining, 422, 'Qty receive melebihi remaining qty.');
+            if ($receive > $remaining) {
+                throw ValidationException::withMessages([
+                    'items' => 'Qty receive melebihi remaining qty.',
+                ]);
+            }
             $product = $poi->product()->first();
-            if (($product?->is_expiry_tracked || $product?->requires_expiry_tracking) && empty($item['expired_date'])) abort(422, 'Expiry date wajib untuk produk expiry tracked.');
-            if (($product?->is_batch_tracked || $product?->requires_batch_tracking) && empty($item['batch_number'])) abort(422, 'Batch number wajib untuk produk batch tracked.');
+            if (($product?->is_expiry_tracked || $product?->requires_expiry_tracking) && empty($item['expired_date'])) {
+                throw ValidationException::withMessages([
+                    'items' => 'Expiry date wajib untuk produk expiry tracked.',
+                ]);
+            }
+            if (($product?->is_batch_tracked || $product?->requires_batch_tracking) && empty($item['batch_number'])) {
+                throw ValidationException::withMessages([
+                    'items' => 'Batch number wajib untuk produk batch tracked.',
+                ]);
+            }
 
             $stored++;
             $gr->items()->create(array_merge([
@@ -113,7 +136,11 @@ class GoodsReceiptController extends Controller
                 'condition_status' => $item['condition_status'] ?? 'good', 'notes' => $item['notes'] ?? null,
             ], $this->facilityInheritanceService->mapFromPoLine($poi)));
         }
-        abort_if($stored === 0, 422, 'Minimal 1 item dengan qty > 0.');
+        if ($stored === 0) {
+            throw ValidationException::withMessages([
+                'items' => 'Minimal 1 item dengan qty > 0.',
+            ]);
+        }
         return redirect()->route('apps.procurement.goods-receipts.show', $gr->id)->with('success', 'Draft GR tersimpan.');
     }
 

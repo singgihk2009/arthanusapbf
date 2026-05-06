@@ -126,6 +126,7 @@ export default function CreateFromPO({ purchaseOrder, items, warehouses = [] }) 
                         </tbody>
                     </table>
                 </div>
+                {errors.items && <small className='mt-2 block text-xs text-red-500'>{errors.items}</small>}
 
                 <div className='mt-3 text-right text-sm font-medium text-gray-700 dark:text-gray-300'>
                     Total Qty: {totalQty.toLocaleString('id-ID')} | Total Value: {totalValue.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
