@@ -11,6 +11,7 @@ use App\Models\Procurement\PurchaseOrderItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -55,37 +56,79 @@ class GoodsReceiptController extends Controller
                 'uom_id' => $i->uom_id,
                 'po_unit_price' => $i->unit_price,
                 'suggested_received_qty' => $i->remaining_qty ?? ($i->qty_ordered - $i->received_qty),
+                'requires_expiry_tracking' => (bool) ($i->product?->is_expiry_tracked || $i->product?->requires_expiry_tracking),
+                'requires_batch_tracking' => (bool) ($i->product?->is_batch_tracked || $i->product?->requires_batch_tracking),
             ]);
 
-        return Inertia::render('Apps/Procurement/GoodsReceipts/CreateFromPO', ['purchaseOrder' => $purchaseOrder, 'items' => $items]);
+        $warehouses = DB::table('warehouses')
+            ->select(['id', 'code', 'name'])
+            ->orderBy('name')
+            ->get();
+
+        return Inertia::render('Apps/Procurement/GoodsReceipts/CreateFromPO', [
+            'purchaseOrder' => $purchaseOrder,
+            'items' => $items,
+            'warehouses' => $warehouses,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate(['purchase_order_id' => 'required|exists:purchase_orders,id', 'received_date' => 'required|date', 'warehouse_id' => 'nullable|integer', 'notes' => 'nullable|string', 'items' => 'required|array|min:1']);
+        $data = $request->validate([
+            'purchase_order_id' => 'required|exists:purchase_orders,id',
+            'received_date' => 'required|date',
+            'warehouse_id' => 'required|integer|exists:warehouses,id',
+            'notes' => 'nullable|string',
+            'items' => 'required|array|min:1',
+            'items.*.warehouse_id' => 'nullable|integer|exists:warehouses,id',
+        ]);
         $po = PurchaseOrder::with('items')->findOrFail($data['purchase_order_id']);
-        abort_if(in_array($po->status, ['cancelled', 'closed', 'fully_received']), 422, 'PO sudah ditutup/dibatalkan.');
+        if (in_array($po->status, ['cancelled', 'closed', 'fully_received'])) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'PO sudah ditutup/dibatalkan.',
+            ]);
+        }
+
+        $grNumber = $this->nextNumber();
 
         $gr = GoodsReceipt::create([
-            'business_id' => 1, 'purchase_order_id' => $po->id, 'vendor_id' => $po->vendor_id, 'warehouse_id' => $data['warehouse_id'] ?? null,
-            'gr_number' => $this->nextNumber(), 'received_date' => $data['received_date'], 'status' => 'draft', 'notes' => $data['notes'] ?? null, 'created_by' => $request->user()?->id,
+            'business_id' => 1, 'purchase_order_id' => $po->id, 'vendor_id' => $po->vendor_id, 'warehouse_id' => $data['warehouse_id'],
+            'number' => $grNumber, 'gr_number' => $grNumber, 'received_date' => $data['received_date'],
+            'document_date' => $data['received_date'],
+            'status' => 'draft', 'notes' => $data['notes'] ?? null, 'created_by' => $request->user()?->id,
         ]);
 
         $stored = 0;
-        foreach ($request->input('items', []) as $item) {
+        foreach ($request->input('items', []) as $index => $item) {
             $poi = PurchaseOrderItem::findOrFail($item['purchase_order_item_id']);
-            if ((int)$poi->purchase_order_id !== (int)$po->id || (int)$poi->product_id !== (int)$item['product_id']) abort(422, 'Item tidak sesuai PO.');
+            if ((int) $poi->purchase_order_id !== (int) $po->id || (int) $poi->product_id !== (int) $item['product_id']) {
+                throw ValidationException::withMessages([
+                    'items' => 'Item tidak sesuai PO.',
+                ]);
+            }
             $remaining = (float)($poi->remaining_qty ?? ($poi->qty_ordered - $poi->received_qty));
             $receive = (float)($item['received_qty'] ?? 0);
             if ($receive <= 0) continue;
-            abort_if($receive > $remaining, 422, 'Qty receive melebihi remaining qty.');
+            if ($receive > $remaining) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.received_qty" => 'Qty receive melebihi remaining qty.',
+                ]);
+            }
             $product = $poi->product()->first();
-            if (($product?->is_expiry_tracked || $product?->requires_expiry_tracking) && empty($item['expired_date'])) abort(422, 'Expiry date wajib untuk produk expiry tracked.');
-            if (($product?->is_batch_tracked || $product?->requires_batch_tracking) && empty($item['batch_number'])) abort(422, 'Batch number wajib untuk produk batch tracked.');
+            if (($product?->is_expiry_tracked || $product?->requires_expiry_tracking) && empty($item['expired_date'])) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.expired_date" => 'Expiry date wajib untuk produk expiry tracked.',
+                ]);
+            }
+            if (($product?->is_batch_tracked || $product?->requires_batch_tracking) && empty($item['batch_number'])) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.batch_number" => 'Batch number wajib untuk produk batch tracked.',
+                ]);
+            }
 
             $stored++;
             $gr->items()->create(array_merge([
-                'purchase_order_item_id' => $poi->id, 'product_id' => $poi->product_id, 'warehouse_id' => $item['warehouse_id'] ?? ($data['warehouse_id'] ?? null),
+                'purchase_order_item_id' => $poi->id, 'product_id' => $poi->product_id, 'warehouse_id' => $item['warehouse_id'] ?? $data['warehouse_id'],
                 'ordered_qty' => $poi->qty_ordered, 'previously_received_qty' => $poi->received_qty, 'received_qty' => $receive,
                 'remaining_qty' => $remaining - $receive, 'uom_id' => $poi->uom_id, 'po_unit_price' => $poi->unit_price,
                 'inventory_unit_cost' => $poi->unit_price, 'inventory_total_cost' => $receive * (float)$poi->unit_price,
@@ -93,7 +136,11 @@ class GoodsReceiptController extends Controller
                 'condition_status' => $item['condition_status'] ?? 'good', 'notes' => $item['notes'] ?? null,
             ], $this->facilityInheritanceService->mapFromPoLine($poi)));
         }
-        abort_if($stored === 0, 422, 'Minimal 1 item dengan qty > 0.');
+        if ($stored === 0) {
+            throw ValidationException::withMessages([
+                'items' => 'Minimal 1 item dengan qty > 0.',
+            ]);
+        }
         return redirect()->route('apps.procurement.goods-receipts.show', $gr->id)->with('success', 'Draft GR tersimpan.');
     }
 
@@ -146,7 +193,17 @@ class GoodsReceiptController extends Controller
     private function nextNumber(): string
     {
         $prefix = 'GR-'.now()->format('Ym').'-';
-        $last = GoodsReceipt::where('gr_number', 'like', $prefix.'%')->orderByDesc('gr_number')->value('gr_number');
+        $last = GoodsReceipt::query()
+            ->where(function ($query) use ($prefix) {
+                $query->where('number', 'like', $prefix.'%')
+                    ->orWhere('gr_number', 'like', $prefix.'%');
+            })
+            ->orderByDesc('number')
+            ->orderByDesc('gr_number')
+            ->value('number');
+        if (! $last) {
+            $last = GoodsReceipt::where('gr_number', 'like', $prefix.'%')->orderByDesc('gr_number')->value('gr_number');
+        }
         $seq = $last ? ((int) substr($last, -4)) + 1 : 1;
         return $prefix.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
     }
