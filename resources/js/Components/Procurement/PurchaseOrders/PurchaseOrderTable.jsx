@@ -110,7 +110,7 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
                                         <Link className='rounded-lg border border-indigo-500 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50' href={route('apps.procurement.purchase-orders.show', po.id)}>Detail</Link>
                                         {status === 'draft' && <Link className='rounded-lg border border-amber-500 px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50' href={route('apps.procurement.purchase-orders.edit', po.id)}>Edit</Link>}
                                         {(status === 'draft' || status === 'cancelled') && <button type='button' onClick={() => handleDeleteDraft(po.id)} className='rounded-lg border border-rose-500 px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50'>Delete</button>}
-                                        {status === 'approved' && <Link className='rounded-lg border border-emerald-500 px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50' href={route('apps.procurement.goods-receipts.create-from-po', po.id)}>Create Goods Receiving</Link>}
+                                        {status === 'approved' && <Link className='rounded-lg border border-emerald-500 px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50' href={`${route('apps.inbound.receiving.create')}?po_id=${po.id}`}>Create Goods Receiving</Link>}
                                     </div>
                                 </Table.Td>
                             </tr>
