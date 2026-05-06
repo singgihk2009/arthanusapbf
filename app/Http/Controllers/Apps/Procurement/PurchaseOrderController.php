@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Inventory\Item;
 use App\Models\Inventory\Uom;
 use App\Models\Inventory\Warehouse;
+use App\Models\Procurement\GoodsReceipt;
 use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\Vendor;
 use Illuminate\Http\Request;
@@ -95,7 +96,18 @@ class PurchaseOrderController extends Controller
 
     public function show(PurchaseOrder $purchaseOrder)
     {
-        $purchaseOrder->load(['vendor:id,name','items.product:id,name','items.uom:id,name','goodsReceipts' => fn ($q) => $q->latest('received_date')]);
+        $purchaseOrder->load(['vendor:id,name','items.product:id,name','items.uom:id,name']);
+
+        $goodsReceipts = GoodsReceipt::query()
+            ->where(function ($query) use ($purchaseOrder) {
+                $query->where('purchase_order_id', $purchaseOrder->id)
+                    ->orWhere('po_id', $purchaseOrder->id);
+            })
+            ->latest('received_date')
+            ->get();
+
+        $purchaseOrder->setRelation('goodsReceipts', $goodsReceipts);
+
         $purchaseOrder->goodsReceipts->each(function ($gr) {
             $gr->total_qty = $gr->items()->sum('received_qty');
             $gr->total_value = $gr->items()->sum('inventory_total_cost');
