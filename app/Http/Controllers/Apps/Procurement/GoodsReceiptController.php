@@ -82,9 +82,12 @@ class GoodsReceiptController extends Controller
         $po = PurchaseOrder::with('items')->findOrFail($data['purchase_order_id']);
         abort_if(in_array($po->status, ['cancelled', 'closed', 'fully_received']), 422, 'PO sudah ditutup/dibatalkan.');
 
+        $grNumber = $this->nextNumber();
+
         $gr = GoodsReceipt::create([
             'business_id' => 1, 'purchase_order_id' => $po->id, 'vendor_id' => $po->vendor_id, 'warehouse_id' => $data['warehouse_id'],
-            'gr_number' => $this->nextNumber(), 'received_date' => $data['received_date'], 'status' => 'draft', 'notes' => $data['notes'] ?? null, 'created_by' => $request->user()?->id,
+            'number' => $grNumber, 'gr_number' => $grNumber, 'received_date' => $data['received_date'],
+            'status' => 'draft', 'notes' => $data['notes'] ?? null, 'created_by' => $request->user()?->id,
         ]);
 
         $stored = 0;
@@ -162,7 +165,17 @@ class GoodsReceiptController extends Controller
     private function nextNumber(): string
     {
         $prefix = 'GR-'.now()->format('Ym').'-';
-        $last = GoodsReceipt::where('gr_number', 'like', $prefix.'%')->orderByDesc('gr_number')->value('gr_number');
+        $last = GoodsReceipt::query()
+            ->where(function ($query) use ($prefix) {
+                $query->where('number', 'like', $prefix.'%')
+                    ->orWhere('gr_number', 'like', $prefix.'%');
+            })
+            ->orderByDesc('number')
+            ->orderByDesc('gr_number')
+            ->value('number');
+        if (! $last) {
+            $last = GoodsReceipt::where('gr_number', 'like', $prefix.'%')->orderByDesc('gr_number')->value('gr_number');
+        }
         $seq = $last ? ((int) substr($last, -4)) + 1 : 1;
         return $prefix.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
     }
