@@ -89,6 +89,8 @@ class GoodsReceiptController extends Controller
 
         $grNumber = $this->nextNumber();
 
+        $grNumber = $this->nextNumber();
+
         $gr = GoodsReceipt::create([
             'business_id' => 1, 'purchase_order_id' => $po->id, 'vendor_id' => $po->vendor_id, 'warehouse_id' => $data['warehouse_id'],
             'number' => $grNumber, 'gr_number' => $grNumber, 'received_date' => $data['received_date'],
