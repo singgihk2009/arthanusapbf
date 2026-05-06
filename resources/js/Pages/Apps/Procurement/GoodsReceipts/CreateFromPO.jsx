@@ -9,10 +9,11 @@ const toDateInputValue = (value) => {
     return str.length >= 10 ? str.slice(0, 10) : str;
 };
 
-export default function CreateFromPO({ purchaseOrder, items }) {
+export default function CreateFromPO({ purchaseOrder, items, warehouses = [] }) {
     const { data, setData, post, processing, errors, isDirty } = useForm({
         purchase_order_id: purchaseOrder.id,
         received_date: toDateInputValue(new Date().toISOString()),
+        warehouse_id: purchaseOrder.warehouse_id ? String(purchaseOrder.warehouse_id) : '',
         notes: '',
         items: items.map((item) => ({ ...item, received_qty: item.suggested_received_qty })),
     });
@@ -71,6 +72,16 @@ export default function CreateFromPO({ purchaseOrder, items }) {
                         <label className='text-sm text-gray-600'>Received Date</label>
                         <input type='date' value={data.received_date} onChange={(e) => setData('received_date', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' />
                         {errors.received_date && <small className='text-xs text-red-500'>{errors.received_date}</small>}
+                    </div>
+                    <div className='flex flex-col gap-2'>
+                        <label className='text-sm text-gray-600'>Warehouse</label>
+                        <select value={data.warehouse_id} onChange={(e) => setData('warehouse_id', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300'>
+                            <option value=''>Pilih Warehouse</option>
+                            {warehouses.map((warehouse) => (
+                                <option key={warehouse.id} value={warehouse.id}>{warehouse.code} - {warehouse.name}</option>
+                            ))}
+                        </select>
+                        {errors.warehouse_id && <small className='text-xs text-red-500'>{errors.warehouse_id}</small>}
                     </div>
                     <div className='flex flex-col gap-2 md:col-span-2'>
                         <label className='text-sm text-gray-600'>Notes</label>
