@@ -1,7 +1,7 @@
 import Table from '@/Components/Table';
 import { Link, router } from '@inertiajs/react';
 import { IconDatabaseOff } from '@tabler/icons-react';
-import { useMemo, useState } from 'react';
+import { cloneElement, isValidElement, useMemo, useState } from 'react';
 
 const STATUS_STYLES = {
     draft: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
@@ -19,9 +19,21 @@ const toRows = (purchaseOrders) => {
 };
 
 const formatCurrency = (value) => Number(value ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const formatDate = (po) => po?.po_date ?? po?.document_date ?? '-';
+const formatDate = (value) => {
+    if (!value) return '-';
 
-export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, compact = false, loading = false, emptyMessage = 'No purchase orders found', showApproveAction = true, onApproved = null }) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+
+    return new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'UTC',
+    }).format(date);
+};
+
+export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, compact = false, loading = false, emptyMessage = 'No purchase orders found', showApproveAction = true, onApproved = null, topActions = null }) {
     const rows = toRows(purchaseOrders);
     const [selectedIds, setSelectedIds] = useState([]);
 
@@ -46,16 +58,19 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
 
     return (
         <div className='space-y-3'>
-            {showApproveAction && (
-                <div className='flex justify-end'>
-                    <button
-                        type='button'
-                        onClick={approveSelectedDrafts}
-                        disabled={!selectedIds.length || !draftRows.length}
-                        className='rounded-lg border border-blue-500 px-3 py-2 text-sm font-medium text-blue-600 enabled:hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50'
-                    >
-                        Approve Selected ({selectedIds.length})
-                    </button>
+            {(showApproveAction || topActions) && (
+                <div className='flex flex-wrap items-center justify-end gap-2'>
+                    {isValidElement(topActions) ? cloneElement(topActions, { className: `${topActions.props.className ?? ''}`.trim() }) : topActions}
+                    {showApproveAction && (
+                        <button
+                            type='button'
+                            onClick={approveSelectedDrafts}
+                            disabled={!selectedIds.length || !draftRows.length}
+                            className='rounded-lg border border-blue-500 px-3 py-2 text-sm font-medium text-blue-600 enabled:hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50'
+                        >
+                            Approve Selected ({selectedIds.length})
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -86,8 +101,8 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
                                 <Table.Td className={compact ? 'p-3 text-xs' : ''}>{isDraft ? <input type='checkbox' checked={selectedIds.includes(po.id)} onChange={() => toggleDraftSelection(po.id)} /> : '-'}</Table.Td>
                                 <Table.Td className={compact ? 'p-3 text-xs' : ''}>{po.po_number ?? po.number ?? '-'}</Table.Td>
                                 {showVendor && <Table.Td className={compact ? 'p-3 text-xs' : ''}>{po.vendor_id ? <Link href={`/apps/procurement/vendors/${po.vendor_id}?tab=overview`} className='text-indigo-600 hover:underline'>{vendorName}</Link> : vendorName}</Table.Td>}
-                                <Table.Td className={compact ? 'p-3 text-xs' : ''}>{formatDate(po)}</Table.Td>
-                                <Table.Td className={compact ? 'p-3 text-xs' : ''}>{po.expected_delivery_date ?? po.expected_date ?? '-'}</Table.Td>
+                                <Table.Td className={compact ? 'p-3 text-xs' : ''}>{formatDate(po?.po_date ?? po?.document_date)}</Table.Td>
+                                <Table.Td className={compact ? 'p-3 text-xs' : ''}>{formatDate(po.expected_delivery_date ?? po.expected_date)}</Table.Td>
                                 <Table.Td className={compact ? 'p-3 text-xs' : ''}>{formatCurrency(po.grand_total)}</Table.Td>
                                 <Table.Td className={compact ? 'p-3 text-xs' : ''}><span className={`rounded-full px-2 py-1 text-xs font-medium ${badgeClass}`}>{po.status ?? '-'}</span></Table.Td>
                                 <Table.Td className={compact ? 'p-3 text-xs' : ''}>

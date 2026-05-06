@@ -42,16 +42,13 @@ export default function Index({ purchaseOrders, filters = {}, statuses = [] }) {
                 </div>
             </form>
 
-            <div className='mb-5 flex items-center justify-end gap-2'>
-                <Button type='link' href={route('apps.procurement.purchase-orders.create')} icon={<IconCirclePlus size={20} strokeWidth={1.5} />} variant='gray' label='Create PO' />
-            </div>
-
             <Table.Card title='Data Purchase Order'>
                 <PurchaseOrderTable
                     purchaseOrders={purchaseOrders}
                     showVendor={true}
                     emptyMessage='Data purchase order tidak ditemukan.'
                     onApproved={() => router.reload({ only: ['purchaseOrders'] })}
+                    topActions={<Button type='link' href={route('apps.procurement.purchase-orders.create')} icon={<IconCirclePlus size={20} strokeWidth={1.5} />} variant='gray' label='Create PO' />}
                 />
             </Table.Card>
 
