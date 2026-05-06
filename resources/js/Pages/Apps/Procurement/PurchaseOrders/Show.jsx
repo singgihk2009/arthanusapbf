@@ -9,7 +9,9 @@ export default function Show({ purchaseOrder }) {
     const statusClass = { draft: 'bg-gray-100 text-gray-700', approved: 'bg-blue-100 text-blue-700', partially_received: 'bg-amber-100 text-amber-700', fully_received: 'bg-green-100 text-green-700', closed: 'bg-purple-100 text-purple-700', cancelled: 'bg-red-100 text-red-700' }[poStatus] || 'bg-gray-100';
 
 
-    const canCreateGoodsReceiving = ['approved', 'partially_received'].includes(poStatus);
+    const hasOutstanding = purchaseOrder.items.some((i) => Number(i.remaining_qty ?? (Number(i.qty_ordered)-Number(i.received_qty ?? i.qty_received ?? 0))) > 0);
+    const fulfillmentStatus = String(purchaseOrder.fulfillment_status || purchaseOrder.status || '').toLowerCase();
+    const canCreateGoodsReceiving = ['approved', 'partially_received'].includes(poStatus) && !['fully_received'].includes(fulfillmentStatus) && !['cancelled','closed'].includes(poStatus) && hasOutstanding;
 
     const handleBack = () => {
         if (window.history.length > 1) {
@@ -47,6 +49,7 @@ export default function Show({ purchaseOrder }) {
                     <div><span className='font-semibold'>Vendor:</span> {purchaseOrder.vendor?.name ?? '-'}</div>
                     <div><span className='font-semibold'>PO Date:</span> {purchaseOrder.po_date}</div>
                     <div><span className='font-semibold'>Expected Delivery:</span> {purchaseOrder.expected_delivery_date ?? '-'}</div>
+                    <div><span className='font-semibold'>Fulfillment:</span> {fulfillmentStatus || '-'} </div>
                     <div><span className='font-semibold'>Grand Total:</span> {Number(purchaseOrder.grand_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
 
@@ -59,7 +62,7 @@ export default function Show({ purchaseOrder }) {
 
                 <Table>
                     <Table.Thead><tr><Table.Th>Product</Table.Th><Table.Th>Qty Ordered</Table.Th><Table.Th>Qty Received</Table.Th><Table.Th>Remaining Qty</Table.Th><Table.Th>Line Total</Table.Th></tr></Table.Thead>
-                    <Table.Tbody>{purchaseOrder.items.map((i) => <tr key={i.id}><Table.Td>{i.product?.name || i.product_name || '-'}</Table.Td><Table.Td>{i.qty_ordered}</Table.Td><Table.Td>{i.qty_received}</Table.Td><Table.Td>{(+i.qty_ordered) - (+i.qty_received)}</Table.Td><Table.Td>{Number(i.line_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Table.Td></tr>)}</Table.Tbody>
+                    <Table.Tbody>{purchaseOrder.items.map((i) => <tr key={i.id}><Table.Td>{i.product?.name || i.product_name || '-'}</Table.Td><Table.Td>{i.qty_ordered}</Table.Td><Table.Td>{i.received_qty ?? i.qty_received}</Table.Td><Table.Td>{i.remaining_qty ?? ((+i.qty_ordered) - (+(i.received_qty ?? i.qty_received)))}</Table.Td><Table.Td>{Number(i.line_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Table.Td></tr>)}</Table.Tbody>
                 </Table>
             </Card>
         </>
