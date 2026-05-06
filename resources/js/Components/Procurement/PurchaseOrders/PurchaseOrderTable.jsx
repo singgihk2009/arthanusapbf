@@ -95,6 +95,8 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
                         const badgeClass = STATUS_STYLES[status] || STATUS_STYLES.draft;
                         const vendorName = po.vendor?.name ?? po.vendor_name ?? '-';
                         const isDraft = status === 'draft';
+                        const outstandingItemsCount = Number(po.outstanding_items_count ?? 0);
+                        const canCreateGoodsReceiving = ['approved', 'partially_received'].includes(status) && outstandingItemsCount > 0;
 
                         return (
                             <tr key={po.id} className='hover:bg-gray-100 dark:hover:bg-gray-900'>
@@ -110,7 +112,7 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
                                         <Link className='rounded-lg border border-indigo-500 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50' href={route('apps.procurement.purchase-orders.show', po.id)}>Detail</Link>
                                         {status === 'draft' && <Link className='rounded-lg border border-amber-500 px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50' href={route('apps.procurement.purchase-orders.edit', po.id)}>Edit</Link>}
                                         {(status === 'draft' || status === 'cancelled') && <button type='button' onClick={() => handleDeleteDraft(po.id)} className='rounded-lg border border-rose-500 px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50'>Delete</button>}
-                                        {status === 'approved' && <Link className='rounded-lg border border-emerald-500 px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50' href={`${route('apps.inbound.receiving.create')}?po_id=${po.id}`}>Create Goods Receiving</Link>}
+                                        {canCreateGoodsReceiving && <Link className='rounded-lg border border-emerald-500 px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50' href={`${route('apps.inbound.receiving.create')}?po_id=${po.id}`}>Create Goods Receiving</Link>}
                                     </div>
                                 </Table.Td>
                             </tr>

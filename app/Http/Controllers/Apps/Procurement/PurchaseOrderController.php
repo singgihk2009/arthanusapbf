@@ -17,7 +17,14 @@ class PurchaseOrderController extends Controller
 {
     public function index(Request $request)
     {
-        $query = PurchaseOrder::with('vendor:id,name')->latest('document_date');
+        $query = PurchaseOrder::with('vendor:id,name')
+            ->withCount(['items as outstanding_items_count' => function ($itemQuery) {
+                $itemQuery->whereRaw('COALESCE(remaining_qty, qty_ordered - COALESCE(received_qty, qty_received, 0)) > 0')
+                    ->where(function ($lineQuery) {
+                        $lineQuery->whereNull('is_closed')->orWhere('is_closed', false);
+                    });
+            }])
+            ->latest('document_date');
         if ($request->filled('status')) $query->where('status', $request->string('status'));
         if ($request->filled('search')) {
             $search = $request->string('search');
