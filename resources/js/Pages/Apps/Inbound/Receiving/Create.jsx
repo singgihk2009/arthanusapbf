@@ -16,15 +16,15 @@ const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 p
 const lineInputClassName = 'rounded border border-gray-300 bg-white px-2 py-1 text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 
 export default function Create() {
-    const { items, uoms, warehouses, transactionCodes } = usePage().props;
+    const { items, uoms, warehouses, transactionCodes, prefill } = usePage().props;
     const [form, setForm] = useState({
         warehouse_id: '',
         transaction_date: new Date().toISOString().slice(0, 10),
-        transaction_code: 'PEMBELIAN',
-        reference: '',
-        vendor_name: '',
+        transaction_code: prefill?.transaction_code || 'PEMBELIAN',
+        reference: prefill?.reference || '',
+        vendor_name: prefill?.vendor_name || '',
         notes: '',
-        lines: [{ ...emptyLine }],
+        lines: prefill?.lines?.length ? prefill.lines : [{ ...emptyLine }],
     });
     const [errors, setErrors] = useState({});
     const [message, setMessage] = useState(null);
