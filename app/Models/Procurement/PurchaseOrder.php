@@ -12,7 +12,8 @@ class PurchaseOrder extends Model
 
     protected $guarded = [];
 
-    public const STATUSES = ['draft', 'approved', 'partially_received', 'fully_received', 'closed', 'cancelled'];
+    public const STATUSES = ['draft', 'pending_approval', 'approved', 'rejected', 'cancelled', 'closed'];
+    public const FULFILLMENT_STATUSES = ['not_received', 'partially_received', 'fully_received', 'closed'];
 
     protected $casts = [
         'po_date' => 'date',
@@ -45,7 +46,12 @@ class PurchaseOrder extends Model
     public function approve(?int $userId = null): void
     {
         if (!$this->isEditable()) abort(422, 'Hanya PO draft yang dapat di-approve.');
-        $this->update(['status' => 'approved', 'approved_by' => $userId, 'approved_at' => now()]);
+        $this->update([
+            'status' => 'approved',
+            'approved_by' => $userId,
+            'approved_at' => now(),
+            'fulfillment_status' => $this->fulfillment_status ?: 'not_received',
+        ]);
     }
 
     public function cancel(): void
@@ -56,15 +62,24 @@ class PurchaseOrder extends Model
 
     public function updateReceivingStatus(): void
     {
-        $total = $this->items()->count();
-        $fully = $this->items()->whereColumn('qty_received', '>=', 'qty_ordered')->count();
-        $has = $this->items()->where('qty_received', '>', 0)->exists();
+        $totals = $this->items()
+            ->selectRaw('COALESCE(SUM(qty_ordered), 0) as total_ordered')
+            ->selectRaw('COALESCE(SUM(COALESCE(received_qty, qty_received, 0)), 0) as total_received')
+            ->first();
 
-        $status = $this->status;
-        if ($total > 0 && $fully === $total) $status = 'fully_received';
-        elseif ($has) $status = 'partially_received';
+        $totalOrdered = (float) ($totals?->total_ordered ?? 0);
+        $totalReceived = (float) ($totals?->total_received ?? 0);
 
-        if ($status !== $this->status) $this->update(['status' => $status, 'fulfillment_status' => $status]);
+        $fulfillmentStatus = 'not_received';
+        if ($totalReceived > 0 && $totalReceived < $totalOrdered) {
+            $fulfillmentStatus = 'partially_received';
+        } elseif ($totalOrdered > 0 && $totalReceived >= $totalOrdered) {
+            $fulfillmentStatus = 'fully_received';
+        }
+
+        if ($fulfillmentStatus !== $this->fulfillment_status) {
+            $this->update(['fulfillment_status' => $fulfillmentStatus]);
+        }
     }
 
     public function isEditable(): bool

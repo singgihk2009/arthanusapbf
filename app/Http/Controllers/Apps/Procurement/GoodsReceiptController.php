@@ -41,7 +41,8 @@ class GoodsReceiptController extends Controller
 
     public function createFromPO(PurchaseOrder $purchaseOrder): Response
     {
-        abort_if(in_array($purchaseOrder->status, ['cancelled', 'closed', 'fully_received']), 422, 'PO tidak valid untuk receiving.');
+        abort_if(in_array($purchaseOrder->status, ['cancelled', 'closed']), 422, 'PO tidak valid untuk receiving.');
+        abort_if(strtolower((string) ($purchaseOrder->fulfillment_status ?? '')) === 'fully_received', 422, 'PO sudah fully received.');
         $purchaseOrder->load(['vendor:id,name', 'items.product:id,name', 'items.uom:id,name']);
 
         $items = $purchaseOrder->items->filter(fn ($i) => (float)($i->remaining_qty ?? ($i->qty_ordered - $i->qty_received)) > 0 && ! $i->is_closed)
@@ -83,7 +84,7 @@ class GoodsReceiptController extends Controller
             'items.*.warehouse_id' => 'nullable|integer|exists:warehouses,id',
         ]);
         $po = PurchaseOrder::with('items')->findOrFail($data['purchase_order_id']);
-        if (in_array($po->status, ['cancelled', 'closed', 'fully_received'])) {
+        if (in_array($po->status, ['cancelled', 'closed']) || strtolower((string) ($po->fulfillment_status ?? '')) === 'fully_received') {
             throw ValidationException::withMessages([
                 'purchase_order_id' => 'PO sudah ditutup/dibatalkan.',
             ]);

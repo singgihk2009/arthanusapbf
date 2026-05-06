@@ -76,6 +76,7 @@ class PurchaseOrderController extends Controller
                 'expected_date' => $expectedDeliveryDate,
                 'expected_delivery_date' => $expectedDeliveryDate,
                 'status' => 'draft',
+                'fulfillment_status' => 'not_received',
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $request->user()?->id,
             ]);
@@ -94,7 +95,11 @@ class PurchaseOrderController extends Controller
 
     public function show(PurchaseOrder $purchaseOrder)
     {
-        $purchaseOrder->load(['vendor:id,name','items.product:id,name','items.uom:id,name']);
+        $purchaseOrder->load(['vendor:id,name','items.product:id,name','items.uom:id,name','goodsReceipts' => fn ($q) => $q->latest('received_date')]);
+        $purchaseOrder->goodsReceipts->each(function ($gr) {
+            $gr->total_qty = $gr->items()->sum('received_qty');
+            $gr->total_value = $gr->items()->sum('inventory_total_cost');
+        });
         return Inertia::render('Apps/Procurement/PurchaseOrders/Show', ['purchaseOrder' => $purchaseOrder]);
     }
 
