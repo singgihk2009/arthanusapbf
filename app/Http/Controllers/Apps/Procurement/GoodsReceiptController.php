@@ -57,17 +57,33 @@ class GoodsReceiptController extends Controller
                 'suggested_received_qty' => $i->remaining_qty ?? ($i->qty_ordered - $i->received_qty),
             ]);
 
-        return Inertia::render('Apps/Procurement/GoodsReceipts/CreateFromPO', ['purchaseOrder' => $purchaseOrder, 'items' => $items]);
+        $warehouses = DB::table('warehouses')
+            ->select(['id', 'code', 'name'])
+            ->orderBy('name')
+            ->get();
+
+        return Inertia::render('Apps/Procurement/GoodsReceipts/CreateFromPO', [
+            'purchaseOrder' => $purchaseOrder,
+            'items' => $items,
+            'warehouses' => $warehouses,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate(['purchase_order_id' => 'required|exists:purchase_orders,id', 'received_date' => 'required|date', 'warehouse_id' => 'nullable|integer', 'notes' => 'nullable|string', 'items' => 'required|array|min:1']);
+        $data = $request->validate([
+            'purchase_order_id' => 'required|exists:purchase_orders,id',
+            'received_date' => 'required|date',
+            'warehouse_id' => 'required|integer|exists:warehouses,id',
+            'notes' => 'nullable|string',
+            'items' => 'required|array|min:1',
+            'items.*.warehouse_id' => 'nullable|integer|exists:warehouses,id',
+        ]);
         $po = PurchaseOrder::with('items')->findOrFail($data['purchase_order_id']);
         abort_if(in_array($po->status, ['cancelled', 'closed', 'fully_received']), 422, 'PO sudah ditutup/dibatalkan.');
 
         $gr = GoodsReceipt::create([
-            'business_id' => 1, 'purchase_order_id' => $po->id, 'vendor_id' => $po->vendor_id, 'warehouse_id' => $data['warehouse_id'] ?? null,
+            'business_id' => 1, 'purchase_order_id' => $po->id, 'vendor_id' => $po->vendor_id, 'warehouse_id' => $data['warehouse_id'],
             'gr_number' => $this->nextNumber(), 'received_date' => $data['received_date'], 'status' => 'draft', 'notes' => $data['notes'] ?? null, 'created_by' => $request->user()?->id,
         ]);
 
@@ -85,7 +101,7 @@ class GoodsReceiptController extends Controller
 
             $stored++;
             $gr->items()->create(array_merge([
-                'purchase_order_item_id' => $poi->id, 'product_id' => $poi->product_id, 'warehouse_id' => $item['warehouse_id'] ?? ($data['warehouse_id'] ?? null),
+                'purchase_order_item_id' => $poi->id, 'product_id' => $poi->product_id, 'warehouse_id' => $item['warehouse_id'] ?? $data['warehouse_id'],
                 'ordered_qty' => $poi->qty_ordered, 'previously_received_qty' => $poi->received_qty, 'received_qty' => $receive,
                 'remaining_qty' => $remaining - $receive, 'uom_id' => $poi->uom_id, 'po_unit_price' => $poi->unit_price,
                 'inventory_unit_cost' => $poi->unit_price, 'inventory_total_cost' => $receive * (float)$poi->unit_price,
