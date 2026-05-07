@@ -88,6 +88,7 @@ class PurchaseOrderController extends Controller
                 'created_by' => $request->user()?->id,
             ]);
             $defaultFacilitySchemeId = (int) (FacilityScheme::query()->where('code', 'REGULAR')->value('id') ?? 0);
+            $supportsFacilityScheme = $this->purchaseOrderItemHasFacilitySchemeColumn();
             foreach ($data['items'] as $item) {
                 $this->facilityValidationService->validateFacilityReference(
                     (int) ($item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId),
@@ -204,6 +205,7 @@ class PurchaseOrderController extends Controller
             ]);
             $purchaseOrder->items()->delete();
             $defaultFacilitySchemeId = (int) (FacilityScheme::query()->where('code', 'REGULAR')->value('id') ?? 0);
+            $supportsFacilityScheme = $this->purchaseOrderItemHasFacilitySchemeColumn();
             foreach ($data['items'] as $item) {
                 $this->facilityValidationService->validateFacilityReference(
                     (int) ($item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId),
