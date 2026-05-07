@@ -19,14 +19,14 @@ class FacilitySchemeController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $payload = $request->validate(['code'=>'required|string|max:100|unique:facility_schemes,code','name'=>'required|string|max:255']);
+        $payload = $request->validate(['code'=>'required|string|max:100|unique:facility_schemes,code','name'=>'required|string|max:255','requires_reference_no'=>'nullable|boolean']);
         FacilityScheme::create($payload + $request->only(['description','is_active','is_restricted','requires_tracking','requires_reporting','requires_approval','tax_treatment','ownership_type','allowed_movement_types','metadata']));
         return back()->with('success','Facility scheme created');
     }
 
     public function update(Request $request, FacilityScheme $facilityScheme): RedirectResponse
     {
-        $payload = $request->validate(['code'=>'required|string|max:100|unique:facility_schemes,code,'.$facilityScheme->id,'name'=>'required|string|max:255']);
+        $payload = $request->validate(['code'=>'required|string|max:100|unique:facility_schemes,code,'.$facilityScheme->id,'name'=>'required|string|max:255','requires_reference_no'=>'nullable|boolean']);
         $facilityScheme->update($payload + $request->only(['description','is_active','is_restricted','requires_tracking','requires_reporting','requires_approval','tax_treatment','ownership_type','allowed_movement_types','metadata']));
         return back()->with('success','Facility scheme updated');
     }
