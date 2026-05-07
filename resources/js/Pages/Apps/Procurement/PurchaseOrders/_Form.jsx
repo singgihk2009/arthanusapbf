@@ -5,6 +5,29 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { useMemo } from 'react';
 
 const emptyItem = (defaultFacilitySchemeId = '') => ({ product_id: '', product_name: '', uom_id: '', facility_scheme_id: defaultFacilitySchemeId, facility_reference_no: '', facility_reference_date: '', facility_reference_note: '', qty_ordered: 1, unit_price: 0, discount_amount: 0, tax_amount: 0, line_total: 0, notes: '' });
+const normalizeFacilityId = (value, fallback = '') => {
+    const resolved = value ?? fallback;
+    return resolved === null || resolved === undefined || resolved === '' ? '' : String(resolved);
+};
+const normalizeItem = (item = {}, fallbackFacilitySchemeId = '') => {
+    const qty = item.qty_ordered ?? 1;
+    const price = item.unit_price ?? 0;
+    const discount = item.discount_amount ?? 0;
+    const tax = item.tax_amount ?? 0;
+
+    return {
+        ...emptyItem(fallbackFacilitySchemeId),
+        ...item,
+        product_id: item.product_id ? String(item.product_id) : '',
+        uom_id: item.uom_id ? String(item.uom_id) : '',
+        facility_scheme_id: normalizeFacilityId(item.facility_scheme_id, fallbackFacilitySchemeId),
+        qty_ordered: qty,
+        unit_price: price,
+        discount_amount: discount,
+        tax_amount: tax,
+        line_total: (Number(qty) || 0) * (Number(price) || 0) - (Number(discount) || 0) + (Number(tax) || 0),
+    };
+};
 const toDateInputValue = (value) => {
     if (!value) return '';
     const str = String(value);
@@ -13,14 +36,21 @@ const toDateInputValue = (value) => {
 
 export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], facilitySchemes = [], defaultFacilitySchemeId = '', defaultVendorId = null, returnTo = '' }) {
     const isEdit = !!purchaseOrder;
+    const initialHeaderFacilitySchemeId = normalizeFacilityId(
+        purchaseOrder?.facility_scheme_id,
+        purchaseOrder?.items?.find((item) => item?.facility_scheme_id)?.facility_scheme_id ?? defaultFacilitySchemeId ?? ''
+    );
+    const initialItems = purchaseOrder?.items?.length
+        ? purchaseOrder.items.map((item) => normalizeItem(item, initialHeaderFacilitySchemeId || String(defaultFacilitySchemeId || '')))
+        : [emptyItem(String(initialHeaderFacilitySchemeId || defaultFacilitySchemeId || ''))];
     const { data, setData, post, put, processing, errors, isDirty } = useForm({
         vendor_id: purchaseOrder?.vendor_id || defaultVendorId || '',
         po_date: toDateInputValue(purchaseOrder?.po_date),
         expected_delivery_date: toDateInputValue(purchaseOrder?.expected_delivery_date),
         notes: purchaseOrder?.notes || '',
-        facility_scheme_id: purchaseOrder?.facility_scheme_id || String(defaultFacilitySchemeId || ''),
+        facility_scheme_id: initialHeaderFacilitySchemeId || String(defaultFacilitySchemeId || ''),
         return_to: returnTo || '',
-        items: purchaseOrder?.items?.length ? purchaseOrder.items : [emptyItem(String(defaultFacilitySchemeId || ''))],
+        items: initialItems,
     });
 
     const productUomMap = useMemo(() => Object.fromEntries(products.map((p) => [String(p.id), p.base_uom_id ? String(p.base_uom_id) : ''])), [products]);
@@ -65,7 +95,7 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Vendor</label><select value={data.vendor_id} onChange={(e) => setData('vendor_id', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300'><option value=''>-</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select>{errors.vendor_id && <small className='text-xs text-red-500'>{errors.vendor_id}</small>}</div>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>PO Date</label><input type='date' value={data.po_date} onChange={(e) => setData('po_date', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' />{errors.po_date && <small className='text-xs text-red-500'>{errors.po_date}</small>}</div>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Expected Delivery Date</label><input type='date' value={data.expected_delivery_date} onChange={(e) => setData('expected_delivery_date', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' /></div>
-                <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Header Facility</label><select value={data.facility_scheme_id} onChange={(e) => { const v=e.target.value; setData('facility_scheme_id', v); setData('items', data.items.map((it)=> ({...it, facility_scheme_id: it.facility_scheme_id || v}))); }} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700'><option value=''>-</option>{facilitySchemes.map((f)=><option key={f.id} value={f.id}>{f.code} - {f.name}</option>)}</select></div><div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Notes</label><textarea value={data.notes} onChange={(e) => setData('notes', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' /></div>
+                <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Header Facility</label><select value={data.facility_scheme_id} onChange={(e) => { const v=e.target.value; setData('facility_scheme_id', v); setData('items', data.items.map((it)=> ({...it, facility_scheme_id: v}))); }} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700'><option value=''>-</option>{facilitySchemes.map((f)=><option key={f.id} value={f.id}>{f.code} - {f.name}</option>)}</select></div><div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Notes</label><textarea value={data.notes} onChange={(e) => setData('notes', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' /></div>
             </div>
             <div className='mt-4 space-y-2'>
                 <div className='hidden md:grid md:grid-cols-10 md:gap-2 px-2 text-xs font-semibold text-gray-600'>
