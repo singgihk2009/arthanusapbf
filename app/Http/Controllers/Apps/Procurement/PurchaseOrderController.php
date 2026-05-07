@@ -100,6 +100,9 @@ class PurchaseOrderController extends Controller
                 ]);
 
                 $payload['facility_scheme_id'] = $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
+                if (! empty($payload['facility_scheme_id']) && in_array('facility_type', $this->purchaseOrderItemColumns(), true)) {
+                    $payload['facility_type'] = FacilityScheme::query()->whereKey($payload['facility_scheme_id'])->value('code');
+                }
 
                 $po->items()->create($this->sanitizePurchaseOrderItemPayload($payload));
             }
@@ -172,6 +175,14 @@ class PurchaseOrderController extends Controller
     {
         abort_unless($purchaseOrder->isEditable(), 422, 'PO hanya dapat diubah ketika draft.');
         $purchaseOrder->load('items');
+        $facilitySchemeByCode = FacilityScheme::query()->pluck('id', 'code');
+        $purchaseOrder->items->transform(function ($item) use ($facilitySchemeByCode) {
+            if (empty($item->facility_scheme_id) && ! empty($item->facility_type)) {
+                $item->facility_scheme_id = $facilitySchemeByCode[$item->facility_type] ?? null;
+            }
+
+            return $item;
+        });
         return Inertia::render('Apps/Procurement/PurchaseOrders/Edit', [
             'purchaseOrder' => $purchaseOrder,
             'vendors' => Vendor::select('id','name')->where('qualification_status', 'qualified')->orderBy('name')->get(),
@@ -217,6 +228,9 @@ class PurchaseOrderController extends Controller
                 ]);
 
                 $payload['facility_scheme_id'] = $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
+                if (! empty($payload['facility_scheme_id']) && in_array('facility_type', $this->purchaseOrderItemColumns(), true)) {
+                    $payload['facility_type'] = FacilityScheme::query()->whereKey($payload['facility_scheme_id'])->value('code');
+                }
 
                 $purchaseOrder->items()->create($this->sanitizePurchaseOrderItemPayload($payload));
             }
