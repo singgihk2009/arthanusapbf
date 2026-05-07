@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Apps\Inbound;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\ReceivingEntryRequest;
 use App\Models\Procurement\PurchaseOrder;
+use App\Services\Inventory\FacilityReferenceValidationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
@@ -16,6 +17,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReceivingEntryController extends Controller
 {
+    public function __construct(private readonly FacilityReferenceValidationService $facilityValidationService) {}
     public function index(): Response
     {
         $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
@@ -63,6 +65,10 @@ class ReceivingEntryController extends Controller
                         'batch_number' => '',
                         'expired_date' => '',
                         'notes' => '',
+                        'facility_scheme_id' => (string) ($line->facility_scheme_id ?? ''),
+                        'facility_reference_no' => (string) ($line->facility_reference_no ?? ''),
+                        'facility_reference_date' => (string) ($line->facility_reference_date ?? ''),
+                        'facility_reference_note' => (string) ($line->facility_reference_note ?? ''),
                     ])
                     ->values();
 
@@ -126,6 +132,10 @@ class ReceivingEntryController extends Controller
                 'batch_number' => (string) ($line->{$batchColumn} ?? ''),
                 'expired_date' => $line->expired_date ? (string) $line->expired_date : '',
                 'notes' => (string) ($line->notes ?? ''),
+                'facility_scheme_id' => (string) ($line->facility_scheme_id ?? ''),
+                'facility_reference_no' => (string) ($line->facility_reference_no ?? ''),
+                'facility_reference_date' => (string) ($line->facility_reference_date ?? ''),
+                'facility_reference_note' => (string) ($line->facility_reference_note ?? ''),
             ]);
 
         return Inertia::render('Apps/Inbound/Receiving/Edit', [
@@ -284,6 +294,7 @@ class ReceivingEntryController extends Controller
             $sourceItemId = null;
             $previouslyReceived = 0;
             $remainingQty = null;
+            $poItem = null;
 
             if ($isPoSource) {
                 $sourceItemId = (int) ($line['source_item_id'] ?? 0);
@@ -321,9 +332,17 @@ class ReceivingEntryController extends Controller
                 $batchColumn => $line['batch_number'] ?? null,
                 'expired_date' => $line['expired_date'] ?? null,
                 'notes' => $line['notes'] ?? null,
+                'facility_scheme_id' => $line['facility_scheme_id'] ?? ($poItem->facility_scheme_id ?? null),
+                'facility_reference_no' => $line['facility_reference_no'] ?? ($poItem->facility_reference_no ?? null),
+                'facility_reference_date' => $line['facility_reference_date'] ?? ($poItem->facility_reference_date ?? null),
+                'facility_reference_note' => $line['facility_reference_note'] ?? ($poItem->facility_reference_note ?? null),
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
+            $this->facilityValidationService->validateFacilityReference(
+                (int) ($linePayload['facility_scheme_id'] ?? 0),
+                $linePayload['facility_reference_no']
+            );
 
             DB::table('receiving_entry_lines')->insert($this->filterColumns('receiving_entry_lines', $linePayload));
         }

@@ -4,7 +4,7 @@ import Card from '@/Components/Card';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useMemo } from 'react';
 
-const emptyItem = (defaultFacilitySchemeId = '') => ({ product_id: '', product_name: '', uom_id: '', facility_scheme_id: defaultFacilitySchemeId, qty_ordered: 1, unit_price: 0, discount_amount: 0, tax_amount: 0, line_total: 0, notes: '' });
+const emptyItem = (defaultFacilitySchemeId = '') => ({ product_id: '', product_name: '', uom_id: '', facility_scheme_id: defaultFacilitySchemeId, facility_reference_no: '', facility_reference_date: '', facility_reference_note: '', qty_ordered: 1, unit_price: 0, discount_amount: 0, tax_amount: 0, line_total: 0, notes: '' });
 const toDateInputValue = (value) => {
     if (!value) return '';
     const str = String(value);
@@ -24,6 +24,7 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
     });
 
     const productUomMap = useMemo(() => Object.fromEntries(products.map((p) => [String(p.id), p.base_uom_id ? String(p.base_uom_id) : ''])), [products]);
+    const facilityMap = useMemo(() => Object.fromEntries(facilitySchemes.map((f) => [String(f.id), f])), [facilitySchemes]);
 
     const setItem = (index, key, value) => {
         const items = [...data.items];
@@ -68,23 +69,32 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
             </div>
             <div className='mt-4 space-y-2'>
                 <div className='hidden md:grid md:grid-cols-10 md:gap-2 px-2 text-xs font-semibold text-gray-600'>
-                    <div>Produk Master</div><div>Nama Produk</div><div>UoM</div><div>Facility</div><div>Qty</div><div>Harga</div><div>Diskon</div><div>Pajak</div><div>Total</div><div>Aksi</div>
+                    <div className='px-1'>Produk Master</div>
+                    <div className='px-1'>Nama Produk</div>
+                    <div className='px-1'>UoM</div>
+                    <div className='px-1'>Facility</div>
+                    <div className='px-1'>No Referensi</div>
+                    <div className='px-1'>Qty</div>
+                    <div className='px-1'>Harga</div>
+                    <div className='px-1'>Pajak</div>
+                    <div className='px-1'>Total</div>
+                    <div className='px-1'>Aksi</div>
                 </div>
                 {data.items.map((it, i) => <div key={i} className='grid grid-cols-1 gap-2 rounded border border-gray-200 p-2 md:grid-cols-10 dark:border-gray-800'>
                     <select value={it.product_id || ''} onChange={(e) => setItem(i, 'product_id', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900'><option value=''>Product</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
                     <input value={it.product_name || ''} onChange={(e) => setItem(i, 'product_name', e.target.value)} placeholder='Nama produk' className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                     <select value={it.uom_id || ''} onChange={(e) => setItem(i, 'uom_id', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900'><option value=''>UOM</option>{uoms.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
                     <select value={it.facility_scheme_id || ''} onChange={(e) => setItem(i, 'facility_scheme_id', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm'><option value=''>Facility</option>{facilitySchemes.map((f)=><option key={f.id} value={f.id}>{f.code}</option>)}</select>
+                    <input value={it.facility_reference_no || ''} onChange={(e) => setItem(i, 'facility_reference_no', e.target.value)} placeholder={(facilityMap[String(it.facility_scheme_id)]?.code === 'KEK_VAT_EXEMPT') ? 'No Referensi PPKEK' : 'No Referensi'} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                     <input type='number' value={it.qty_ordered} onChange={(e) => setItem(i, 'qty_ordered', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                     <input type='number' value={it.unit_price} onChange={(e) => setItem(i, 'unit_price', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
-                    <input type='number' value={it.discount_amount} onChange={(e) => setItem(i, 'discount_amount', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                     <input type='number' value={it.tax_amount} onChange={(e) => setItem(i, 'tax_amount', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                     <div className='flex items-center text-sm'>{Number(it.line_total || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                     <button type='button' onClick={() => setData('items', data.items.filter((_, idx) => idx !== i))} className='rounded border border-rose-400 px-2 py-1 text-xs text-rose-600'>Remove</button>
                 </div>)}
                 <button type='button' onClick={() => setData('items', [...data.items, emptyItem(String(data.facility_scheme_id || defaultFacilitySchemeId || ''))])} className='rounded border border-gray-300 px-3 py-1 text-sm'>+ Add Item</button>
             </div>
-            <div className='mt-3 text-right text-sm font-medium'>Subtotal: {totals.subtotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Discount: {totals.discount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Tax: {totals.tax.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Grand Total: {totals.grand.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className='mt-3 text-right text-sm font-medium'>Subtotal: {totals.subtotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Tax: {totals.tax.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Grand Total: {totals.grand.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
         </Card>
     </>;
 }

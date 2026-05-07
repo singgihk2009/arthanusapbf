@@ -10,6 +10,7 @@ use App\Models\Inventory\FacilityScheme;
 use App\Models\Procurement\GoodsReceipt;
 use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\Vendor;
+use App\Services\Inventory\FacilityReferenceValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -18,6 +19,7 @@ use Inertia\Inertia;
 
 class PurchaseOrderController extends Controller
 {
+    public function __construct(private readonly FacilityReferenceValidationService $facilityValidationService) {}
     public function index(Request $request)
     {
         $query = PurchaseOrder::with('vendor:id,name')
@@ -52,7 +54,7 @@ class PurchaseOrderController extends Controller
             'uoms' => Uom::select('id','name')->orderBy('name')->get(),
             'defaultVendorId' => $request->integer('vendor_id') ?: null,
             'returnTo' => $request->string('return_to')->toString(),
-            'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('code')->get(['id','code','name','is_restricted']),
+            'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('code')->get(['id','code','name','is_restricted','requires_reference_no']),
             'defaultFacilitySchemeId' => FacilityScheme::query()->where('code', 'REGULAR')->value('id'),
         ]);
     }
@@ -87,6 +89,10 @@ class PurchaseOrderController extends Controller
             ]);
             $defaultFacilitySchemeId = (int) (FacilityScheme::query()->where('code', 'REGULAR')->value('id') ?? 0);
             foreach ($data['items'] as $item) {
+                $this->facilityValidationService->validateFacilityReference(
+                    (int) ($item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId),
+                    $item['facility_reference_no'] ?? null
+                );
                 $lineBase = (float)$item['qty_ordered'] * (float)$item['unit_price'];
                 $po->items()->create(array_merge($item, [
                     'facility_scheme_id' => $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null,
@@ -168,7 +174,7 @@ class PurchaseOrderController extends Controller
             'products' => Item::select('id','name','base_uom_id')->orderBy('name')->get(),
             'uoms' => Uom::select('id','name')->orderBy('name')->get(),
             'returnTo' => $request->string('return_to')->toString(),
-            'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('code')->get(['id','code','name','is_restricted']),
+            'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('code')->get(['id','code','name','is_restricted','requires_reference_no']),
             'defaultFacilitySchemeId' => FacilityScheme::query()->where('code', 'REGULAR')->value('id'),
         ]);
     }
@@ -196,6 +202,10 @@ class PurchaseOrderController extends Controller
             $purchaseOrder->items()->delete();
             $defaultFacilitySchemeId = (int) (FacilityScheme::query()->where('code', 'REGULAR')->value('id') ?? 0);
             foreach ($data['items'] as $item) {
+                $this->facilityValidationService->validateFacilityReference(
+                    (int) ($item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId),
+                    $item['facility_reference_no'] ?? null
+                );
                 $lineBase = (float)$item['qty_ordered'] * (float)$item['unit_price'];
                 $purchaseOrder->items()->create(array_merge($item, [
                     'facility_scheme_id' => $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null,
@@ -238,6 +248,9 @@ class PurchaseOrderController extends Controller
             'items.*.tax_amount' => ['nullable','numeric','min:0'],
             'facility_scheme_id' => ['nullable','exists:facility_schemes,id'],
             'items.*.facility_scheme_id' => ['nullable','exists:facility_schemes,id'],
+            'items.*.facility_reference_no' => ['nullable','string','max:120'],
+            'items.*.facility_reference_date' => ['nullable','date'],
+            'items.*.facility_reference_note' => ['nullable','string'],
             'items.*.notes' => ['nullable','string'],
         ]);
     }
