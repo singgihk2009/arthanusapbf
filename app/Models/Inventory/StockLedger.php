@@ -13,6 +13,7 @@ class StockLedger extends Model
         'warehouse_id',
         'item_id',
         'batch_id',
+        'facility_scheme_id',
         'qty_base',
         'uom_id',
         'qty_input',

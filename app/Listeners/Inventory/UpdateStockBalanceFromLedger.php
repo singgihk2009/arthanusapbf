@@ -18,6 +18,7 @@ class UpdateStockBalanceFromLedger
                 'warehouse_id' => $ledger->warehouse_id,
                 'item_id' => $ledger->item_id,
                 'batch_id' => $ledger->batch_id,
+                'facility_scheme_id' => $ledger->facility_scheme_id,
             ],
             [
                 'on_hand_base' => 0,
@@ -29,6 +30,7 @@ class UpdateStockBalanceFromLedger
             ->where('warehouse_id', $ledger->warehouse_id)
             ->where('item_id', $ledger->item_id)
             ->where('batch_id', $ledger->batch_id)
+            ->where('facility_scheme_id', $ledger->facility_scheme_id)
             ->sum('qty_base');
 
         $balance->update(['on_hand_base' => $onHandBase]);
