@@ -63,6 +63,10 @@ class ReceivingEntryRequest extends FormRequest
             'lines.*.batch_number' => ['nullable', 'string', 'max:100'],
             'lines.*.expired_date' => ['nullable', 'date'],
             'lines.*.notes' => ['nullable', 'string'],
+            'lines.*.facility_scheme_id' => ['nullable', 'integer', 'exists:facility_schemes,id'],
+            'lines.*.facility_reference_no' => ['nullable', 'string', 'max:120'],
+            'lines.*.facility_reference_date' => ['nullable', 'date'],
+            'lines.*.facility_reference_note' => ['nullable', 'string'],
         ];
     }
 
