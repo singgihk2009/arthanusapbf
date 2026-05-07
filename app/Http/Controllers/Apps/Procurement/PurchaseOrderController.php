@@ -88,16 +88,24 @@ class PurchaseOrderController extends Controller
                 'created_by' => $request->user()?->id,
             ]);
             $defaultFacilitySchemeId = (int) (FacilityScheme::query()->where('code', 'REGULAR')->value('id') ?? 0);
+            $supportsFacilityScheme = $this->purchaseOrderItemHasFacilitySchemeColumn();
             foreach ($data['items'] as $item) {
                 $this->facilityValidationService->validateFacilityReference(
                     (int) ($item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId),
                     $item['facility_reference_no'] ?? null
                 );
                 $lineBase = (float)$item['qty_ordered'] * (float)$item['unit_price'];
-                $po->items()->create(array_merge($item, [
-                    'facility_scheme_id' => $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null,
-                    'line_total' => $lineBase - (float)$item['discount_amount'] + (float)$item['tax_amount']
-                ]));
+                $payload = array_merge($item, [
+                    'line_total' => $lineBase - (float) ($item['discount_amount'] ?? 0) + (float) ($item['tax_amount'] ?? 0),
+                ]);
+
+                if ($supportsFacilityScheme) {
+                    $payload['facility_scheme_id'] = $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
+                } else {
+                    unset($payload['facility_scheme_id']);
+                }
+
+                $po->items()->create($payload);
             }
             $po->recalculateTotals();
         });
@@ -201,16 +209,24 @@ class PurchaseOrderController extends Controller
             ]);
             $purchaseOrder->items()->delete();
             $defaultFacilitySchemeId = (int) (FacilityScheme::query()->where('code', 'REGULAR')->value('id') ?? 0);
+            $supportsFacilityScheme = $this->purchaseOrderItemHasFacilitySchemeColumn();
             foreach ($data['items'] as $item) {
                 $this->facilityValidationService->validateFacilityReference(
                     (int) ($item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId),
                     $item['facility_reference_no'] ?? null
                 );
                 $lineBase = (float)$item['qty_ordered'] * (float)$item['unit_price'];
-                $purchaseOrder->items()->create(array_merge($item, [
-                    'facility_scheme_id' => $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null,
-                    'line_total' => $lineBase - (float)$item['discount_amount'] + (float)$item['tax_amount']
-                ]));
+                $payload = array_merge($item, [
+                    'line_total' => $lineBase - (float) ($item['discount_amount'] ?? 0) + (float) ($item['tax_amount'] ?? 0),
+                ]);
+
+                if ($supportsFacilityScheme) {
+                    $payload['facility_scheme_id'] = $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
+                } else {
+                    unset($payload['facility_scheme_id']);
+                }
+
+                $purchaseOrder->items()->create($payload);
             }
             $purchaseOrder->recalculateTotals();
         });
@@ -253,6 +269,21 @@ class PurchaseOrderController extends Controller
             'items.*.facility_reference_note' => ['nullable','string'],
             'items.*.notes' => ['nullable','string'],
         ]);
+    }
+
+
+    private function purchaseOrderItemHasFacilitySchemeColumn(): bool
+    {
+        static $supportsFacilityScheme = null;
+
+        if ($supportsFacilityScheme !== null) {
+            return $supportsFacilityScheme;
+        }
+
+        $supportsFacilityScheme = Schema::hasTable('purchase_order_items')
+            && Schema::hasColumn('purchase_order_items', 'facility_scheme_id');
+
+        return $supportsFacilityScheme;
     }
 
     private function generateNumber(): string
