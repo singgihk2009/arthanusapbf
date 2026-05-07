@@ -191,6 +191,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'qty_input' => $line->qty_received,
                 'unit_cost' => $unitCostBase,
                 'created_by' => $request->user()?->id,
+                'facility_scheme_id' => $line->facility_scheme_id ?? $this->resolveRegularFacilitySchemeId(),
             ]);
         }
 
@@ -274,6 +275,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                     'qty_input' => $line->qty,
                     'unit_cost' => $unitCostBase,
                     'created_by' => $request->user()?->id,
+                'facility_scheme_id' => $line->facility_scheme_id ?? $this->resolveRegularFacilitySchemeId(),
                 ]);
             }
 
@@ -344,6 +346,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'qty_input' => $line->qty_requested,
                 'unit_cost' => $unitCost,
                 'created_by' => $request->user()?->id,
+                'facility_scheme_id' => $line->facility_scheme_id ?? $this->resolveRegularFacilitySchemeId(),
             ]);
 
             $this->stockService->postMutation([
@@ -358,6 +361,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'qty_input' => $line->qty_requested,
                 'unit_cost' => $unitCost,
                 'created_by' => $request->user()?->id,
+                'facility_scheme_id' => $line->facility_scheme_id ?? $this->resolveRegularFacilitySchemeId(),
             ]);
         }
 
@@ -414,6 +418,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                         'uom_id' => $line->uom_id,
                         'qty_input' => $line->qty_sold,
                         'created_by' => $request->user()?->id,
+                'facility_scheme_id' => $line->facility_scheme_id ?? $this->resolveRegularFacilitySchemeId(),
                     ]);
                 }
 
@@ -430,6 +435,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'uom_id' => $line->uom_id,
                 'qty_input' => $line->qty_sold,
                 'created_by' => $request->user()?->id,
+                'facility_scheme_id' => $line->facility_scheme_id ?? $this->resolveRegularFacilitySchemeId(),
             ]);
         }
 
@@ -480,6 +486,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'qty_input' => $line->qty_used,
                 'unit_cost' => $unitCost,
                 'created_by' => $request->user()?->id,
+                'facility_scheme_id' => $line->facility_scheme_id ?? $this->resolveRegularFacilitySchemeId(),
             ]);
         }
 
@@ -551,6 +558,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'uom_id' => $line->uom_id,
                 'qty_input' => $line->qty_adjusted,
                 'created_by' => $request->user()?->id,
+                'facility_scheme_id' => $line->facility_scheme_id ?? $this->resolveRegularFacilitySchemeId(),
             ]);
         }
 
@@ -1002,6 +1010,18 @@ class InventoryPostingController extends Controller implements HasMiddleware
         }
 
         return 0;
+    }
+
+    private function resolveRegularFacilitySchemeId(): ?int
+    {
+        static $regularId = null;
+        if ($regularId !== null) {
+            return $regularId;
+        }
+
+        $regularId = DB::table('facility_schemes')->where('code', 'REGULAR')->value('id');
+
+        return $regularId;
     }
 
     private function resolveColumn(string $table, array $candidates): ?string

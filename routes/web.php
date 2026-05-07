@@ -8,6 +8,7 @@ use App\Http\Controllers\Apps\MasterData\ItemController;
 use App\Http\Controllers\Apps\MasterData\UomController;
 use App\Http\Controllers\Apps\MasterData\CategoryController;
 use App\Http\Controllers\Apps\MasterData\WarehouseController;
+use App\Http\Controllers\Apps\MasterData\FacilitySchemeController;
 use App\Http\Controllers\Apps\MasterData\ItemBarcodeController;
 use App\Http\Controllers\Apps\MasterData\ItemUomConversionController;
 use App\Http\Controllers\Apps\MasterData\MinStockController;
@@ -23,6 +24,7 @@ use App\Http\Controllers\Apps\Outbound\StockOpnameController;
 use App\Http\Controllers\Apps\Transfer\WarehouseTransferController;
 use App\Http\Controllers\Apps\InventoryPostingController;
 use App\Http\Controllers\Apps\Reports\InventoryReportController;
+use App\Http\Controllers\Apps\Reports\FacilityMovementReportController;
 use App\Http\Controllers\Apps\Integration\IntegrationController;
 use App\Http\Controllers\Apps\Procurement\VendorController;
 use App\Http\Controllers\Apps\Procurement\PurchaseOrderController;
@@ -70,6 +72,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::get('/items/template/excel', [ItemController::class, 'downloadTemplateExcel'])->name('items.template.excel');
         Route::post('/items/import/excel', [ItemController::class, 'importExcel'])->name('items.import.excel');
         Route::resource('/items', ItemController::class);
+        Route::resource('/facility-schemes', FacilitySchemeController::class)->except(['create','edit','show']);
         Route::resource('/conversions', ItemUomConversionController::class)->parameters(['conversions' => 'conversion']);
         Route::resource('/barcodes', ItemBarcodeController::class)->parameters(['barcodes' => 'barcode']);
         Route::resource('/min-stocks', MinStockController::class)->parameters(['min-stocks' => 'min_stock']);
@@ -114,6 +117,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
     // inventory report page
     Route::get('/reports/inventory', InventoryReportPageController::class)->name('reports.inventory.index');
     Route::get('/reports/inventory/export/excel', [InventoryReportPageController::class, 'exportStockBalanceExcel'])->name('reports.inventory.export.excel');
+    Route::get('/reports/facility-movements', FacilityMovementReportController::class)->name('reports.facility-movements.index');
 
     // inventory posting actions
     Route::post('/inventory/posting/grn/{goodsReceipt}', [InventoryPostingController::class, 'postGoodsReceipt'])->name('inventory.posting.grn');
