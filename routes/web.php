@@ -73,6 +73,9 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], f
         Route::post('/items/import/excel', [ItemController::class, 'importExcel'])->name('items.import.excel');
         Route::resource('/items', ItemController::class);
         Route::resource('/facility-schemes', FacilitySchemeController::class)->except(['create','edit','show']);
+        Route::redirect('/facility-scheme', '/apps/master-data/facility-schemes', 301);
+        Route::redirect('/facilities', '/apps/master-data/facility-schemes', 301);
+        Route::redirect('/fasilitas', '/apps/master-data/facility-schemes', 301);
         Route::resource('/conversions', ItemUomConversionController::class)->parameters(['conversions' => 'conversion']);
         Route::resource('/barcodes', ItemBarcodeController::class)->parameters(['barcodes' => 'barcode']);
         Route::resource('/min-stocks', MinStockController::class)->parameters(['min-stocks' => 'min_stock']);
