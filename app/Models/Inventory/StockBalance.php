@@ -10,6 +10,7 @@ class StockBalance extends Model
         'warehouse_id',
         'item_id',
         'batch_id',
+        'facility_scheme_id',
         'on_hand_base',
         'reserved_base',
     ];
