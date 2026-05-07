@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Inventory\Item;
 use App\Models\Inventory\Uom;
 use App\Models\Inventory\Warehouse;
+use App\Models\Inventory\FacilityScheme;
 use App\Models\Procurement\GoodsReceipt;
 use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\Vendor;
@@ -51,6 +52,8 @@ class PurchaseOrderController extends Controller
             'uoms' => Uom::select('id','name')->orderBy('name')->get(),
             'defaultVendorId' => $request->integer('vendor_id') ?: null,
             'returnTo' => $request->string('return_to')->toString(),
+            'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('code')->get(['id','code','name','is_restricted']),
+            'defaultFacilitySchemeId' => FacilityScheme::query()->where('code', 'REGULAR')->value('id'),
         ]);
     }
 
@@ -82,9 +85,13 @@ class PurchaseOrderController extends Controller
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $request->user()?->id,
             ]);
+            $defaultFacilitySchemeId = (int) (FacilityScheme::query()->where('code', 'REGULAR')->value('id') ?? 0);
             foreach ($data['items'] as $item) {
                 $lineBase = (float)$item['qty_ordered'] * (float)$item['unit_price'];
-                $po->items()->create(array_merge($item, ['line_total' => $lineBase - (float)$item['discount_amount'] + (float)$item['tax_amount']]));
+                $po->items()->create(array_merge($item, [
+                    'facility_scheme_id' => $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null,
+                    'line_total' => $lineBase - (float)$item['discount_amount'] + (float)$item['tax_amount']
+                ]));
             }
             $po->recalculateTotals();
         });
@@ -161,6 +168,8 @@ class PurchaseOrderController extends Controller
             'products' => Item::select('id','name','base_uom_id')->orderBy('name')->get(),
             'uoms' => Uom::select('id','name')->orderBy('name')->get(),
             'returnTo' => $request->string('return_to')->toString(),
+            'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('code')->get(['id','code','name','is_restricted']),
+            'defaultFacilitySchemeId' => FacilityScheme::query()->where('code', 'REGULAR')->value('id'),
         ]);
     }
 
@@ -185,9 +194,13 @@ class PurchaseOrderController extends Controller
                 'notes' => $data['notes'] ?? null,
             ]);
             $purchaseOrder->items()->delete();
+            $defaultFacilitySchemeId = (int) (FacilityScheme::query()->where('code', 'REGULAR')->value('id') ?? 0);
             foreach ($data['items'] as $item) {
                 $lineBase = (float)$item['qty_ordered'] * (float)$item['unit_price'];
-                $purchaseOrder->items()->create(array_merge($item, ['line_total' => $lineBase - (float)$item['discount_amount'] + (float)$item['tax_amount']]));
+                $purchaseOrder->items()->create(array_merge($item, [
+                    'facility_scheme_id' => $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null,
+                    'line_total' => $lineBase - (float)$item['discount_amount'] + (float)$item['tax_amount']
+                ]));
             }
             $purchaseOrder->recalculateTotals();
         });
@@ -223,6 +236,8 @@ class PurchaseOrderController extends Controller
             'items.*.unit_price' => ['required','numeric','min:0'],
             'items.*.discount_amount' => ['nullable','numeric','min:0'],
             'items.*.tax_amount' => ['nullable','numeric','min:0'],
+            'facility_scheme_id' => ['nullable','exists:facility_schemes,id'],
+            'items.*.facility_scheme_id' => ['nullable','exists:facility_schemes,id'],
             'items.*.notes' => ['nullable','string'],
         ]);
     }

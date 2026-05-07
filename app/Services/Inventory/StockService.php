@@ -23,6 +23,7 @@ class StockService
                 'warehouse_id' => $payload['warehouse_id'],
                 'item_id' => $payload['item_id'],
                 'batch_id' => $payload['batch_id'] ?? null,
+                'facility_scheme_id' => $payload['facility_scheme_id'] ?? null,
                 'qty_base' => $payload['qty_base'],
                 'uom_id' => $payload['uom_id'],
                 'qty_input' => $payload['qty_input'],
