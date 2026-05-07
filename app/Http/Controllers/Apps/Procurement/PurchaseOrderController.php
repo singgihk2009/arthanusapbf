@@ -275,6 +275,15 @@ class PurchaseOrderController extends Controller
         return array_intersect_key($payload, array_flip($allowedColumns));
     }
 
+    /**
+     * Backward-compatible helper kept to avoid fatal errors in environments
+     * that still call the old method name (e.g. cached container/opcache).
+     */
+    private function purchaseOrderItemHasFacilitySchemeColumn(): bool
+    {
+        return in_array('facility_scheme_id', $this->purchaseOrderItemColumns(), true);
+    }
+
     private function purchaseOrderItemColumns(): array
     {
         static $columns = null;
