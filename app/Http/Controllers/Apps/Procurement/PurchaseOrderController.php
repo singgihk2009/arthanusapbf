@@ -99,13 +99,9 @@ class PurchaseOrderController extends Controller
                     'line_total' => $lineBase - (float) ($item['discount_amount'] ?? 0) + (float) ($item['tax_amount'] ?? 0),
                 ]);
 
-                if ($supportsFacilityScheme) {
-                    $payload['facility_scheme_id'] = $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
-                } else {
-                    unset($payload['facility_scheme_id']);
-                }
+                $payload['facility_scheme_id'] = $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
 
-                $po->items()->create($payload);
+                $po->items()->create($this->sanitizePurchaseOrderItemPayload($payload));
             }
             $po->recalculateTotals();
         });
@@ -220,13 +216,9 @@ class PurchaseOrderController extends Controller
                     'line_total' => $lineBase - (float) ($item['discount_amount'] ?? 0) + (float) ($item['tax_amount'] ?? 0),
                 ]);
 
-                if ($supportsFacilityScheme) {
-                    $payload['facility_scheme_id'] = $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
-                } else {
-                    unset($payload['facility_scheme_id']);
-                }
+                $payload['facility_scheme_id'] = $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
 
-                $purchaseOrder->items()->create($payload);
+                $purchaseOrder->items()->create($this->sanitizePurchaseOrderItemPayload($payload));
             }
             $purchaseOrder->recalculateTotals();
         });
@@ -272,18 +264,34 @@ class PurchaseOrderController extends Controller
     }
 
 
-    private function purchaseOrderItemHasFacilitySchemeColumn(): bool
+    private function sanitizePurchaseOrderItemPayload(array $payload): array
     {
-        static $supportsFacilityScheme = null;
+        $allowedColumns = $this->purchaseOrderItemColumns();
 
-        if ($supportsFacilityScheme !== null) {
-            return $supportsFacilityScheme;
+        if (empty($allowedColumns)) {
+            return $payload;
         }
 
-        $supportsFacilityScheme = Schema::hasTable('purchase_order_items')
-            && Schema::hasColumn('purchase_order_items', 'facility_scheme_id');
+        return array_intersect_key($payload, array_flip($allowedColumns));
+    }
 
-        return $supportsFacilityScheme;
+    private function purchaseOrderItemColumns(): array
+    {
+        static $columns = null;
+
+        if ($columns !== null) {
+            return $columns;
+        }
+
+        if (! Schema::hasTable('purchase_order_items')) {
+            $columns = [];
+
+            return $columns;
+        }
+
+        $columns = Schema::getColumnListing('purchase_order_items');
+
+        return $columns;
     }
 
     private function generateNumber(): string
