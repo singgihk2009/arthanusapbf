@@ -94,10 +94,16 @@ class PurchaseOrderController extends Controller
                     $item['facility_reference_no'] ?? null
                 );
                 $lineBase = (float)$item['qty_ordered'] * (float)$item['unit_price'];
-                $po->items()->create(array_merge($item, [
-                    'facility_scheme_id' => $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null,
-                    'line_total' => $lineBase - (float)$item['discount_amount'] + (float)$item['tax_amount']
-                ]));
+                $payload = array_merge($item, [
+                    'line_total' => $lineBase - (float) ($item['discount_amount'] ?? 0) + (float) ($item['tax_amount'] ?? 0),
+                ]);
+
+                $payload['facility_scheme_id'] = $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
+                if (! empty($payload['facility_scheme_id']) && in_array('facility_type', $this->purchaseOrderItemColumns(), true)) {
+                    $payload['facility_type'] = FacilityScheme::query()->whereKey($payload['facility_scheme_id'])->value('code');
+                }
+
+                $po->items()->create($this->sanitizePurchaseOrderItemPayload($payload));
             }
             $po->recalculateTotals();
         });
@@ -168,6 +174,14 @@ class PurchaseOrderController extends Controller
     {
         abort_unless($purchaseOrder->isEditable(), 422, 'PO hanya dapat diubah ketika draft.');
         $purchaseOrder->load('items');
+        $facilitySchemeByCode = FacilityScheme::query()->pluck('id', 'code');
+        $purchaseOrder->items->transform(function ($item) use ($facilitySchemeByCode) {
+            if (empty($item->facility_scheme_id) && ! empty($item->facility_type)) {
+                $item->facility_scheme_id = $facilitySchemeByCode[$item->facility_type] ?? null;
+            }
+
+            return $item;
+        });
         return Inertia::render('Apps/Procurement/PurchaseOrders/Edit', [
             'purchaseOrder' => $purchaseOrder,
             'vendors' => Vendor::select('id','name')->where('qualification_status', 'qualified')->orderBy('name')->get(),
@@ -207,10 +221,16 @@ class PurchaseOrderController extends Controller
                     $item['facility_reference_no'] ?? null
                 );
                 $lineBase = (float)$item['qty_ordered'] * (float)$item['unit_price'];
-                $purchaseOrder->items()->create(array_merge($item, [
-                    'facility_scheme_id' => $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null,
-                    'line_total' => $lineBase - (float)$item['discount_amount'] + (float)$item['tax_amount']
-                ]));
+                $payload = array_merge($item, [
+                    'line_total' => $lineBase - (float) ($item['discount_amount'] ?? 0) + (float) ($item['tax_amount'] ?? 0),
+                ]);
+
+                $payload['facility_scheme_id'] = $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
+                if (! empty($payload['facility_scheme_id']) && in_array('facility_type', $this->purchaseOrderItemColumns(), true)) {
+                    $payload['facility_type'] = FacilityScheme::query()->whereKey($payload['facility_scheme_id'])->value('code');
+                }
+
+                $purchaseOrder->items()->create($this->sanitizePurchaseOrderItemPayload($payload));
             }
             $purchaseOrder->recalculateTotals();
         });
@@ -253,6 +273,46 @@ class PurchaseOrderController extends Controller
             'items.*.facility_reference_note' => ['nullable','string'],
             'items.*.notes' => ['nullable','string'],
         ]);
+    }
+
+
+    private function sanitizePurchaseOrderItemPayload(array $payload): array
+    {
+        $allowedColumns = $this->purchaseOrderItemColumns();
+
+        if (empty($allowedColumns)) {
+            return $payload;
+        }
+
+        return array_intersect_key($payload, array_flip($allowedColumns));
+    }
+
+    /**
+     * Backward-compatible helper kept to avoid fatal errors in environments
+     * that still call the old method name (e.g. cached container/opcache).
+     */
+    private function purchaseOrderItemHasFacilitySchemeColumn(): bool
+    {
+        return in_array('facility_scheme_id', $this->purchaseOrderItemColumns(), true);
+    }
+
+    private function purchaseOrderItemColumns(): array
+    {
+        static $columns = null;
+
+        if ($columns !== null) {
+            return $columns;
+        }
+
+        if (! Schema::hasTable('purchase_order_items')) {
+            $columns = [];
+
+            return $columns;
+        }
+
+        $columns = Schema::getColumnListing('purchase_order_items');
+
+        return $columns;
     }
 
     private function generateNumber(): string
