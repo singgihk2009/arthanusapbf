@@ -5,6 +5,29 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { useMemo } from 'react';
 
 const emptyItem = (defaultFacilitySchemeId = '') => ({ product_id: '', product_name: '', uom_id: '', facility_scheme_id: defaultFacilitySchemeId, facility_reference_no: '', facility_reference_date: '', facility_reference_note: '', qty_ordered: 1, unit_price: 0, discount_amount: 0, tax_amount: 0, line_total: 0, notes: '' });
+const normalizeFacilityId = (value, fallback = '') => {
+    const resolved = value ?? fallback;
+    return resolved === null || resolved === undefined || resolved === '' ? '' : String(resolved);
+};
+const normalizeItem = (item = {}, fallbackFacilitySchemeId = '') => {
+    const qty = item.qty_ordered ?? 1;
+    const price = item.unit_price ?? 0;
+    const discount = item.discount_amount ?? 0;
+    const tax = item.tax_amount ?? 0;
+
+    return {
+        ...emptyItem(fallbackFacilitySchemeId),
+        ...item,
+        product_id: item.product_id ? String(item.product_id) : '',
+        uom_id: item.uom_id ? String(item.uom_id) : '',
+        facility_scheme_id: normalizeFacilityId(item.facility_scheme_id, fallbackFacilitySchemeId),
+        qty_ordered: qty,
+        unit_price: price,
+        discount_amount: discount,
+        tax_amount: tax,
+        line_total: (Number(qty) || 0) * (Number(price) || 0) - (Number(discount) || 0) + (Number(tax) || 0),
+    };
+};
 const toDateInputValue = (value) => {
     if (!value) return '';
     const str = String(value);
@@ -13,14 +36,21 @@ const toDateInputValue = (value) => {
 
 export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], facilitySchemes = [], defaultFacilitySchemeId = '', defaultVendorId = null, returnTo = '' }) {
     const isEdit = !!purchaseOrder;
+    const initialHeaderFacilitySchemeId = normalizeFacilityId(
+        purchaseOrder?.facility_scheme_id,
+        purchaseOrder?.items?.find((item) => item?.facility_scheme_id)?.facility_scheme_id ?? defaultFacilitySchemeId ?? ''
+    );
+    const initialItems = purchaseOrder?.items?.length
+        ? purchaseOrder.items.map((item) => normalizeItem(item, initialHeaderFacilitySchemeId || String(defaultFacilitySchemeId || '')))
+        : [emptyItem(String(initialHeaderFacilitySchemeId || defaultFacilitySchemeId || ''))];
     const { data, setData, post, put, processing, errors, isDirty } = useForm({
         vendor_id: purchaseOrder?.vendor_id || defaultVendorId || '',
         po_date: toDateInputValue(purchaseOrder?.po_date),
         expected_delivery_date: toDateInputValue(purchaseOrder?.expected_delivery_date),
         notes: purchaseOrder?.notes || '',
-        facility_scheme_id: purchaseOrder?.facility_scheme_id || String(defaultFacilitySchemeId || ''),
+        facility_scheme_id: initialHeaderFacilitySchemeId || String(defaultFacilitySchemeId || ''),
         return_to: returnTo || '',
-        items: purchaseOrder?.items?.length ? purchaseOrder.items : [emptyItem(String(defaultFacilitySchemeId || ''))],
+        items: initialItems,
     });
 
     const productUomMap = useMemo(() => Object.fromEntries(products.map((p) => [String(p.id), p.base_uom_id ? String(p.base_uom_id) : ''])), [products]);
