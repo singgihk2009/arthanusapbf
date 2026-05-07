@@ -3,6 +3,7 @@ import {
     IconArrowsExchange,
     IconBox,
     IconBuildingWarehouse,
+    IconBuildingFactory2,
     IconCategory,
     IconClipboardCheck,
     IconExchange,
@@ -54,6 +55,7 @@ export default function Menu() {
                 { title: 'Regulatory Product', href: '/apps/master-data/regulatory-products', icon: <IconStack2 size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/regulatory-products'), permissions: true },
                 { title: 'Regulatory Document', href: '/apps/master-data/regulatory-documents', icon: <IconFileDescription size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/regulatory-documents'), permissions: true },
                 { title: 'Minimum Stock', href: '/apps/master-data/min-stocks', icon: <IconListCheck size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/min-stocks'), permissions: true },
+                { title: 'Fasilitas', href: '/apps/master-data/facility-schemes', icon: <IconBuildingFactory2 size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/facility-schemes'), permissions: true },
             ],
         },
         {

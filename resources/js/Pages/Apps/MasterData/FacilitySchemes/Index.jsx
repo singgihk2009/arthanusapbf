@@ -1,5 +1,129 @@
 import AppLayout from '@/Layouts/AppLayout';
+import Button from '@/Components/Button';
+import Checkbox from '@/Components/Checkbox';
+import InputError from '@/Components/InputError';
+import Pagination from '@/Components/Pagination';
+import Table from '@/Components/Table';
+import TextInput from '@/Components/TextInput';
+import { Head, useForm } from '@inertiajs/react';
+import { IconDatabaseOff, IconPencilCog, IconTrash } from '@tabler/icons-react';
+import { useEffect, useState } from 'react';
+
+const initialForm = {
+    code: '',
+    name: '',
+    description: '',
+    is_active: true,
+    is_restricted: false,
+    requires_tracking: true,
+    requires_reporting: false,
+    requires_approval: false,
+    requires_reference_no: false,
+};
 
 export default function Index({ data }) {
-  return <AppLayout title="Facility Schemes"><div className="p-4">Facility schemes loaded: {data?.total ?? 0}</div></AppLayout>;
+    const [editing, setEditing] = useState(null);
+    const form = useForm(initialForm);
+
+    useEffect(() => {
+        if (editing) {
+            form.setData({
+                code: editing.code ?? '',
+                name: editing.name ?? '',
+                description: editing.description ?? '',
+                is_active: !!editing.is_active,
+                is_restricted: !!editing.is_restricted,
+                requires_tracking: !!editing.requires_tracking,
+                requires_reporting: !!editing.requires_reporting,
+                requires_approval: !!editing.requires_approval,
+                requires_reference_no: !!editing.requires_reference_no,
+            });
+        } else {
+            form.setData(initialForm);
+        }
+    }, [editing]);
+
+    const submit = (e) => {
+        e.preventDefault();
+        if (editing) {
+            form.put(route('apps.master-data.facility-schemes.update', editing.id), {
+                preserveScroll: true,
+                onSuccess: () => setEditing(null),
+            });
+            return;
+        }
+        form.post(route('apps.master-data.facility-schemes.store'), {
+            preserveScroll: true,
+            onSuccess: () => form.reset(),
+        });
+    };
+
+    return (
+        <>
+            <Head title="Master Fasilitas" />
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                <div className="lg:col-span-1">
+                    <Table.Card title={editing ? 'Edit Fasilitas' : 'Tambah Fasilitas'}>
+                        <form onSubmit={submit} className="space-y-3">
+                            <div>
+                                <TextInput value={form.data.code} onChange={(e) => form.setData('code', e.target.value)} placeholder="Kode" className="w-full" />
+                                <InputError message={form.errors.code} />
+                            </div>
+                            <div>
+                                <TextInput value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} placeholder="Nama fasilitas" className="w-full" />
+                                <InputError message={form.errors.name} />
+                            </div>
+                            <div>
+                                <textarea value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} className="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" rows={3} placeholder="Deskripsi" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                {[
+                                    ['is_active', 'Aktif'],
+                                    ['is_restricted', 'Restricted'],
+                                    ['requires_tracking', 'Perlu Tracking'],
+                                    ['requires_reporting', 'Perlu Reporting'],
+                                    ['requires_approval', 'Perlu Approval'],
+                                    ['requires_reference_no', 'No Referensi Wajib'],
+                                ].map(([key, label]) => (
+                                    <label key={key} className="flex items-center gap-2">
+                                        <Checkbox checked={form.data[key]} onChange={(e) => form.setData(key, e.target.checked)} /> {label}
+                                    </label>
+                                ))}
+                            </div>
+                            <div className="flex gap-2">
+                                <Button type="submit" variant="blue" label={editing ? 'Update' : 'Simpan'} />
+                                {editing && <Button type="button" onClick={() => setEditing(null)} variant="gray" label="Batal" />}
+                            </div>
+                        </form>
+                    </Table.Card>
+                </div>
+
+                <div className="lg:col-span-2">
+                    <Table.Card title={'Data Fasilitas'}>
+                        <Table>
+                            <Table.Thead><tr><Table.Th>Kode</Table.Th><Table.Th>Nama</Table.Th><Table.Th>Status</Table.Th><Table.Th className="w-32"></Table.Th></tr></Table.Thead>
+                            <Table.Tbody>
+                                {data.data.length ? data.data.map((item) => (
+                                    <tr key={item.id} className="hover:bg-gray-100 dark:hover:bg-gray-900">
+                                        <Table.Td>{item.code}</Table.Td>
+                                        <Table.Td>{item.name}</Table.Td>
+                                        <Table.Td>{item.is_active ? 'Aktif' : 'Nonaktif'}</Table.Td>
+                                        <Table.Td>
+                                            <div className="flex gap-2">
+                                                <Button type="button" onClick={() => setEditing(item)} icon={<IconPencilCog size={16} strokeWidth={1.5} />} variant="orange" />
+                                                <Button type="delete" url={route('apps.master-data.facility-schemes.destroy', item.id)} icon={<IconTrash size={16} strokeWidth={1.5} />} variant="rose" />
+                                            </div>
+                                        </Table.Td>
+                                    </tr>
+                                )) : <Table.Empty colSpan={4} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>Data fasilitas tidak ditemukan.</span></>} />}
+                            </Table.Tbody>
+                        </Table>
+                    </Table.Card>
+                    {data.last_page !== 1 && <Pagination links={data.links} />}
+                </div>
+            </div>
+        </>
+    );
 }
+
+Index.layout = (page) => <AppLayout children={page} />;
