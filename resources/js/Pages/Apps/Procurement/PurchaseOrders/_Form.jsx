@@ -38,17 +38,17 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
     const isEdit = !!purchaseOrder;
     const initialHeaderFacilitySchemeId = normalizeFacilityId(
         purchaseOrder?.facility_scheme_id,
-        purchaseOrder?.items?.find((item) => item?.facility_scheme_id)?.facility_scheme_id ?? defaultFacilitySchemeId ?? ''
+        purchaseOrder?.items?.find((item) => item?.facility_scheme_id)?.facility_scheme_id ?? ''
     );
     const initialItems = purchaseOrder?.items?.length
-        ? purchaseOrder.items.map((item) => normalizeItem(item, initialHeaderFacilitySchemeId || String(defaultFacilitySchemeId || '')))
+        ? purchaseOrder.items.map((item) => normalizeItem(item, initialHeaderFacilitySchemeId))
         : [emptyItem(String(initialHeaderFacilitySchemeId || defaultFacilitySchemeId || ''))];
     const { data, setData, post, put, processing, errors, isDirty } = useForm({
         vendor_id: purchaseOrder?.vendor_id || defaultVendorId || '',
         po_date: toDateInputValue(purchaseOrder?.po_date),
         expected_delivery_date: toDateInputValue(purchaseOrder?.expected_delivery_date),
         notes: purchaseOrder?.notes || '',
-        facility_scheme_id: initialHeaderFacilitySchemeId || String(defaultFacilitySchemeId || ''),
+        facility_scheme_id: initialHeaderFacilitySchemeId || (isEdit ? '' : String(defaultFacilitySchemeId || '')),
         return_to: returnTo || '',
         items: initialItems,
     });
