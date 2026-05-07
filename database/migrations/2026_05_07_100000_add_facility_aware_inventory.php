@@ -48,9 +48,9 @@ return new class extends Migration {
         }
 
         $tables = [
-            'purchase_requisition_lines', 'purchase_order_lines', 'receiving_entry_lines', 'item_batches',
+            'purchase_requisition_lines', 'purchase_order_lines', 'purchase_order_items', 'receiving_entry_lines', 'item_batches',
             'stock_ledgers', 'stock_balances', 'sales_lines', 'internal_usage_lines', 'warehouse_transfer_lines',
-            'stock_adjustment_lines', 'stock_opname_lines', 'goods_receipt_lines',
+            'stock_adjustment_lines', 'stock_opname_lines', 'goods_receipt_lines', 'goods_receipt_items',
         ];
 
         foreach ($tables as $tableName) {
@@ -88,7 +88,7 @@ return new class extends Migration {
 
     public function down(): void
     {
-        $tables = ['goods_receipt_lines','stock_opname_lines','stock_adjustment_lines','warehouse_transfer_lines','internal_usage_lines','sales_lines','stock_balances','stock_ledgers','item_batches','receiving_entry_lines','purchase_order_lines','purchase_requisition_lines'];
+        $tables = ['goods_receipt_items','goods_receipt_lines','stock_opname_lines','stock_adjustment_lines','warehouse_transfer_lines','internal_usage_lines','sales_lines','stock_balances','stock_ledgers','item_batches','receiving_entry_lines','purchase_order_lines','purchase_requisition_lines'];
         foreach ($tables as $tableName) {
             if (Schema::hasTable($tableName) && Schema::hasColumn($tableName, 'facility_scheme_id')) {
                 Schema::table($tableName, function (Blueprint $table) {
