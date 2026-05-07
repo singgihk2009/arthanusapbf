@@ -27,18 +27,18 @@ return new class extends Migration {
 
         Schema::create('warehouse_facility_schemes', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('warehouse_id')->constrained('warehouses')->cascadeOnDelete();
-            $table->foreignId('facility_scheme_id')->constrained('facility_schemes')->cascadeOnDelete();
+            $table->foreignId('warehouse_id')->constrained('warehouses', indexName: 'wfs_wh_fk')->cascadeOnDelete();
+            $table->foreignId('facility_scheme_id')->constrained('facility_schemes', indexName: 'wfs_fac_fk')->cascadeOnDelete();
             $table->timestamps();
-            $table->unique(['warehouse_id', 'facility_scheme_id']);
+            $table->unique(['warehouse_id', 'facility_scheme_id'], 'wfs_wh_fac_unq');
         });
 
         Schema::create('customer_facility_schemes', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
-            $table->foreignId('facility_scheme_id')->constrained('facility_schemes')->cascadeOnDelete();
+            $table->foreignId('customer_id')->constrained('customers', indexName: 'cfs_cust_fk')->cascadeOnDelete();
+            $table->foreignId('facility_scheme_id')->constrained('facility_schemes', indexName: 'cfs_fac_fk')->cascadeOnDelete();
             $table->timestamps();
-            $table->unique(['customer_id', 'facility_scheme_id']);
+            $table->unique(['customer_id', 'facility_scheme_id'], 'cfs_cust_fac_unq');
         });
 
         $tables = [
