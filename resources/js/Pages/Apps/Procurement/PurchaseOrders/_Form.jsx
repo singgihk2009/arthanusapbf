@@ -4,7 +4,7 @@ import Card from '@/Components/Card';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useMemo } from 'react';
 
-const emptyItem = (defaultFacilitySchemeId = '') => ({ product_id: '', product_name: '', uom_id: '', facility_scheme_id: defaultFacilitySchemeId, qty_ordered: 1, unit_price: 0, discount_amount: 0, tax_amount: 0, line_total: 0, notes: '' });
+const emptyItem = (defaultFacilitySchemeId = '') => ({ product_id: '', product_name: '', uom_id: '', facility_scheme_id: defaultFacilitySchemeId, facility_reference_no: '', facility_reference_date: '', facility_reference_note: '', qty_ordered: 1, unit_price: 0, discount_amount: 0, tax_amount: 0, line_total: 0, notes: '' });
 const toDateInputValue = (value) => {
     if (!value) return '';
     const str = String(value);
@@ -24,6 +24,7 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
     });
 
     const productUomMap = useMemo(() => Object.fromEntries(products.map((p) => [String(p.id), p.base_uom_id ? String(p.base_uom_id) : ''])), [products]);
+    const facilityMap = useMemo(() => Object.fromEntries(facilitySchemes.map((f) => [String(f.id), f])), [facilitySchemes]);
 
     const setItem = (index, key, value) => {
         const items = [...data.items];
@@ -75,6 +76,9 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
                     <input value={it.product_name || ''} onChange={(e) => setItem(i, 'product_name', e.target.value)} placeholder='Nama produk' className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                     <select value={it.uom_id || ''} onChange={(e) => setItem(i, 'uom_id', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900'><option value=''>UOM</option>{uoms.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
                     <select value={it.facility_scheme_id || ''} onChange={(e) => setItem(i, 'facility_scheme_id', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm'><option value=''>Facility</option>{facilitySchemes.map((f)=><option key={f.id} value={f.id}>{f.code}</option>)}</select>
+                    <input value={it.facility_reference_no || ''} onChange={(e) => setItem(i, 'facility_reference_no', e.target.value)} placeholder={(facilityMap[String(it.facility_scheme_id)]?.code === 'KEK_VAT_EXEMPT') ? 'No Referensi PPKEK' : 'No Referensi'} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
+                    <input type='date' value={it.facility_reference_date || ''} onChange={(e) => setItem(i, 'facility_reference_date', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
+                    <input value={it.facility_reference_note || ''} onChange={(e) => setItem(i, 'facility_reference_note', e.target.value)} placeholder='Catatan fasilitas' className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                     <input type='number' value={it.qty_ordered} onChange={(e) => setItem(i, 'qty_ordered', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                     <input type='number' value={it.unit_price} onChange={(e) => setItem(i, 'unit_price', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                     <input type='number' value={it.discount_amount} onChange={(e) => setItem(i, 'discount_amount', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
