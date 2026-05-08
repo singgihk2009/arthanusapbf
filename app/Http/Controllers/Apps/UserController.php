@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Apps;
 
 use App\Models\User;
 use App\Http\Requests\UserRequest;
+use App\Models\Inventory\Warehouse;
 use Spatie\Permission\Models\Role;
 use App\Http\Controllers\Controller;
 use Illuminate\Routing\Controllers\Middleware;
@@ -57,7 +58,8 @@ class UserController extends Controller implements HasMiddleware
 
         // render view
         return inertia('Apps/Users/Create', [
-            'roles' => $roles
+            'roles' => $roles,
+            'warehouses' => Warehouse::query()->select('id','code','name')->orderBy('name')->get()
         ]);
     }
 
@@ -75,6 +77,7 @@ class UserController extends Controller implements HasMiddleware
 
         // assign role to user
         $user->assignRole($request->selectedRoles);
+        $this->syncWarehouses($user, $request->input('warehouse_ids', []), $request->input('default_warehouse_id'));
 
         // render view
         return to_route('apps.users.index');
@@ -97,7 +100,11 @@ class UserController extends Controller implements HasMiddleware
         // render view
         return inertia('Apps/Users/Edit', [
             'roles' => $roles,
-            'user' => $user
+            'warehouses' => Warehouse::query()->select('id','code','name')->orderBy('name')->get(),
+            'user' => $user,
+            'warehouses' => Warehouse::query()->select('id','code','name')->orderBy('name')->get(),
+            'assignedWarehouseIds' => $user->warehouses()->pluck('warehouses.id')->map(fn($id)=>(string)$id)->values(),
+            'defaultWarehouseId' => optional($user->defaultWarehouse())->id ? (string) optional($user->defaultWarehouse())->id : null
         ]);
     }
 
@@ -120,6 +127,7 @@ class UserController extends Controller implements HasMiddleware
 
         // assign role to user
         $user->syncRoles($request->selectedRoles);
+        $this->syncWarehouses($user, $request->input('warehouse_ids', []), $request->input('default_warehouse_id'));
 
         // render view
         return to_route('apps.users.index');
@@ -140,4 +148,18 @@ class UserController extends Controller implements HasMiddleware
         // render view
         return back();
     }
+
+    private function syncWarehouses(User $user, array $warehouseIds, mixed $defaultWarehouseId): void
+    {
+        $warehouseIds = collect($warehouseIds)->map(fn ($id) => (int) $id)->unique()->values();
+        $isStockkeeper = collect($user->getRoleNames())->contains(fn ($name) => strtolower((string) $name) === 'stockkeeper');
+        if ($isStockkeeper && $warehouseIds->isEmpty()) { abort(422, 'Role Stockkeeper wajib memiliki minimal satu warehouse.'); }
+
+        $defaultWarehouseId = $defaultWarehouseId ? (int) $defaultWarehouseId : ($warehouseIds->first() ?: null);
+        if ($defaultWarehouseId && ! $warehouseIds->contains($defaultWarehouseId)) { abort(422, 'Default warehouse harus termasuk assigned warehouse.'); }
+
+        $syncData = $warehouseIds->mapWithKeys(fn ($id) => [$id => ['is_default' => $defaultWarehouseId === $id]])->all();
+        $user->warehouses()->sync($syncData);
+    }
 }
+
