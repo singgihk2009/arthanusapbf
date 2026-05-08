@@ -365,10 +365,13 @@ class ReceivingEntryController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
-            $this->facilityValidationService->validateFacilityReference(
-                (int) ($linePayload['facility_scheme_id'] ?? 0),
-                $linePayload['facility_reference_no']
-            );
+            $facilitySchemeId = (int) ($linePayload['facility_scheme_id'] ?? 0);
+            if ($facilitySchemeId > 0) {
+                $this->facilityValidationService->validateFacilityReference(
+                    $facilitySchemeId,
+                    $linePayload['facility_reference_no']
+                );
+            }
 
             DB::table('receiving_entry_lines')->insert($this->filterColumns('receiving_entry_lines', $linePayload));
         }
