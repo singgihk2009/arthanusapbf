@@ -14,6 +14,8 @@ class WarehouseTransferRequest extends FormRequest
 
     public function rules(): array
     {
+                $allowed = auth()->user()?->allowedWarehouseIds() ?? [];
+
         return [
             'from_warehouse_id' => ['required', 'integer', 'exists:warehouses,id', 'different:to_warehouse_id'],
             'to_warehouse_id' => ['required', 'integer', 'exists:warehouses,id', 'different:from_warehouse_id'],
@@ -30,6 +32,12 @@ class WarehouseTransferRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator): void {
+            $user = $this->user();
+            if ($user && ! $user->hasRole(['super-admin', 'Admin', 'Super Admin'])) {
+                $allowed = $user->allowedWarehouseIds();
+                if (! in_array((int) $this->input('from_warehouse_id'), $allowed, true)) { $validator->errors()->add('from_warehouse_id', 'Gudang asal tidak diizinkan.'); }
+                if (! in_array((int) $this->input('to_warehouse_id'), $allowed, true)) { $validator->errors()->add('to_warehouse_id', 'Gudang tujuan tidak diizinkan.'); }
+            }
             $lines = $this->input('lines', []);
 
             foreach ($lines as $index => $line) {

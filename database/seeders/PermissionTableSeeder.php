@@ -71,6 +71,23 @@ class PermissionTableSeeder extends Seeder
             'inventory-posting-adjustment',
             'inventory-posting-opening-balance',
 
+            
+            'inventory.view',
+            'inventory.dashboard.view',
+            'inventory.stock_card.view',
+            'inventory.stock_ledger.view',
+            'inventory.movement.view',
+            'inventory.receiving.view',
+            'inventory.receiving.create',
+            'inventory.receiving.update',
+            'inventory.adjustment.view',
+            'inventory.adjustment.create',
+            'inventory.transfer.view',
+            'inventory.transfer.create',
+            'inventory.stock_opname.view',
+            'inventory.stock_opname.create',
+            'inventory.report.view',
+
             // integration permissions
             'integration-access',
             'integration-outbox-read',
