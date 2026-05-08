@@ -12,6 +12,10 @@ class AuthHomeRouteService
             return route('apps.dashboard', absolute: false);
         }
 
+        if ($user->hasRole(['Stockkeeper', 'stockkeeper'])) {
+            return route('apps.inbound.receiving.index', absolute: false);
+        }
+
         if ($user->can('dashboard-data')) {
             return route('apps.dashboard', absolute: false);
         }
