@@ -20,6 +20,7 @@ class RestrictInventoryReportsAccess
             return $next($request);
         }
 
-        abort(403, 'Anda hanya memiliki akses ke modul report.');
+        return redirect()->route('apps.reports.inventory.index')
+            ->with('error', 'Anda hanya memiliki akses ke modul report.');
     }
 }
