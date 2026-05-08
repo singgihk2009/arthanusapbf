@@ -29,6 +29,12 @@ class UserRequest extends FormRequest
                 'email' => 'required|email|unique:users',
                 'password' => 'required|min:4|confirmed',
                 'selectedRoles' => 'required|array|min:1',
+                'warehouse_ids' => 'nullable|array',
+                'warehouse_ids.*' => 'integer|exists:warehouses,id',
+                'default_warehouse_id' => 'nullable|integer|exists:warehouses,id',
+                'warehouse_ids' => 'nullable|array',
+                'warehouse_ids.*' => 'integer|exists:warehouses,id',
+                'default_warehouse_id' => 'nullable|integer|exists:warehouses,id',
             ];
         elseif($method === 'PUT')
             return [
@@ -36,6 +42,9 @@ class UserRequest extends FormRequest
                 'email' => 'required|email|unique:users,email,'. $this->user->id,
                 'password' => 'nullable|min:4|confirmed',
                 'selectedRoles' => 'required|array|min:1',
+                'warehouse_ids' => 'nullable|array',
+                'warehouse_ids.*' => 'integer|exists:warehouses,id',
+                'default_warehouse_id' => 'nullable|integer|exists:warehouses,id',
             ];
     }
 

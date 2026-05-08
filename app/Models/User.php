@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Spatie\Permission\Traits\HasRoles;
+use App\Models\Inventory\Warehouse;
 
 class User extends Authenticatable
 {
@@ -64,6 +65,34 @@ class User extends Authenticatable
         return Attribute::make(
             get: fn ($value) => $value != null ? asset('/storage/avatars/' . $value) : asset('avatar.png'),
         );
+    }
+
+
+
+    public function warehouses()
+    {
+        return $this->belongsToMany(Warehouse::class, 'user_warehouses')
+            ->withPivot('is_default')
+            ->withTimestamps();
+    }
+
+    public function defaultWarehouse()
+    {
+        return $this->warehouses()->wherePivot('is_default', true)->first() ?? $this->warehouses()->first();
+    }
+
+    public function allowedWarehouseIds(): array
+    {
+        if ($this->hasRole(['super-admin', 'Admin', 'Super Admin'])) {
+            return Warehouse::query()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        }
+
+        return $this->warehouses()->pluck('warehouses.id')->map(fn ($id) => (int) $id)->all();
+    }
+
+    public function hasWarehouseAccess($warehouseId): bool
+    {
+        return in_array((int) $warehouseId, $this->allowedWarehouseIds(), true);
     }
 
     /**

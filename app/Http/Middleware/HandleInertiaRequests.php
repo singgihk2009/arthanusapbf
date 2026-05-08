@@ -34,7 +34,10 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
+                'roles' => $request->user() ? $request->user()->getRoleNames()->values() : [],
                 'permissions' => $request->user() ? $request->user()->getPermissions() : [],
+                'allowedWarehouses' => $request->user() ? $request->user()->warehouses()->select('warehouses.id','warehouses.code','warehouses.name')->orderBy('name')->get() : [],
+                'defaultWarehouse' => $request->user() ? $request->user()->defaultWarehouse() : null,
                 'super' => $request->user() ? $request->user()->isSuperAdmin() : false,
             ],
         ];
