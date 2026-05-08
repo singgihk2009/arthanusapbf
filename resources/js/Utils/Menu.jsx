@@ -26,7 +26,9 @@ import {
 export default function Menu() {
     const { url, props } = usePage();
     const roles = props?.auth?.roles ?? [];
-    const isStockkeeper = roles.some((role) => String(role).toLowerCase() === 'stockkeeper');
+    const normalizedRoles = roles.map((role) => String(role).toLowerCase());
+    const isStockkeeper = normalizedRoles.includes('stockkeeper');
+    const isInventoryReportsAccess = normalizedRoles.includes('inventory-reports-access');
 
     const menuNavigation = [
         {
@@ -114,6 +116,10 @@ export default function Menu() {
             ],
         },
     ];
+
+    if (isInventoryReportsAccess) {
+        return menuNavigation.filter((section) => section.title === 'REPORT');
+    }
 
     if (isStockkeeper) {
         return menuNavigation.filter((section) => section.title === 'INVENTORY');
