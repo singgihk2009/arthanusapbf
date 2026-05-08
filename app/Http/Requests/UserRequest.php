@@ -6,61 +6,48 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UserRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
-        $method = $this->method();
+        $base = [
+            'name' => 'required|string|max:255',
+            'selectedRoles' => 'required|array|min:1',
+            'warehouse_ids' => 'nullable|array',
+            'warehouse_ids.*' => 'integer|exists:warehouses,id',
+            'default_warehouse_id' => 'nullable|integer|exists:warehouses,id',
+        ];
 
-        if($method === 'POST')
-            return [
-                'name' => 'required|string|max:255',
+        if ($this->isMethod('post')) {
+            return $base + [
                 'email' => 'required|email|unique:users',
                 'password' => 'required|min:4|confirmed',
-                'selectedRoles' => 'required|array|min:1',
-                'warehouse_ids' => 'nullable|array',
-                'warehouse_ids.*' => 'integer|exists:warehouses,id',
-                'default_warehouse_id' => 'nullable|integer|exists:warehouses,id',
-                'warehouse_ids' => 'nullable|array',
-                'warehouse_ids.*' => 'integer|exists:warehouses,id',
-                'default_warehouse_id' => 'nullable|integer|exists:warehouses,id',
             ];
-        elseif($method === 'PUT')
-            return [
-                'name' => 'required|string|max:255',
-                'email' => 'required|email|unique:users,email,'. $this->user->id,
-                'password' => 'nullable|min:4|confirmed',
-                'selectedRoles' => 'required|array|min:1',
-                'warehouse_ids' => 'nullable|array',
-                'warehouse_ids.*' => 'integer|exists:warehouses,id',
-                'default_warehouse_id' => 'nullable|integer|exists:warehouses,id',
-            ];
+        }
+
+        return $base + [
+            'email' => 'required|email|unique:users,email,' . $this->user->id,
+            'password' => 'nullable|min:4|confirmed',
+        ];
     }
 
-    public function messages()
+    public function withValidator($validator): void
     {
-        return [
-            'name.required' => 'kolom nama pengguna tidak boleh kosong.',
-            'email.required' => 'kolom email pengguna tidak boleh kosong.',
-            'email.unique' => 'email pengguna sudah ada, silahkan gunakan nama lainnya.',
-            'password.required' => 'kolom kata sandi tidak boleh kosong',
-            'password.min' => 'kolom kata sandi minimal 4 huruf',
-            'password.confirmed' => 'kolom konfirmasi kata sandi tidak sesuai',
+        $validator->after(function ($validator): void {
+            $roles = collect($this->input('selectedRoles', []))->map(fn ($role) => strtolower((string) $role));
+            $warehouseIds = collect($this->input('warehouse_ids', []))->filter()->map(fn ($id) => (int) $id)->unique()->values();
+            $defaultWarehouseId = $this->input('default_warehouse_id') ? (int) $this->input('default_warehouse_id') : null;
 
-            'selectedRoles.required' => 'kolom akses group tidak boleh kosong.',
-            'selectedRoles.min' => 'kolom akses group minimal harus 1 data',
+            if ($roles->contains('stockkeeper') && $warehouseIds->isEmpty()) {
+                $validator->errors()->add('warehouse_ids', 'Role Stockkeeper wajib memiliki minimal satu warehouse.');
+            }
 
-        ];
+            if ($defaultWarehouseId && ! $warehouseIds->contains($defaultWarehouseId)) {
+                $validator->errors()->add('default_warehouse_id', 'Default warehouse wajib salah satu assigned warehouse.');
+            }
+        });
     }
 }

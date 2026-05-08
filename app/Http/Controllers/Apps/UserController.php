@@ -100,7 +100,6 @@ class UserController extends Controller implements HasMiddleware
         // render view
         return inertia('Apps/Users/Edit', [
             'roles' => $roles,
-            'warehouses' => Warehouse::query()->select('id','code','name')->orderBy('name')->get(),
             'user' => $user,
             'warehouses' => Warehouse::query()->select('id','code','name')->orderBy('name')->get(),
             'assignedWarehouseIds' => $user->warehouses()->pluck('warehouses.id')->map(fn($id)=>(string)$id)->values(),
@@ -153,7 +152,10 @@ class UserController extends Controller implements HasMiddleware
     {
         $warehouseIds = collect($warehouseIds)->map(fn ($id) => (int) $id)->unique()->values();
         $isStockkeeper = collect($user->getRoleNames())->contains(fn ($name) => strtolower((string) $name) === 'stockkeeper');
-        if ($isStockkeeper && $warehouseIds->isEmpty()) { abort(422, 'Role Stockkeeper wajib memiliki minimal satu warehouse.'); }
+        if ($isStockkeeper && $warehouseIds->isEmpty()) {
+            $user->warehouses()->sync([]);
+            return;
+        }
 
         $defaultWarehouseId = $defaultWarehouseId ? (int) $defaultWarehouseId : ($warehouseIds->first() ?: null);
         if ($defaultWarehouseId && ! $warehouseIds->contains($defaultWarehouseId)) { abort(422, 'Default warehouse harus termasuk assigned warehouse.'); }
