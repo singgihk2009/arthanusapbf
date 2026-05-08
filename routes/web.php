@@ -52,7 +52,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth']], function(){
+Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 'restrict_inventory_reports_access']], function(){
     // dashboard route
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     // permissions route
