@@ -36,7 +36,7 @@ class RoleTableSeeder extends Seeder
 
         $stockkeeper = Role::firstOrCreate(['name' => 'Stockkeeper']);
         $stockkeeperPermissions = Permission::whereIn('name', [
-            'inventory.view','inventory.dashboard.view','inventory.stock_card.view','inventory.stock_ledger.view','inventory.movement.view',
+            'dashboard-data','inventory.view','inventory.dashboard.view','inventory.stock_card.view','inventory.stock_ledger.view','inventory.movement.view',
             'inventory.receiving.view','inventory.receiving.create','inventory.receiving.update','inventory.adjustment.view','inventory.adjustment.create',
             'inventory.transfer.view','inventory.transfer.create','inventory.stock_opname.view','inventory.stock_opname.create','inventory.report.view'
         ])->get();

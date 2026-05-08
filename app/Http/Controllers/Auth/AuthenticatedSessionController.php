@@ -11,9 +11,31 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use App\Models\User;
 
 class AuthenticatedSessionController extends Controller
 {
+    private function resolveHomeRoute(?User $user): string
+    {
+        if (! $user) {
+            return route('apps.dashboard', absolute: false);
+        }
+
+        if ($user->can('dashboard-data')) {
+            return route('apps.dashboard', absolute: false);
+        }
+
+        if ($user->can('inventory.receiving.view') || $user->can('inventory.view')) {
+            return route('apps.inbound.receiving.index', absolute: false);
+        }
+
+        if ($user->can('inventory-reports-access')) {
+            return route('apps.reports.inventory.index', absolute: false);
+        }
+
+        return route('profile.edit', absolute: false);
+    }
+
     /**
      * Display the login view.
      */
@@ -34,7 +56,9 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('apps.dashboard', absolute: false));
+        $user = $request->user();
+
+        return redirect()->intended($this->resolveHomeRoute($user));
     }
 
     /**
