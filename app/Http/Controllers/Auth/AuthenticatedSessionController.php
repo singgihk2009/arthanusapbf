@@ -11,9 +11,11 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use App\Services\AuthHomeRouteService;
 
 class AuthenticatedSessionController extends Controller
 {
+
     /**
      * Display the login view.
      */
@@ -34,7 +36,7 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('apps.dashboard', absolute: false));
+        return redirect()->intended(app(AuthHomeRouteService::class)->resolve($request->user()));
     }
 
     /**

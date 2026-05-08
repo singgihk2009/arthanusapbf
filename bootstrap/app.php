@@ -3,6 +3,8 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use App\Services\AuthHomeRouteService;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -24,5 +26,20 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->respond(function ($response, $exception, $request) {
+            if ($request->expectsJson()) {
+                return $response;
+            }
+
+            $statusCode = $exception instanceof HttpExceptionInterface
+                ? $exception->getStatusCode()
+                : null;
+
+            if ($statusCode === 403 && $request->user()) {
+                return redirect(app(AuthHomeRouteService::class)->resolve($request->user()))
+                    ->with('error', 'Anda tidak memiliki akses ke halaman tersebut.');
+            }
+
+            return $response;
+        });
     })->create();
