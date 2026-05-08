@@ -24,7 +24,9 @@ import {
 } from '@tabler/icons-react';
 
 export default function Menu() {
-    const { url } = usePage();
+    const { url, props } = usePage();
+    const roles = props?.auth?.roles ?? [];
+    const isStockkeeper = roles.some((role) => String(role).toLowerCase() === 'stockkeeper');
 
     const menuNavigation = [
         {
@@ -112,6 +114,10 @@ export default function Menu() {
             ],
         },
     ];
+
+    if (isStockkeeper) {
+        return menuNavigation.filter((section) => section.title === 'INVENTORY');
+    }
 
     return menuNavigation;
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\ReceivingEntryRequest;
 use App\Models\Procurement\PurchaseOrder;
 use App\Services\Inventory\FacilityReferenceValidationService;
+use App\Services\WarehouseAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
@@ -17,12 +18,20 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReceivingEntryController extends Controller
 {
-    public function __construct(private readonly FacilityReferenceValidationService $facilityValidationService) {}
+    public function __construct(
+        private readonly FacilityReferenceValidationService $facilityValidationService,
+        private readonly WarehouseAccessService $warehouseAccessService
+    ) {}
     public function index(): Response
     {
+        $user = auth()->user();
+        abort_if(! $user, 401);
         $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
 
-        $entries = DB::table('receiving_entries')
+        $query = DB::table('receiving_entries');
+        $this->warehouseAccessService->scopeInventoryQuery($query, $user);
+
+        $entries = $query
             ->orderByDesc('id')
             ->paginate(15)
             ->through(function (object $entry) use ($warehouseCodes): object {
@@ -38,6 +47,9 @@ class ReceivingEntryController extends Controller
 
     public function create(\Illuminate\Http\Request $request): Response
     {
+        $user = $request->user();
+        abort_if(! $user, 401);
+        $allowedWarehouseIds = $this->warehouseAccessService->getAllowedWarehouseIds($user);
         $prefill = null;
         $poId = (int) $request->integer('po_id');
 
@@ -89,7 +101,7 @@ class ReceivingEntryController extends Controller
         return Inertia::render('Apps/Inbound/Receiving/Create', [
             'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
-            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
+            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
             'transactionCodes' => ['PEMBELIAN', 'RETUR', 'ADJUSTMENT'],
             'prefill' => $prefill,
         ]);
@@ -98,6 +110,7 @@ class ReceivingEntryController extends Controller
     public function store(ReceivingEntryRequest $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validated();
+        $this->warehouseAccessService->assertWarehouseAccess($request->user(), $validated['warehouse_id']);
         $userId = $request->user()?->id;
 
         DB::transaction(function () use ($validated, $userId): void {
@@ -114,8 +127,12 @@ class ReceivingEntryController extends Controller
 
     public function edit(int $receivingEntry): Response
     {
+        $user = auth()->user();
+        abort_if(! $user, 401);
         $entry = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
         abort_if(! $entry, 404);
+        $this->warehouseAccessService->assertWarehouseAccess($user, $this->resolveEntryWarehouseId($entry));
+        $allowedWarehouseIds = $this->warehouseAccessService->getAllowedWarehouseIds($user);
 
         $lineForeignKey = $this->resolveLineForeignKeyColumn();
         $batchColumn = $this->resolveBatchColumn();
@@ -151,7 +168,7 @@ class ReceivingEntryController extends Controller
             'lines' => $lines,
             'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
-            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
+            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
             'transactionCodes' => ['PEMBELIAN', 'RETUR', 'ADJUSTMENT'],
         ]);
     }
@@ -159,10 +176,12 @@ class ReceivingEntryController extends Controller
     public function update(ReceivingEntryRequest $request, int $receivingEntry): RedirectResponse|JsonResponse
     {
         $validated = $request->validated();
+        $this->warehouseAccessService->assertWarehouseAccess($request->user(), $validated['warehouse_id']);
 
         DB::transaction(function () use ($validated, $receivingEntry): void {
             $entry = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
             abort_if(! $entry, 404);
+            $this->warehouseAccessService->assertWarehouseAccess($request->user(), $this->resolveEntryWarehouseId($entry));
             abort_if(strtolower((string) ($entry->status ?? '')) === 'posted', 422, 'Dokumen POSTED tidak dapat diubah.');
 
             $warehouse = DB::table('warehouses')->where('id', $validated['warehouse_id'])->first(['id', 'code']);
@@ -199,9 +218,12 @@ class ReceivingEntryController extends Controller
 
     public function destroy(int $receivingEntry): RedirectResponse
     {
+        $user = auth()->user();
+        abort_if(! $user, 401);
         DB::transaction(function () use ($receivingEntry): void {
             $entry = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
             abort_if(! $entry, 404);
+            $this->warehouseAccessService->assertWarehouseAccess(auth()->user(), $this->resolveEntryWarehouseId($entry));
             abort_if(strtolower((string) ($entry->status ?? '')) === 'posted', 422, 'Dokumen POSTED tidak dapat dihapus.');
 
             DB::table('stock_ledgers')
@@ -219,8 +241,12 @@ class ReceivingEntryController extends Controller
 
     public function exportExcel(): StreamedResponse
     {
+        $user = auth()->user();
+        abort_if(! $user, 401);
         $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
-        $rows = DB::table('receiving_entries')->orderByDesc('id')->get();
+        $query = DB::table('receiving_entries');
+        $this->warehouseAccessService->scopeInventoryQuery($query, $user);
+        $rows = $query->orderByDesc('id')->get();
 
         return response()->streamDownload(function () use ($rows, $warehouseCodes): void {
             $output = fopen('php://output', 'w');

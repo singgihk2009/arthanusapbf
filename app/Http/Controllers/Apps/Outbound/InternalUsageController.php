@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Apps\Outbound;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\InternalUsageRequest;
+use App\Services\WarehouseAccessService;
 use App\Services\Inventory\UomConversionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -20,15 +21,23 @@ class InternalUsageController extends Controller
         ['value' => 'INTERNAL_USE', 'label' => 'Internal Use'],
     ];
 
-    public function __construct(private readonly UomConversionService $uomConversionService)
+    public function __construct(
+        private readonly UomConversionService $uomConversionService,
+        private readonly WarehouseAccessService $warehouseAccessService
+    )
     {
     }
 
     public function index(): Response
     {
+        $user = auth()->user();
+        abort_if(! $user, 401);
         $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
 
-        $entries = DB::table('internal_usages')
+        $query = DB::table('internal_usages');
+        $this->warehouseAccessService->scopeInventoryQuery($query, $user);
+
+        $entries = $query
             ->orderByDesc('id')
             ->paginate(15)
             ->through(function (object $entry) use ($warehouseCodes): object {
@@ -44,10 +53,14 @@ class InternalUsageController extends Controller
 
     public function create(): Response
     {
+        $user = auth()->user();
+        abort_if(! $user, 401);
+        $allowedWarehouseIds = $this->warehouseAccessService->getAllowedWarehouseIds($user);
+
         return Inertia::render('Apps/Outbound/InternalUsage/Create', [
             'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
-            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
+            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
             'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
             'transactionCodes' => self::TRANSACTION_CODE_OPTIONS,
         ]);
@@ -56,6 +69,7 @@ class InternalUsageController extends Controller
     public function store(InternalUsageRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+        $this->warehouseAccessService->assertWarehouseAccess($request->user(), $validated['warehouse_id']);
 
         DB::transaction(function () use ($validated): void {
             $entryId = DB::table('internal_usages')->insertGetId([
@@ -79,8 +93,12 @@ class InternalUsageController extends Controller
 
     public function edit(int $internalUsage): Response
     {
+        $user = auth()->user();
+        abort_if(! $user, 401);
         $entry = DB::table('internal_usages')->where('id', $internalUsage)->first();
         abort_if(! $entry, 404);
+        $this->warehouseAccessService->assertWarehouseAccess($user, $entry->warehouse_id);
+        $allowedWarehouseIds = $this->warehouseAccessService->getAllowedWarehouseIds($user);
 
         $lines = DB::table('internal_usage_lines')
             ->where('internal_usage_id', $internalUsage)
@@ -108,7 +126,7 @@ class InternalUsageController extends Controller
             'lines' => $lines,
             'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
-            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('name')->get(),
+            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
             'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
             'transactionCodes' => self::TRANSACTION_CODE_OPTIONS,
         ]);
@@ -117,10 +135,12 @@ class InternalUsageController extends Controller
     public function update(InternalUsageRequest $request, int $internalUsage): RedirectResponse
     {
         $validated = $request->validated();
+        $this->warehouseAccessService->assertWarehouseAccess($request->user(), $validated['warehouse_id']);
 
         DB::transaction(function () use ($validated, $internalUsage): void {
             $entry = DB::table('internal_usages')->where('id', $internalUsage)->first();
             abort_if(! $entry, 404);
+            $this->warehouseAccessService->assertWarehouseAccess($request->user(), $entry->warehouse_id);
             abort_if($entry->status === 'POSTED', 422, 'Dokumen POSTED tidak dapat diubah.');
             $linked = DB::table('inv_transactions')->where('source_table', 'internal_usages')->where('source_id', $entry->id)->exists();
             abort_if($linked, 422, 'Dokumen sudah terikat GL, gunakan reversal/adjustment.');
@@ -143,9 +163,12 @@ class InternalUsageController extends Controller
 
     public function destroy(int $internalUsage): RedirectResponse
     {
+        $user = auth()->user();
+        abort_if(! $user, 401);
         DB::transaction(function () use ($internalUsage): void {
             $entry = DB::table('internal_usages')->where('id', $internalUsage)->first();
             abort_if(! $entry, 404);
+            $this->warehouseAccessService->assertWarehouseAccess(auth()->user(), $entry->warehouse_id);
             abort_if($entry->status === 'POSTED', 422, 'Dokumen POSTED tidak dapat dihapus.');
             $linked = DB::table('inv_transactions')->where('source_table', 'internal_usages')->where('source_id', $entry->id)->exists();
             abort_if($linked, 422, 'Dokumen sudah terikat GL, gunakan reversal/adjustment.');
