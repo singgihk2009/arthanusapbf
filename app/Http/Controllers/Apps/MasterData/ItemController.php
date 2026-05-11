@@ -183,7 +183,7 @@ class ItemController extends Controller implements HasMiddleware
                         'category_id' => $categoryId,
                         'base_uom_id' => $baseUomId,
                         'track_expired' => $this->toBoolean($data['track_expired'] ?? null),
-                        'is_active' => $this->toBoolean($data['is_active'] ?? 1),
+                        'is_active' => $this->toBoolean($data['is_active'] ?? null, true),
                     ]
                 );
 
@@ -535,6 +535,10 @@ class ItemController extends Controller implements HasMiddleware
         foreach ($xml->sheetData->row as $row) {
             $line = [];
             foreach ($row->c as $cell) {
+                $cellReference = (string) ($cell['r'] ?? '');
+                preg_match('/^[A-Z]+/', $cellReference, $matches);
+                $columnLetters = $matches[0] ?? '';
+                $columnIndex = $this->columnLettersToIndex($columnLetters);
                 $type = (string) ($cell['t'] ?? '');
                 $value = '';
 
@@ -547,8 +551,13 @@ class ItemController extends Controller implements HasMiddleware
                     $value = isset($cell->v) ? (string) $cell->v : '';
                 }
 
-                $line[] = trim($value);
+                if ($columnIndex >= 0) {
+                    $line[$columnIndex] = trim($value);
+                } else {
+                    $line[] = trim($value);
+                }
             }
+            ksort($line);
             $table[] = $line;
         }
 
@@ -621,10 +630,34 @@ class ItemController extends Controller implements HasMiddleware
         return true;
     }
 
-    private function toBoolean(mixed $value): bool
+    private function toBoolean(mixed $value, bool $default = false): bool
     {
+        if ($value === null || trim((string) $value) === '') {
+            return $default;
+        }
+
         $normalized = strtolower(trim((string) $value));
 
         return in_array($normalized, ['1', 'true', 'yes', 'ya'], true);
+    }
+
+    private function columnLettersToIndex(string $letters): int
+    {
+        $letters = strtoupper(trim($letters));
+        if ($letters === '') {
+            return -1;
+        }
+
+        $index = 0;
+        foreach (str_split($letters) as $char) {
+            $ord = ord($char);
+            if ($ord < 65 || $ord > 90) {
+                return -1;
+            }
+
+            $index = ($index * 26) + ($ord - 64);
+        }
+
+        return $index - 1;
     }
 }
