@@ -170,6 +170,7 @@ export default function Index() {
                         <tr>
                             <Table.Th className="w-10">No</Table.Th>
                             <Table.Th><button type="button" onClick={() => toggleSort('sku')} className="inline-flex items-center gap-1">SKU {sortIcon('sku')}</button></Table.Th>
+                            <Table.Th>NIE</Table.Th>
                             <Table.Th><button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1">Nama {sortIcon('name')}</button></Table.Th>
                             <Table.Th><button type="button" onClick={() => toggleSort('category_name')} className="inline-flex items-center gap-1">Kategori {sortIcon('category_name')}</button></Table.Th>
                             <Table.Th>Base UOM</Table.Th>
@@ -184,6 +185,7 @@ export default function Index() {
                             <tr key={item.id} className="hover:bg-gray-100 dark:hover:bg-gray-900">
                                 <Table.Td className="text-center">{++i + (items.current_page - 1) * items.per_page}</Table.Td>
                                 <Table.Td>{item.sku}</Table.Td>
+                                <Table.Td>{item.nie ?? '-'}</Table.Td>
                                 <Table.Td>{item.name}</Table.Td>
                                 <Table.Td>{item.category?.name ?? '-'}</Table.Td>
                                 <Table.Td>{item.base_uom?.code ?? '-'}</Table.Td>
@@ -202,7 +204,7 @@ export default function Index() {
                                     </div>
                                 </Table.Td>
                             </tr>
-                        )) : <Table.Empty colSpan={9} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto text-gray-500 dark:text-white mb-2'/><span className='text-gray-500'>Data item tidak ditemukan.</span></>} />}
+                        )) : <Table.Empty colSpan={10} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto text-gray-500 dark:text-white mb-2'/><span className='text-gray-500'>Data item tidak ditemukan.</span></>} />}
                     </Table.Tbody>
                 </Table>
             </Table.Card>
