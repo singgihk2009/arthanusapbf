@@ -91,11 +91,12 @@ class ItemController extends Controller implements HasMiddleware
 
         return response()->streamDownload(function () use ($rows): void {
             $output = fopen('php://output', 'w');
-            fputcsv($output, ['SKU', 'Nama', 'Kategori', 'Base UOM', 'Minimum Stok', 'Jumlah Foto', 'Status']);
+            fputcsv($output, ['SKU', 'NIE', 'Nama', 'Kategori', 'Base UOM', 'Minimum Stok', 'Jumlah Foto', 'Status']);
 
             foreach ($rows as $item) {
                 fputcsv($output, [
                     $item->sku,
+                    $item->nie,
                     $item->name,
                     $item->category?->name ?? '-',
                     $item->baseUom?->code ?? '-',
@@ -114,8 +115,8 @@ class ItemController extends Controller implements HasMiddleware
     public function downloadTemplateExcel()
     {
         $rows = [
-            ['sku', 'name', 'category_name', 'base_uom_code', 'default_barcode', 'track_expired', 'is_active', 'warehouse_code', 'min_stock_base'],
-            ['SKU-001', 'Contoh Item', 'MED-OTC', 'PCS', '8990011223344', '0', '1', 'WH-UTAMA', '10'],
+            ['sku', 'nie', 'name', 'category_name', 'base_uom_code', 'default_barcode', 'track_expired', 'is_active', 'warehouse_code', 'min_stock_base'],
+            ['SKU-001', 'NIE-001', 'Contoh Item', 'MED-OTC', 'PCS', '8990011223344', '0', '1', 'WH-UTAMA', '10'],
         ];
 
         $tempPath = storage_path('app/master-item-template-'.now()->format('YmdHis').'.xlsx');
@@ -154,6 +155,7 @@ class ItemController extends Controller implements HasMiddleware
                 $data = validator($row, [
                     'sku' => ['required', 'string', 'max:100'],
                     'name' => ['required', 'string', 'max:255'],
+                    'nie' => ['nullable', 'string', 'max:255'],
                     'category_code' => ['nullable', 'string', 'max:100'],
                     'category_name' => ['nullable', 'string', 'max:255'],
                     'category' => ['nullable', 'string', 'max:255'],
@@ -177,6 +179,7 @@ class ItemController extends Controller implements HasMiddleware
                     ['sku' => $data['sku']],
                     [
                         'name' => $data['name'],
+                        'nie' => $data['nie'] ?? null,
                         'category_id' => $categoryId,
                         'base_uom_id' => $baseUomId,
                         'track_expired' => $this->toBoolean($data['track_expired'] ?? null),
