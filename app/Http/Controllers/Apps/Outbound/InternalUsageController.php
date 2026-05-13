@@ -137,7 +137,7 @@ class InternalUsageController extends Controller
         $validated = $request->validated();
         $this->warehouseAccessService->assertWarehouseAccess($request->user(), $validated['warehouse_id']);
 
-        DB::transaction(function () use ($validated, $internalUsage): void {
+        DB::transaction(function () use ($validated, $internalUsage, $request): void {
             $entry = DB::table('internal_usages')->where('id', $internalUsage)->first();
             abort_if(! $entry, 404);
             $this->warehouseAccessService->assertWarehouseAccess($request->user(), $entry->warehouse_id);
