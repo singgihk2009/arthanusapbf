@@ -64,9 +64,9 @@ export default function Index() {
             { key: 'number', label: 'No' },
             { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
             { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
-            ...((isIncomingReport || isUsageReport) ? [{ key: 'gr_number', label: 'Nomor Dokumen' }] : []),
-            { key: 'transaction_code', label: 'Kode Transaksi' },
             { key: 'reference', label: 'Referensi' },
+            ...((isIncomingReport || isUsageReport) ? [{ key: 'gr_number', label: 'Nomor PO' }] : []),
+            { key: 'transaction_code', label: 'Kode Transaksi' },
             ...((isIncomingReport || isUsageReport) ? [{ key: 'po_date', label: 'Tanggal PO' }] : []),
             { key: 'item_name', label: 'Item', sortKey: 'item' },
             { key: 'category_name', label: 'Kategori', sortKey: 'category' },
@@ -298,9 +298,9 @@ export default function Index() {
                                     ) : (
                                         <>
                                             <Table.Td>{formatDate(row.trx_datetime)}</Table.Td>
+                                            <Table.Td>{row.reference}</Table.Td>
                                             {(isIncomingReport || isUsageReport) && <Table.Td>{row.gr_number ?? '-'}</Table.Td>}
                                             <Table.Td>{row.transaction_code}</Table.Td>
-                                            <Table.Td>{row.reference}</Table.Td>
                                             {(isIncomingReport || isUsageReport) && <Table.Td>{formatDate(row.po_date)}</Table.Td>}
                                             <Table.Td>{row.item_name}</Table.Td>
                                             <Table.Td>{row.category_name}</Table.Td>
