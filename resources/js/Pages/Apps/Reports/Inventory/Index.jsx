@@ -4,7 +4,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import React, { useMemo } from 'react';
 
 export default function Index() {
-    const { filters, warehouses, categories, items, reportData } = usePage().props;
+    const { filters, warehouses, categories, items, facilitySchemes, reportData } = usePage().props;
 
     const reportTypes = [
         { value: 'incoming-items', label: 'Laporan Barang Masuk (Qty & Value)' },
@@ -72,6 +72,8 @@ export default function Index() {
                 ? [
                     { key: 'status', label: 'Status', sortKey: 'status' },
                     { key: 'vendor_name', label: 'Vendor', sortKey: 'vendor' },
+                    { key: 'facility_name', label: 'Fasilitas' },
+                    { key: 'facility_reference_no', label: 'No Fasilitas' },
                 ]
                 : []),
         ];
@@ -172,6 +174,20 @@ export default function Index() {
                                 <option value="all">Semua Status</option>
                                 <option value="posted">Posted</option>
                                 <option value="unposted">Belum Posted</option>
+                            </select>
+                        )}
+
+
+                        {isIncomingReport && (
+                            <select
+                                value={filters.facility_scheme_id ?? ''}
+                                onChange={(e) => updateFilters({ facility_scheme_id: e.target.value || null, page: 1 })}
+                                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
+                            >
+                                <option value="">Semua Fasilitas</option>
+                                {facilitySchemes.map((facility) => (
+                                    <option key={facility.id} value={facility.id}>{facility.code} - {facility.name}</option>
+                                ))}
                             </select>
                         )}
 
@@ -280,6 +296,8 @@ export default function Index() {
                                                 <>
                                                     <Table.Td>{row.status}</Table.Td>
                                                     <Table.Td>{row.vendor_name}</Table.Td>
+                                                    <Table.Td>{row.facility_name}</Table.Td>
+                                                    <Table.Td>{row.facility_reference_no}</Table.Td>
                                                 </>
                                             )}
                                         </>
