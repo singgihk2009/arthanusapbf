@@ -30,6 +30,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('code')->get(),
             'categories' => DB::table('categories')->select('id', 'name')->orderBy('name')->get(),
             'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
+            'facilitySchemes' => DB::table('facility_schemes')->select('id', 'code', 'name')->orderBy('code')->get(),
             'reportData' => $reportData,
         ]);
     }
@@ -93,6 +94,8 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             if ($isIncoming) {
                 $xlsxRows[0][] = 'Status';
                 $xlsxRows[0][] = 'Vendor';
+                $xlsxRows[0][] = 'Fasilitas';
+                $xlsxRows[0][] = 'No Fasilitas';
             }
         }
 
@@ -137,6 +140,8 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 if ($isIncoming) {
                     $line[] = $row->status;
                     $line[] = $row->vendor_name;
+                    $line[] = $row->facility_name;
+                    $line[] = $row->facility_reference_no;
                 }
             }
 
@@ -185,6 +190,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             'sort_dir' => $sortDir,
             'per_page' => $perPage,
             'status' => strtolower($request->string('status')->toString() ?: 'all'),
+            'facility_scheme_id' => $request->integer('facility_scheme_id') ?: null,
             'start_date' => $request->date('start_date')?->toDateString() ?? now()->subDays(30)->toDateString(),
             'end_date' => $request->date('end_date')?->toDateString() ?? now()->toDateString(),
         ];
@@ -331,6 +337,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             ->join('items', 'items.id', '=', 'receiving_entry_lines.item_id')
             ->join('uoms', 'uoms.id', '=', 'receiving_entry_lines.uom_id')
             ->leftJoin('categories', 'categories.id', '=', 'items.category_id')
+            ->leftJoin('facility_schemes', 'facility_schemes.id', '=', 'receiving_entry_lines.facility_scheme_id')
             ->when($status !== 'all', function ($query) use ($status) {
                 if ($status === 'posted') {
                     $query->where('receiving_entries.status', 'POSTED');
@@ -342,6 +349,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             })
             ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('receiving_entries.warehouse_id', $warehouseId))
             ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('items.category_id', $categoryId))
+            ->when($filters['facility_scheme_id'], fn ($query, $facilitySchemeId) => $query->where('receiving_entry_lines.facility_scheme_id', $facilitySchemeId))
             ->when($filters['search'] !== '', function ($query) use ($filters) {
                 $keyword = '%'.$filters['search'].'%';
                 $query->where(function ($subQuery) use ($keyword) {
@@ -370,6 +378,8 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw('ABS(COALESCE(receiving_entry_lines.value, receiving_entry_lines.qty * COALESCE(receiving_entry_lines.price, 0))) as value'),
                 DB::raw("COALESCE(receiving_entries.status, 'DRAFT') as status"),
                 DB::raw("COALESCE(receiving_entries.vendor_name, '-') as vendor_name"),
+                DB::raw("COALESCE(facility_schemes.name, facility_schemes.code, '-') as facility_name"),
+                DB::raw("COALESCE(receiving_entry_lines.facility_reference_no, '-') as facility_reference_no"),
             ])
             ->orderBy($sortColumn, $filters['sort_dir'])
             ->orderBy('receiving_entry_lines.id', 'desc');
