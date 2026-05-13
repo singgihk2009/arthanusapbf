@@ -78,7 +78,9 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'Warehouse',
                 'Tanggal',
                 'Kode Transaksi',
+                'Nomor GR',
                 'Referensi',
+                'Tanggal PO',
                 'Item',
                 'Kategori',
                 'SKU',
@@ -88,8 +90,8 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 $isIncoming ? 'Value' : 'Valuation Rp',
             ]];
 
-            $numberColumns = [8, 9, 10];
-            $dateColumns = [1];
+            $numberColumns = [10, 11, 12];
+            $dateColumns = [1, 5];
 
             if ($isIncoming) {
                 $xlsxRows[0][] = 'Status';
@@ -127,7 +129,9 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                     $row->warehouse_name,
                     $row->trx_datetime,
                     $row->transaction_code,
+                    $row->gr_number,
                     $row->reference,
+                    $row->po_date,
                     $row->item_name,
                     $row->category_name,
                     $row->sku,
@@ -338,6 +342,10 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             ->join('uoms', 'uoms.id', '=', 'receiving_entry_lines.uom_id')
             ->leftJoin('categories', 'categories.id', '=', 'items.category_id')
             ->leftJoin('facility_schemes', 'facility_schemes.id', '=', 'receiving_entry_lines.facility_scheme_id')
+            ->leftJoin('purchase_orders', function ($join) {
+                $join->on('purchase_orders.id', '=', 'receiving_entries.source_id')
+                    ->where('receiving_entries.source_type', '=', 'purchase_order');
+            })
             ->when($status !== 'all', function ($query) use ($status) {
                 if ($status === 'posted') {
                     $query->where('receiving_entries.status', 'POSTED');
@@ -371,7 +379,9 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'items.sku',
                 DB::raw("DATE_FORMAT(receiving_entries.transaction_date, '%Y-%m-%d') as trx_datetime"),
                 DB::raw("COALESCE(receiving_entries.transaction_code, '-') as transaction_code"),
+                DB::raw("COALESCE(receiving_entries.number, '-') as gr_number"),
                 DB::raw("COALESCE(receiving_entries.reference, receiving_entries.number) as reference"),
+                DB::raw("COALESCE(DATE_FORMAT(purchase_orders.po_date, '%Y-%m-%d'), '-') as po_date"),
                 DB::raw('COALESCE(uoms.code, uoms.name) as uom_name'),
                 DB::raw('COALESCE(receiving_entry_lines.price, 0) as unit_price'),
                 DB::raw('ABS(receiving_entry_lines.qty) as qty'),
