@@ -51,10 +51,10 @@ export default function Index() {
             { key: 'number', label: 'No' },
             { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
             { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
-            ...(isIncomingReport ? [{ key: 'gr_number', label: 'Nomor GR' }] : []),
+            ...((isIncomingReport || isUsageReport) ? [{ key: 'gr_number', label: 'Nomor Dokumen' }] : []),
             { key: 'transaction_code', label: 'Kode Transaksi' },
             { key: 'reference', label: 'Referensi' },
-            ...(isIncomingReport ? [{ key: 'po_date', label: 'Tanggal PO' }] : []),
+            ...((isIncomingReport || isUsageReport) ? [{ key: 'po_date', label: 'Tanggal PO' }] : []),
             { key: 'item_name', label: 'Item', sortKey: 'item' },
             { key: 'category_name', label: 'Kategori', sortKey: 'category' },
             { key: 'sku', label: 'SKU' },
@@ -67,10 +67,10 @@ export default function Index() {
             },
             {
                 key: 'value',
-                label: isIncomingReport ? 'Value' : 'Valuation Rp',
+                label: isIncomingReport ? 'Value' : 'Value',
                 sortKey: 'value',
             },
-            ...(isIncomingReport
+            ...((isIncomingReport || isUsageReport)
                 ? [
                     { key: 'status', label: 'Status', sortKey: 'status' },
                     { key: 'vendor_name', label: 'Vendor', sortKey: 'vendor' },
@@ -79,7 +79,7 @@ export default function Index() {
                 ]
                 : []),
         ];
-    }, [isIncomingReport, isStockCardReport, isStockPositionReport]);
+    }, [isIncomingReport, isUsageReport, isStockCardReport, isStockPositionReport]);
 
     const updateFilters = (nextFilters) => {
         router.get(route('apps.reports.inventory.index'), {
