@@ -43,7 +43,7 @@ export default function Edit() {
         setMessage(null);
 
         try {
-            await window.axios.put(route('apps.outbound.internal-usage.update', entry.id), form);
+            await window.axios.post(route('apps.outbound.internal-usage.update', entry.id), { ...form, _method: 'PUT' });
             setMessage({ type: 'success', text: 'Dispatch berhasil diperbarui.' });
         } catch (error) {
             if (error.response?.status === 422) {
