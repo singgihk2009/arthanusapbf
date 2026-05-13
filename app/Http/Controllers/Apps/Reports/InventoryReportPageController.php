@@ -41,6 +41,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         $rows = $this->baseQuery($filters)->limit(10000)->get();
 
         $isIncoming = $filters['type'] === 'incoming-items';
+        $isUsage = $filters['type'] === 'item-usage';
         $isStockPosition = $filters['type'] === 'stock-position';
         $isStockCard = $filters['type'] === 'stock-card-movement';
         $tempPath = storage_path('app/'.$filters['type'].'-report-'.now()->format('YmdHis').'.xlsx');
@@ -87,13 +88,13 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'UoM',
                 'Unit Price',
                 $isIncoming ? 'Qty Masuk' : 'Qty Keluar',
-                $isIncoming ? 'Value' : 'Valuation Rp',
+                'Value',
             ]];
 
             $numberColumns = [10, 11, 12];
             $dateColumns = [1, 5];
 
-            if ($isIncoming) {
+            if ($isIncoming || $isUsage) {
                 $xlsxRows[0][] = 'Status';
                 $xlsxRows[0][] = 'Vendor';
                 $xlsxRows[0][] = 'Fasilitas';
@@ -141,7 +142,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                     (float) $row->value,
                 ];
 
-                if ($isIncoming) {
+                if ($isIncoming || $isUsage) {
                     $line[] = $row->status;
                     $line[] = $row->vendor_name;
                     $line[] = $row->facility_name;
@@ -412,6 +413,22 @@ class InventoryReportPageController extends Controller implements HasMiddleware
 
         $sortColumn = $sortable[$filters['sort_by']] ?? $sortable['trx_datetime'];
 
+        $sourceLedgerSubquery = DB::table('stock_ledgers as usage_ledgers')
+            ->select([
+                'usage_ledgers.id as usage_ledger_id',
+                DB::raw("(SELECT src.id FROM stock_ledgers src
+                    WHERE src.qty_base > 0
+                      AND src.item_id = usage_ledgers.item_id
+                      AND src.warehouse_id = usage_ledgers.warehouse_id
+                      AND (usage_ledgers.batch_id IS NULL OR src.batch_id = usage_ledgers.batch_id)
+                      AND src.trx_datetime <= usage_ledgers.trx_datetime
+                      AND src.trx_type IN ('RCV_IN', 'TRANSFER_IN', 'OPENING_BALANCE')
+                    ORDER BY src.trx_datetime DESC, src.id DESC
+                    LIMIT 1) as source_ledger_id"),
+            ])
+            ->where('usage_ledgers.trx_type', 'USAGE_OUT')
+            ->where('usage_ledgers.qty_base', '<', 0);
+
         return DB::table('stock_ledgers')
             ->join('warehouses', 'warehouses.id', '=', 'stock_ledgers.warehouse_id')
             ->join('items', 'items.id', '=', 'stock_ledgers.item_id')
@@ -420,6 +437,20 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 $join->on('internal_usages.id', '=', 'stock_ledgers.trx_id')
                     ->where('stock_ledgers.trx_type', '=', 'USAGE_OUT');
             })
+            ->leftJoinSub($sourceLedgerSubquery, 'source_ledgers_map', function ($join) {
+                $join->on('source_ledgers_map.usage_ledger_id', '=', 'stock_ledgers.id');
+            })
+            ->leftJoin('stock_ledgers as source_ledgers', 'source_ledgers.id', '=', 'source_ledgers_map.source_ledger_id')
+            ->leftJoin('receiving_entries as source_receiving_entries', function ($join) {
+                $join->on('source_receiving_entries.id', '=', 'source_ledgers.trx_id')
+                    ->where('source_ledgers.trx_type', '=', 'RCV_IN');
+            })
+            ->leftJoin('receiving_entry_lines as source_receiving_lines', 'source_receiving_lines.id', '=', 'source_ledgers.trx_line_id')
+            ->leftJoin('purchase_orders as source_purchase_orders', function ($join) {
+                $join->on('source_purchase_orders.id', '=', 'source_receiving_entries.source_id')
+                    ->where('source_receiving_entries.source_type', '=', 'purchase_order');
+            })
+            ->leftJoin('facility_schemes as source_facility_schemes', 'source_facility_schemes.id', '=', 'source_receiving_lines.facility_scheme_id')
             ->leftJoin('categories', 'categories.id', '=', 'items.category_id')
             ->where('stock_ledgers.trx_type', 'USAGE_OUT')
             ->where('stock_ledgers.qty_base', '<', 0)
@@ -448,8 +479,12 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw('ABS(COALESCE(stock_ledgers.unit_cost, 0) * (stock_ledgers.qty_base / NULLIF(stock_ledgers.qty_input, 0))) as unit_price'),
                 DB::raw('ABS(stock_ledgers.qty_input) as qty'),
                 DB::raw('ABS(stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0)) as value'),
-                DB::raw("'-' as status"),
-                DB::raw("'-' as vendor_name"),
+                DB::raw("COALESCE(source_receiving_entries.number, '-') as gr_number"),
+                DB::raw("COALESCE(source_receiving_entries.vendor_name, '-') as vendor_name"),
+                DB::raw("COALESCE(DATE_FORMAT(source_purchase_orders.po_date, '%Y-%m-%d'), '-') as po_date"),
+                DB::raw("COALESCE(source_facility_schemes.name, source_facility_schemes.code, '-') as facility_name"),
+                DB::raw("COALESCE(source_receiving_lines.facility_reference_no, '-') as facility_reference_no"),
+                DB::raw("COALESCE(source_receiving_entries.status, '-') as status"),
             ])
             ->orderBy($sortColumn, $filters['sort_dir'])
             ->orderBy('stock_ledgers.id', 'desc');
