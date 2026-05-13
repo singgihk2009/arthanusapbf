@@ -285,8 +285,10 @@ export default function Index() {
                                     ) : (
                                         <>
                                             <Table.Td>{row.trx_datetime}</Table.Td>
+                                            {isIncomingReport && <Table.Td>{row.gr_number}</Table.Td>}
                                             <Table.Td>{row.transaction_code}</Table.Td>
                                             <Table.Td>{row.reference}</Table.Td>
+                                            {isIncomingReport && <Table.Td>{row.po_date}</Table.Td>}
                                             <Table.Td>{row.item_name}</Table.Td>
                                             <Table.Td>{row.category_name}</Table.Td>
                                             <Table.Td>{row.sku}</Table.Td>
