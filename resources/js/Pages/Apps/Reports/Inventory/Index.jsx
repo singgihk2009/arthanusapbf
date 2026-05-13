@@ -51,8 +51,10 @@ export default function Index() {
             { key: 'number', label: 'No' },
             { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
             { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
+            ...(isIncomingReport ? [{ key: 'gr_number', label: 'Nomor GR' }] : []),
             { key: 'transaction_code', label: 'Kode Transaksi' },
             { key: 'reference', label: 'Referensi' },
+            ...(isIncomingReport ? [{ key: 'po_date', label: 'Tanggal PO' }] : []),
             { key: 'item_name', label: 'Item', sortKey: 'item' },
             { key: 'category_name', label: 'Kategori', sortKey: 'category' },
             { key: 'sku', label: 'SKU' },
@@ -283,8 +285,10 @@ export default function Index() {
                                     ) : (
                                         <>
                                             <Table.Td>{row.trx_datetime}</Table.Td>
+                                            {isIncomingReport && <Table.Td>{row.gr_number}</Table.Td>}
                                             <Table.Td>{row.transaction_code}</Table.Td>
                                             <Table.Td>{row.reference}</Table.Td>
+                                            {isIncomingReport && <Table.Td>{row.po_date}</Table.Td>}
                                             <Table.Td>{row.item_name}</Table.Td>
                                             <Table.Td>{row.category_name}</Table.Td>
                                             <Table.Td>{row.sku}</Table.Td>
