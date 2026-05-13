@@ -3,6 +3,19 @@ import AppLayout from '@/Layouts/AppLayout';
 import { Head, router, usePage } from '@inertiajs/react';
 import React, { useMemo } from 'react';
 
+
+const formatDate = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+
+    return new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    }).format(date);
+};
+
 export default function Index() {
     const { filters, warehouses, categories, items, facilitySchemes, reportData } = usePage().props;
 
@@ -167,7 +180,7 @@ export default function Index() {
                             </select>
                         )}
 
-                        {isIncomingReport && (
+                        {(isIncomingReport || isUsageReport) && (
                             <select
                                 value={filters.status ?? 'all'}
                                 onChange={(e) => updateFilters({ status: e.target.value, page: 1 })}
@@ -180,7 +193,7 @@ export default function Index() {
                         )}
 
 
-                        {isIncomingReport && (
+                        {(isIncomingReport || isUsageReport) && (
                             <select
                                 value={filters.facility_scheme_id ?? ''}
                                 onChange={(e) => updateFilters({ facility_scheme_id: e.target.value || null, page: 1 })}
@@ -273,7 +286,7 @@ export default function Index() {
                                         </>
                                     ) : isStockCardReport ? (
                                         <>
-                                            <Table.Td>{row.trx_datetime}</Table.Td>
+                                            <Table.Td>{formatDate(row.trx_datetime)}</Table.Td>
                                             <Table.Td>{row.reference}</Table.Td>
                                             <Table.Td>{row.item_name}</Table.Td>
                                             <Table.Td>{row.sku}</Table.Td>
@@ -284,11 +297,11 @@ export default function Index() {
                                         </>
                                     ) : (
                                         <>
-                                            <Table.Td>{row.trx_datetime}</Table.Td>
-                                            {isIncomingReport && <Table.Td>{row.gr_number}</Table.Td>}
+                                            <Table.Td>{formatDate(row.trx_datetime)}</Table.Td>
+                                            {(isIncomingReport || isUsageReport) && <Table.Td>{row.gr_number ?? '-'}</Table.Td>}
                                             <Table.Td>{row.transaction_code}</Table.Td>
                                             <Table.Td>{row.reference}</Table.Td>
-                                            {isIncomingReport && <Table.Td>{row.po_date}</Table.Td>}
+                                            {(isIncomingReport || isUsageReport) && <Table.Td>{formatDate(row.po_date)}</Table.Td>}
                                             <Table.Td>{row.item_name}</Table.Td>
                                             <Table.Td>{row.category_name}</Table.Td>
                                             <Table.Td>{row.sku}</Table.Td>
@@ -296,7 +309,7 @@ export default function Index() {
                                             <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
                                             <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
                                             <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
-                                            {isIncomingReport && (
+                                            {(isIncomingReport || isUsageReport) && (
                                                 <>
                                                     <Table.Td>{row.status}</Table.Td>
                                                     <Table.Td>{row.vendor_name}</Table.Td>
