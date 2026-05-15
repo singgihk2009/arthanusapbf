@@ -125,6 +125,32 @@ export default function Index() {
                 ? 'Laporan Posisi Stok'
                 : 'Laporan Kartu Stok Movement per Item';
 
+    const poLink = (row) => {
+        if (!row?.purchase_order_id || !row?.gr_number || row.gr_number === '-') return row?.gr_number ?? '-';
+
+        return (
+            <a
+                href={route('apps.procurement.purchase-orders.show', row.purchase_order_id)}
+                className="text-indigo-600 hover:underline dark:text-indigo-400"
+            >
+                {row.gr_number}
+            </a>
+        );
+    };
+
+    const vendorLink = (row) => {
+        if (!row?.vendor_id || !row?.vendor_name || row.vendor_name === '-') return row?.vendor_name ?? '-';
+
+        return (
+            <a
+                href={route('apps.procurement.vendors.overview', row.vendor_id)}
+                className="text-indigo-600 hover:underline dark:text-indigo-400"
+            >
+                {row.vendor_name}
+            </a>
+        );
+    };
+
     return (
         <>
             <Head title="Inventory Reports" />
@@ -300,7 +326,7 @@ export default function Index() {
                                         <>
                                             <Table.Td>{formatDate(row.trx_datetime)}</Table.Td>
                                             <Table.Td>{row.reference}</Table.Td>
-                                            {(isIncomingReport || isUsageReport) && <Table.Td>{row.gr_number ?? '-'}</Table.Td>}
+                                            {(isIncomingReport || isUsageReport) && <Table.Td>{poLink(row)}</Table.Td>}
                                             <Table.Td>{row.transaction_code}</Table.Td>
                                             {(isIncomingReport || isUsageReport) && <Table.Td>{formatDate(row.po_date)}</Table.Td>}
                                             <Table.Td>{row.item_name}</Table.Td>
@@ -313,7 +339,7 @@ export default function Index() {
                                             {(isIncomingReport || isUsageReport) && (
                                                 <>
                                                     <Table.Td>{row.status}</Table.Td>
-                                                    <Table.Td>{row.vendor_name}</Table.Td>
+                                                    <Table.Td>{vendorLink(row)}</Table.Td>
                                                     <Table.Td>{row.facility_name}</Table.Td>
                                                     <Table.Td>{row.facility_reference_no}</Table.Td>
                                                 </>

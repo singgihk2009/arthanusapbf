@@ -420,6 +420,8 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw('ABS(COALESCE(receiving_entry_lines.value, receiving_entry_lines.qty * COALESCE(receiving_entry_lines.price, 0))) as value'),
                 DB::raw("COALESCE(receiving_entries.status, 'DRAFT') as status"),
                 DB::raw("COALESCE(receiving_entries.vendor_name, '-') as vendor_name"),
+                'receiving_entries.vendor_id as vendor_id',
+                'purchase_orders.id as purchase_order_id',
                 DB::raw("COALESCE(facility_schemes.name, facility_schemes.code, '-') as facility_name"),
                 DB::raw("COALESCE(receiving_entry_lines.facility_reference_no, '-') as facility_reference_no"),
             ])
@@ -516,6 +518,8 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw('ABS(stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0)) as value'),
                 DB::raw("COALESCE(source_purchase_orders.number, '-') as gr_number"),
                 DB::raw("COALESCE(source_receiving_entries.vendor_name, '-') as vendor_name"),
+                'source_receiving_entries.vendor_id as vendor_id',
+                'source_purchase_orders.id as purchase_order_id',
                 DB::raw("COALESCE(DATE_FORMAT(source_purchase_orders.po_date, '%Y-%m-%d'), '-') as po_date"),
                 DB::raw("COALESCE(source_facility_schemes.name, source_facility_schemes.code, '-') as facility_name"),
                 DB::raw("COALESCE(source_receiving_lines.facility_reference_no, '-') as facility_reference_no"),
