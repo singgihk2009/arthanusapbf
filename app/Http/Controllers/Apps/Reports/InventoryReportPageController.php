@@ -251,6 +251,10 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_balances.warehouse_id', $warehouseId))
             ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('items.category_id', $categoryId))
             ->when($filters['item_id'], fn ($query, $itemId) => $query->where('stock_balances.item_id', $itemId))
+            ->whereBetween('stock_balances.updated_at', [
+                Carbon::parse($filters['start_date'])->startOfDay(),
+                Carbon::parse($filters['end_date'])->endOfDay(),
+            ])
             ->when($filters['search'] !== '', function ($query) use ($filters) {
                 $keyword = '%'.$filters['search'].'%';
                 $query->where(function ($subQuery) use ($keyword) {
@@ -457,6 +461,10 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             ->where('stock_ledgers.qty_base', '<', 0)
             ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_ledgers.warehouse_id', $warehouseId))
             ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('items.category_id', $categoryId))
+            ->whereBetween('stock_ledgers.trx_datetime', [
+                Carbon::parse($filters['start_date'])->startOfDay(),
+                Carbon::parse($filters['end_date'])->endOfDay(),
+            ])
             ->when($filters['search'] !== '', function ($query) use ($filters) {
                 $keyword = '%'.$filters['search'].'%';
                 $query->where(function ($subQuery) use ($keyword) {
