@@ -30,7 +30,7 @@ export default function Index() {
     const isUsageReport = filters.type === 'item-usage';
     const isStockPositionReport = filters.type === 'stock-position';
     const isStockCardReport = filters.type === 'stock-card-movement';
-    const isDateRangeReport = isIncomingReport || isStockCardReport;
+    const isDateRangeReport = isIncomingReport || isUsageReport || isStockPositionReport || isStockCardReport;
 
     const columns = useMemo(() => {
         if (isStockPositionReport) {
