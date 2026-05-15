@@ -30,6 +30,7 @@ export default function Index() {
     const isUsageReport = filters.type === 'item-usage';
     const isStockPositionReport = filters.type === 'stock-position';
     const isStockCardReport = filters.type === 'stock-card-movement';
+    const isDateRangeReport = isIncomingReport || isStockCardReport;
 
     const columns = useMemo(() => {
         if (isStockPositionReport) {
@@ -206,7 +207,7 @@ export default function Index() {
                             </select>
                         )}
 
-                        {isStockCardReport && (
+                        {isDateRangeReport && (
                             <>
                                 <input
                                     type="date"
