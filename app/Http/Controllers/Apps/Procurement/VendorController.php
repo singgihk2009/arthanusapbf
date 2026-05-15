@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use ZipArchive;
+use Illuminate\Validation\ValidationException;
 
 class VendorController extends Controller
 {
@@ -229,7 +230,14 @@ class VendorController extends Controller
 
     public function uploadDocument(Request $request, Vendor $vendor)
     {
-        $data = $request->validate(['document_type_id' => ['required_without:document_type','nullable','exists:document_types,id'], 'document_type' => ['required_without:document_type_id','nullable','string'], 'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'], 'document_number' => ['nullable'], 'issue_date' => ['nullable', 'date'], 'expiry_date' => ['nullable', 'date']]);
+        if ($request->hasFile('file') && ! $request->file('file')->isValid()) {
+            throw ValidationException::withMessages([
+                'file' => $this->resolveUploadFailureMessage($request->file('file')->getError()),
+            ]);
+        }
+
+        $maxUploadKb = $this->resolveUploadMaxKb(5120);
+        $data = $request->validate(['document_type_id' => ['required_without:document_type','nullable','exists:document_types,id'], 'document_type' => ['required_without:document_type_id','nullable','string'], 'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', "max:{$maxUploadKb}"], 'document_number' => ['nullable'], 'issue_date' => ['nullable', 'date'], 'expiry_date' => ['nullable', 'date']]);
 
         try {
             $path = $request->file('file')->store("private/vendor-documents/{$vendor->id}");
@@ -387,4 +395,45 @@ class VendorController extends Controller
         $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
         $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml); $zip->close();
     }
+
+    private function resolveUploadFailureMessage(int $errorCode): string
+    {
+        return match ($errorCode) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'Ukuran file melebihi batas server. Set upload_max_filesize dan post_max_size minimal 5M.',
+            UPLOAD_ERR_PARTIAL => 'Upload file terputus. Silakan coba lagi.',
+            UPLOAD_ERR_NO_FILE => 'File belum dipilih.',
+            default => 'The file failed to upload. Silakan coba lagi atau hubungi admin.',
+        };
+    }
+
+    private function resolveUploadMaxKb(int $requestedMaxKb): int
+    {
+        $limitsKb = [
+            $requestedMaxKb,
+            $this->iniToKilobytes((string) ini_get('upload_max_filesize')),
+            $this->iniToKilobytes((string) ini_get('post_max_size')),
+        ];
+
+        $limitsKb = array_filter($limitsKb, fn ($value) => is_int($value) && $value > 0);
+        return (int) min($limitsKb ?: [$requestedMaxKb]);
+    }
+
+    private function iniToKilobytes(string $value): int
+    {
+        if ($value === '') {
+            return 0;
+        }
+
+        $value = trim($value);
+        $unit = strtolower(substr($value, -1));
+        $number = (float) $value;
+
+        return match ($unit) {
+            'g' => (int) ($number * 1024 * 1024),
+            'm' => (int) ($number * 1024),
+            'k' => (int) $number,
+            default => (int) ($number / 1024),
+        };
+    }
+
 }
