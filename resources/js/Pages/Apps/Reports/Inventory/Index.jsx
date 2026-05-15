@@ -143,7 +143,7 @@ export default function Index() {
 
         return (
             <a
-                href={route('apps.procurement.vendors.overview', row.vendor_id)}
+                href={route('apps.procurement.vendors.show', row.vendor_id)}
                 className="text-indigo-600 hover:underline dark:text-indigo-400"
             >
                 {row.vendor_name}
