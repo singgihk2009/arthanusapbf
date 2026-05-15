@@ -21,6 +21,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use ZipArchive;
 
@@ -228,27 +229,37 @@ class VendorController extends Controller
 
     public function uploadDocument(Request $request, Vendor $vendor)
     {
-        $data = $request->validate(['document_type_id' => ['nullable','exists:document_types,id'], 'document_type' => ['nullable','string'], 'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'], 'document_number' => ['nullable'], 'issue_date' => ['nullable', 'date'], 'expiry_date' => ['nullable', 'date']]);
-        $path = $request->file('file')->store("private/vendor-documents/{$vendor->id}");
-        $docTypeId = $data['document_type_id'] ?? null;
-        if (!$docTypeId && !empty($data['document_type'])) {
-            $docType = DocumentType::firstOrCreate(['code' => strtoupper($data['document_type'])], ['name' => strtoupper($data['document_type'])]);
-            $docTypeId = $docType->id;
+        $data = $request->validate(['document_type_id' => ['required_without:document_type','nullable','exists:document_types,id'], 'document_type' => ['required_without:document_type_id','nullable','string'], 'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'], 'document_number' => ['nullable'], 'issue_date' => ['nullable', 'date'], 'expiry_date' => ['nullable', 'date']]);
+
+        try {
+            $path = $request->file('file')->store("private/vendor-documents/{$vendor->id}");
+            $docTypeId = $data['document_type_id'] ?? null;
+            if (!$docTypeId && !empty($data['document_type'])) {
+                $docType = DocumentType::withTrashed()->firstOrCreate(['code' => strtoupper($data['document_type'])], ['name' => strtoupper($data['document_type'])]);
+                if ($docType->trashed()) {
+                    $docType->restore();
+                }
+                $docTypeId = $docType->id;
+            }
+            $originalFileName = $request->file('file')->getClientOriginalName();
+            $docTypeName = !empty($data['document_type'])
+                ? strtoupper($data['document_type'])
+                : ($docTypeId ? DocumentType::query()->whereKey($docTypeId)->value('name') : null);
+            $title = $docTypeName ?: pathinfo($originalFileName, PATHINFO_FILENAME);
+
+            $requirement = DocumentRequirement::query()
+                ->where('owner_type', 'vendor')
+                ->where('document_type_id', $docTypeId)
+                ->active()
+                ->first();
+            $status = ($requirement?->requires_verification ?? true) ? 'pending_review' : 'verified';
+
+            Document::updateOrCreate(['owner_type' => 'vendor', 'owner_id' => $vendor->id, 'document_type_id' => $docTypeId], ['title' => $title, 'file_path' => $path, 'original_file_name' => $originalFileName, 'mime_type' => $request->file('file')->getClientMimeType(), 'file_size' => $request->file('file')->getSize(), 'document_number' => $data['document_number'] ?? null, 'issue_date' => $data['issue_date'] ?? null, 'expiry_date' => $data['expiry_date'] ?? null, 'uploaded_by' => auth()->id(), 'status' => $status, 'verified_by' => $status === 'verified' ? auth()->id() : null, 'verified_at' => $status === 'verified' ? now() : null]);
+        } catch (\Throwable $e) {
+            Log::error('Vendor document upload failed', ['vendor_id' => $vendor->id, 'user_id' => auth()->id(), 'message' => $e->getMessage()]);
+            return back()->withErrors(['file' => 'The file failed to upload. Silakan coba lagi atau hubungi admin.']);
         }
-        $originalFileName = $request->file('file')->getClientOriginalName();
-        $docTypeName = !empty($data['document_type'])
-            ? strtoupper($data['document_type'])
-            : ($docTypeId ? DocumentType::query()->whereKey($docTypeId)->value('name') : null);
-        $title = $docTypeName ?: pathinfo($originalFileName, PATHINFO_FILENAME);
 
-        $requirement = DocumentRequirement::query()
-            ->where('owner_type', 'vendor')
-            ->where('document_type_id', $docTypeId)
-            ->active()
-            ->first();
-        $status = ($requirement?->requires_verification ?? true) ? 'pending_review' : 'verified';
-
-        Document::updateOrCreate(['owner_type' => 'vendor', 'owner_id' => $vendor->id, 'document_type_id' => $docTypeId], ['title' => $title, 'file_path' => $path, 'original_file_name' => $originalFileName, 'mime_type' => $request->file('file')->getClientMimeType(), 'file_size' => $request->file('file')->getSize(), 'document_number' => $data['document_number'] ?? null, 'issue_date' => $data['issue_date'] ?? null, 'expiry_date' => $data['expiry_date'] ?? null, 'uploaded_by' => auth()->id(), 'status' => $status, 'verified_by' => $status === 'verified' ? auth()->id() : null, 'verified_at' => $status === 'verified' ? now() : null]);
         return back();
     }
 
