@@ -237,24 +237,42 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             'warehouse' => 'warehouses.name',
             'item' => 'items.name',
             'category' => 'categories.name',
-            'on_hand' => DB::raw('SUM(stock_balances.on_hand_base)'),
+            'on_hand' => DB::raw('ending_balance'),
             'reserved' => DB::raw('SUM(stock_balances.reserved_base)'),
-            'available' => DB::raw('SUM(stock_balances.on_hand_base - stock_balances.reserved_base)'),
+            'available' => DB::raw('(ending_balance - SUM(stock_balances.reserved_base))'),
         ];
 
         $sortColumn = $sortable[$filters['sort_by']] ?? $sortable['warehouse'];
+
+        $startDate = Carbon::parse($filters['start_date'])->startOfDay();
+        $endDate = Carbon::parse($filters['end_date'])->endOfDay();
+
+        $ledgerSums = DB::table('stock_ledgers')
+            ->select([
+                'warehouse_id',
+                'item_id',
+                DB::raw('SUM(CASE WHEN trx_datetime < "'.$startDate->format('Y-m-d H:i:s').'" THEN qty_base ELSE 0 END) as beginning_balance'),
+                DB::raw('SUM(CASE WHEN trx_datetime BETWEEN "'.$startDate->format('Y-m-d H:i:s').'" AND "'.$endDate->format('Y-m-d H:i:s').'" THEN qty_base ELSE 0 END) as movement_qty'),
+            ])
+            ->where('trx_datetime', '<=', $endDate)
+            ->groupBy('warehouse_id', 'item_id');
 
         return DB::table('stock_balances')
             ->join('warehouses', 'warehouses.id', '=', 'stock_balances.warehouse_id')
             ->join('items', 'items.id', '=', 'stock_balances.item_id')
             ->leftJoin('categories', 'categories.id', '=', 'items.category_id')
+            ->leftJoinSub($ledgerSums, 'ledger_sums', function ($join) {
+                $join->on('ledger_sums.warehouse_id', '=', 'stock_balances.warehouse_id')
+                    ->on('ledger_sums.item_id', '=', 'stock_balances.item_id');
+            })
             ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_balances.warehouse_id', $warehouseId))
             ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('items.category_id', $categoryId))
             ->when($filters['item_id'], fn ($query, $itemId) => $query->where('stock_balances.item_id', $itemId))
-            ->whereBetween('stock_balances.updated_at', [
-                Carbon::parse($filters['start_date'])->startOfDay(),
-                Carbon::parse($filters['end_date'])->endOfDay(),
-            ])
+            ->where(function ($query) {
+                $query->whereNotNull('ledger_sums.item_id')
+                    ->orWhere('stock_balances.on_hand_base', '!=', 0)
+                    ->orWhere('stock_balances.reserved_base', '!=', 0);
+            })
             ->when($filters['search'] !== '', function ($query) use ($filters) {
                 $keyword = '%'.$filters['search'].'%';
                 $query->where(function ($subQuery) use ($keyword) {
@@ -264,16 +282,17 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                         ->orWhere('categories.name', 'like', $keyword);
                 });
             })
-            ->groupBy('stock_balances.warehouse_id', 'stock_balances.item_id', 'warehouses.name', 'items.name', 'items.sku', 'categories.name')
+            ->groupBy('stock_balances.warehouse_id', 'stock_balances.item_id', 'warehouses.name', 'items.name', 'items.sku', 'categories.name', 'ledger_sums.beginning_balance', 'ledger_sums.movement_qty')
             ->select([
                 'warehouses.name as warehouse_name',
                 'items.name as item_name',
-                DB::raw('COALESCE(categories.name, \'-\') as category_name'),
+                DB::raw('COALESCE(categories.name, "-") as category_name'),
                 'items.sku',
-                DB::raw('SUM(stock_balances.on_hand_base) as on_hand'),
+                DB::raw('COALESCE(ledger_sums.beginning_balance, 0) + COALESCE(ledger_sums.movement_qty, 0) as ending_balance'),
                 DB::raw('SUM(stock_balances.reserved_base) as reserved'),
-                DB::raw('SUM(stock_balances.on_hand_base - stock_balances.reserved_base) as available'),
+                DB::raw('(COALESCE(ledger_sums.beginning_balance, 0) + COALESCE(ledger_sums.movement_qty, 0) - SUM(stock_balances.reserved_base)) as available'),
             ])
+            ->selectRaw('(COALESCE(ledger_sums.beginning_balance, 0) + COALESCE(ledger_sums.movement_qty, 0)) as on_hand')
             ->orderBy($sortColumn, $filters['sort_dir']);
     }
 
@@ -286,15 +305,22 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         $startDate = $filters['start_date'].' 00:00:00';
         $endDate = $filters['end_date'].' 23:59:59';
 
-        $openingBalance = DB::table('stock_ledgers')
+        $openingBalancePerWarehouse = DB::table('stock_ledgers')
+            ->select([
+                'warehouse_id',
+                DB::raw('SUM(qty_base) as opening_balance'),
+            ])
             ->where('item_id', $filters['item_id'])
             ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('warehouse_id', $warehouseId))
             ->where('trx_datetime', '<', $startDate)
-            ->sum('qty_base');
+            ->groupBy('warehouse_id');
 
         return DB::table('stock_ledgers')
             ->join('warehouses', 'warehouses.id', '=', 'stock_ledgers.warehouse_id')
             ->join('items', 'items.id', '=', 'stock_ledgers.item_id')
+            ->leftJoinSub($openingBalancePerWarehouse, 'opening_balances', function ($join) {
+                $join->on('opening_balances.warehouse_id', '=', 'stock_ledgers.warehouse_id');
+            })
             ->where('stock_ledgers.item_id', $filters['item_id'])
             ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_ledgers.warehouse_id', $warehouseId))
             ->whereBetween('stock_ledgers.trx_datetime', [$startDate, $endDate])
@@ -317,7 +343,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw('stock_ledgers.qty_base as qty'),
                 DB::raw('COALESCE(stock_ledgers.unit_cost, 0) as unit_price'),
                 DB::raw('stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0) as value'),
-                DB::raw('('.(float) $openingBalance.' + SUM(stock_ledgers.qty_base) OVER (ORDER BY stock_ledgers.trx_datetime, stock_ledgers.id)) as running_balance'),
+                DB::raw('(COALESCE(opening_balances.opening_balance, 0) + SUM(stock_ledgers.qty_base) OVER (PARTITION BY stock_ledgers.warehouse_id ORDER BY stock_ledgers.trx_datetime, stock_ledgers.id)) as running_balance'),
             ])
             ->orderBy('stock_ledgers.trx_datetime')
             ->orderBy('stock_ledgers.id');
