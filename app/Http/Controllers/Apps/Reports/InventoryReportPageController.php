@@ -196,7 +196,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             'per_page' => $perPage,
             'status' => strtolower($request->string('status')->toString() ?: 'all'),
             'facility_scheme_id' => $request->integer('facility_scheme_id') ?: null,
-            'start_date' => $request->date('start_date')?->toDateString() ?? now()->subDays(30)->toDateString(),
+            'start_date' => $request->date('start_date')?->toDateString() ?? now()->startOfYear()->toDateString(),
             'end_date' => $request->date('end_date')?->toDateString() ?? now()->toDateString(),
         ];
     }
@@ -359,6 +359,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('receiving_entries.warehouse_id', $warehouseId))
             ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('items.category_id', $categoryId))
             ->when($filters['facility_scheme_id'], fn ($query, $facilitySchemeId) => $query->where('receiving_entry_lines.facility_scheme_id', $facilitySchemeId))
+            ->whereBetween('receiving_entries.transaction_date', [$filters['start_date'], $filters['end_date']])
             ->when($filters['search'] !== '', function ($query) use ($filters) {
                 $keyword = '%'.$filters['search'].'%';
                 $query->where(function ($subQuery) use ($keyword) {
