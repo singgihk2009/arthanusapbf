@@ -221,6 +221,7 @@ class VendorController extends Controller
     {
         $user = auth()->user();
         abort_if(! $user, 401);
+        $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
 
         $vendorNames = collect([
             $vendor->vendor_name,
@@ -251,8 +252,8 @@ class VendorController extends Controller
             ->select('receiving_entries.*', 'purchase_orders.vendor_id as purchase_order_vendor_id')
             ->orderByDesc('receiving_entries.id')
             ->paginate(10)
-            ->through(function (object $entry): object {
-                $entry->warehouse_label = $this->resolveReceivingWarehouseLabel($entry);
+            ->through(function (object $entry) use ($warehouseCodes): object {
+                $entry->warehouse_label = $this->resolveReceivingWarehouseLabel($entry, $warehouseCodes);
 
                 return $entry;
             });
@@ -260,8 +261,14 @@ class VendorController extends Controller
         return response()->json(['receivings' => $receivings]);
     }
 
-    private function resolveReceivingWarehouseLabel(object $entry): string
+    private function resolveReceivingWarehouseLabel(object $entry, Collection $warehouseCodes): string
     {
+        $warehouseCodeById = trim((string) ($warehouseCodes->get((int) ($entry->warehouse_id ?? 0)) ?? ''));
+
+        if ($warehouseCodeById !== '') {
+            return $warehouseCodeById;
+        }
+
         $warehouseName = trim((string) ($entry->warehouse_name ?? ''));
 
         if ($warehouseName !== '') {
