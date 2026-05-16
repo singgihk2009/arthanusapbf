@@ -214,9 +214,29 @@ class VendorController extends Controller
     public function purchaseOrders(Vendor $vendor) { return response()->json(['purchase_orders' => PurchaseOrder::where('vendor_id', $vendor->id)->latest('document_date')->paginate(10)]); }
     public function receivings(Vendor $vendor)
     {
+        $vendorNames = collect([
+            $vendor->vendor_name,
+            $vendor->name,
+        ])
+            ->filter(fn ($name) => is_string($name) && trim($name) !== '')
+            ->map(fn ($name) => mb_strtolower(trim((string) $name)))
+            ->unique()
+            ->values();
+
         $receivings = DB::table('receiving_entries')
             ->leftJoin('warehouses', 'warehouses.id', '=', 'receiving_entries.warehouse_id')
-            ->where('receiving_entries.vendor_id', $vendor->id)
+            ->leftJoin('purchase_orders', function ($join) {
+                $join->on('purchase_orders.id', '=', 'receiving_entries.source_id')
+                    ->where('receiving_entries.source_type', '=', 'purchase_order');
+            })
+            ->where(function ($query) use ($vendor, $vendorNames) {
+                $query->where('receiving_entries.vendor_id', $vendor->id)
+                    ->orWhere('purchase_orders.vendor_id', $vendor->id);
+
+                if ($vendorNames->isNotEmpty()) {
+                    $query->orWhereIn(DB::raw('LOWER(TRIM(receiving_entries.vendor_name))'), $vendorNames->all());
+                }
+            })
             ->select([
                 'receiving_entries.id',
                 'receiving_entries.number',
