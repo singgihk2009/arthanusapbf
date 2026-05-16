@@ -178,7 +178,7 @@ class ReceivingEntryController extends Controller
         $validated = $request->validated();
         $this->warehouseAccessService->assertWarehouseAccess($request->user(), $validated['warehouse_id']);
 
-        DB::transaction(function () use ($validated, $receivingEntry): void {
+        DB::transaction(function () use ($request, $validated, $receivingEntry): void {
             $entry = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
             abort_if(! $entry, 404);
             $this->warehouseAccessService->assertWarehouseAccess($request->user(), $this->resolveEntryWarehouseId($entry));
@@ -190,9 +190,9 @@ class ReceivingEntryController extends Controller
                 'transaction_code' => $validated['transaction_code'],
                 'reference' => $validated['reference'] ?? null,
                 'vendor_name' => $validated['vendor_name'] ?? null,
-            'vendor_id' => $validated['vendor_id'] ?? null,
-            'source_type' => $validated['source_type'] ?? null,
-            'source_id' => $validated['source_id'] ?? null,
+                'vendor_id' => $validated['vendor_id'] ?? null,
+                'source_type' => $validated['source_type'] ?? null,
+                'source_id' => $validated['source_id'] ?? null,
                 'notes' => $validated['notes'] ?? null,
                 'updated_at' => now(),
             ];
