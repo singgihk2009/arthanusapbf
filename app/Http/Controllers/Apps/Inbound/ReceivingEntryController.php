@@ -29,7 +29,8 @@ class ReceivingEntryController extends Controller
         $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
 
         $query = DB::table('receiving_entries');
-        $this->warehouseAccessService->scopeInventoryQuery($query, $user);
+        $warehouseColumn = $this->resolveWarehouseColumn('receiving_entries') ?? 'warehouse_id';
+        $this->warehouseAccessService->scopeInventoryQuery($query, $user, $warehouseColumn);
 
         $entries = $query
             ->orderByDesc('id')
@@ -245,7 +246,8 @@ class ReceivingEntryController extends Controller
         abort_if(! $user, 401);
         $warehouseCodes = DB::table('warehouses')->pluck('code', 'id');
         $query = DB::table('receiving_entries');
-        $this->warehouseAccessService->scopeInventoryQuery($query, $user);
+        $warehouseColumn = $this->resolveWarehouseColumn('receiving_entries') ?? 'warehouse_id';
+        $this->warehouseAccessService->scopeInventoryQuery($query, $user, $warehouseColumn);
         $rows = $query->orderByDesc('id')->get();
 
         return response()->streamDownload(function () use ($rows, $warehouseCodes): void {
