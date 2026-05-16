@@ -225,10 +225,7 @@ class VendorController extends Controller
 
         $receivings = DB::table('receiving_entries')
             ->leftJoin('warehouses', 'warehouses.id', '=', 'receiving_entries.warehouse_id')
-            ->leftJoin('purchase_orders', function ($join) {
-                $join->on('purchase_orders.id', '=', 'receiving_entries.source_id')
-                    ->where('receiving_entries.source_type', '=', 'purchase_order');
-            })
+            ->leftJoin('purchase_orders', 'purchase_orders.id', '=', 'receiving_entries.source_id')
             ->where(function ($query) use ($vendor, $vendorNames) {
                 $query->where('receiving_entries.vendor_id', $vendor->id)
                     ->orWhere('purchase_orders.vendor_id', $vendor->id);
