@@ -24,9 +24,14 @@ use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use ZipArchive;
 use Illuminate\Validation\ValidationException;
+use App\Services\WarehouseAccessService;
 
 class VendorController extends Controller
 {
+    public function __construct(
+        private readonly WarehouseAccessService $warehouseAccessService
+    ) {}
+
     public function index(Request $request)
     {
         $search = trim((string) $request->string('search')->toString());
@@ -214,6 +219,9 @@ class VendorController extends Controller
     public function purchaseOrders(Vendor $vendor) { return response()->json(['purchase_orders' => PurchaseOrder::where('vendor_id', $vendor->id)->latest('document_date')->paginate(10)]); }
     public function receivings(Vendor $vendor)
     {
+        $user = auth()->user();
+        abort_if(! $user, 401);
+
         $vendorNames = collect([
             $vendor->vendor_name,
             $vendor->name,
@@ -223,32 +231,52 @@ class VendorController extends Controller
             ->unique()
             ->values();
 
-        $receivings = DB::table('receiving_entries')
-            ->leftJoin('warehouses', 'warehouses.id', '=', 'receiving_entries.warehouse_id')
-            ->leftJoin('purchase_orders', 'purchase_orders.id', '=', 'receiving_entries.source_id')
-            ->where(function ($query) use ($vendor, $vendorNames) {
-                $query->where('receiving_entries.vendor_id', $vendor->id)
+        $query = DB::table('receiving_entries')
+            ->leftJoin('purchase_orders', function ($join) {
+                $join->on('purchase_orders.id', '=', 'receiving_entries.source_id')
+                    ->where('receiving_entries.source_type', '=', 'purchase_order');
+            });
+
+        $this->warehouseAccessService->scopeInventoryQuery($query, $user);
+
+        $receivings = $query
+            ->where(function ($scopedQuery) use ($vendor, $vendorNames) {
+                $scopedQuery->where('receiving_entries.vendor_id', $vendor->id)
                     ->orWhere('purchase_orders.vendor_id', $vendor->id);
 
                 if ($vendorNames->isNotEmpty()) {
-                    $query->orWhereIn(DB::raw('LOWER(TRIM(receiving_entries.vendor_name))'), $vendorNames->all());
+                    $scopedQuery->orWhereIn(DB::raw('LOWER(TRIM(receiving_entries.vendor_name))'), $vendorNames->all());
                 }
             })
-            ->select([
-                'receiving_entries.id',
-                'receiving_entries.number',
-                'receiving_entries.transaction_date',
-                'receiving_entries.transaction_code',
-                'receiving_entries.vendor_name',
-                'receiving_entries.status',
-                'receiving_entries.total_value',
-                DB::raw("COALESCE(warehouses.name, receiving_entries.warehouse_code, receiving_entries.kode_gudang, '-') as warehouse_label"),
-            ])
-            ->orderByDesc('receiving_entries.transaction_date')
+            ->select('receiving_entries.*', 'purchase_orders.vendor_id as purchase_order_vendor_id')
             ->orderByDesc('receiving_entries.id')
-            ->paginate(10);
+            ->paginate(10)
+            ->through(function (object $entry): object {
+                $entry->warehouse_label = $this->resolveReceivingWarehouseLabel($entry);
+
+                return $entry;
+            });
 
         return response()->json(['receivings' => $receivings]);
+    }
+
+    private function resolveReceivingWarehouseLabel(object $entry): string
+    {
+        $warehouseName = trim((string) ($entry->warehouse_name ?? ''));
+
+        if ($warehouseName !== '') {
+            return $warehouseName;
+        }
+
+        $warehouseCode = trim((string) ($entry->warehouse_code ?? ''));
+
+        if ($warehouseCode !== '') {
+            return $warehouseCode;
+        }
+
+        $legacyWarehouseCode = trim((string) ($entry->kode_gudang ?? ''));
+
+        return $legacyWarehouseCode !== '' ? $legacyWarehouseCode : '-';
     }
     public function invoices(Vendor $vendor) { return response()->json(['invoices' => VendorInvoice::where('vendor_id', $vendor->id)->latest('invoice_date')->paginate(10)]); }
     public function payments(Vendor $vendor) { return response()->json(['payments' => VendorPayment::where('vendor_id', $vendor->id)->latest('payment_date')->paginate(10)]); }
