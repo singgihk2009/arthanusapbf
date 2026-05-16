@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Apps\Procurement;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Procurement\StoreVendorRequest;
 use App\Http\Requests\Procurement\UpdateVendorRequest;
-use App\Models\Procurement\GoodsReceipt;
 use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\Vendor;
 use App\Models\Procurement\DocumentType;
@@ -213,7 +212,47 @@ class VendorController extends Controller
         return response()->json(['documents' => $vendor->documents()->with('documentType')->latest()->get(), 'requirements'=>$requirements]);
     }
     public function purchaseOrders(Vendor $vendor) { return response()->json(['purchase_orders' => PurchaseOrder::where('vendor_id', $vendor->id)->latest('document_date')->paginate(10)]); }
-    public function receivings(Vendor $vendor) { return response()->json(['receivings' => GoodsReceipt::where('supplier_id', $vendor->id)->latest('document_date')->paginate(10)]); }
+    public function receivings(Vendor $vendor)
+    {
+        $vendorNames = collect([
+            $vendor->vendor_name,
+            $vendor->name,
+        ])
+            ->filter(fn ($name) => is_string($name) && trim($name) !== '')
+            ->map(fn ($name) => mb_strtolower(trim((string) $name)))
+            ->unique()
+            ->values();
+
+        $receivings = DB::table('receiving_entries')
+            ->leftJoin('warehouses', 'warehouses.id', '=', 'receiving_entries.warehouse_id')
+            ->leftJoin('purchase_orders', function ($join) {
+                $join->on('purchase_orders.id', '=', 'receiving_entries.source_id')
+                    ->where('receiving_entries.source_type', '=', 'purchase_order');
+            })
+            ->where(function ($query) use ($vendor, $vendorNames) {
+                $query->where('receiving_entries.vendor_id', $vendor->id)
+                    ->orWhere('purchase_orders.vendor_id', $vendor->id);
+
+                if ($vendorNames->isNotEmpty()) {
+                    $query->orWhereIn(DB::raw('LOWER(TRIM(receiving_entries.vendor_name))'), $vendorNames->all());
+                }
+            })
+            ->select([
+                'receiving_entries.id',
+                'receiving_entries.number',
+                'receiving_entries.transaction_date',
+                'receiving_entries.transaction_code',
+                'receiving_entries.vendor_name',
+                'receiving_entries.status',
+                'receiving_entries.total_value',
+                DB::raw("COALESCE(warehouses.name, receiving_entries.warehouse_code, receiving_entries.kode_gudang, '-') as warehouse_label"),
+            ])
+            ->orderByDesc('receiving_entries.transaction_date')
+            ->orderByDesc('receiving_entries.id')
+            ->paginate(10);
+
+        return response()->json(['receivings' => $receivings]);
+    }
     public function invoices(Vendor $vendor) { return response()->json(['invoices' => VendorInvoice::where('vendor_id', $vendor->id)->latest('invoice_date')->paginate(10)]); }
     public function payments(Vendor $vendor) { return response()->json(['payments' => VendorPayment::where('vendor_id', $vendor->id)->latest('payment_date')->paginate(10)]); }
     public function ledger(Vendor $vendor) { return response()->json(['ledger' => VendorLedger::where('vendor_id', $vendor->id)->latest('transaction_date')->paginate(10)]); }
