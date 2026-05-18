@@ -1,7 +1,7 @@
 import Table from '@/Components/Table';
 import AppLayout from '@/Layouts/AppLayout';
 import { Head, router, usePage } from '@inertiajs/react';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 
 const formatDate = (value) => {
@@ -17,7 +17,40 @@ const formatDate = (value) => {
 };
 
 export default function Index() {
-    const { filters, warehouses, categories, items, facilitySchemes, reportData } = usePage().props;
+    const { filters, warehouses, categories, items, selectedItem, facilitySchemes, reportData } = usePage().props;
+    const [itemQuery, setItemQuery] = useState('');
+    const [itemOptions, setItemOptions] = useState([]);
+    const [itemLoading, setItemLoading] = useState(false);
+    const [itemError, setItemError] = useState('');
+
+    const canSearchItem = itemQuery.trim().length >= 3;
+
+    useEffect(() => {
+        if (!isStockCardReport) return;
+        if (!canSearchItem) {
+            setItemOptions([]);
+            setItemError('');
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            setItemLoading(true);
+            try {
+                const response = await window.axios.get(route('apps.reports.inventory.search-items'), {
+                    params: { q: itemQuery.trim(), limit: 20 },
+                });
+                setItemOptions(response.data?.data ?? []);
+                setItemError('');
+            } catch (error) {
+                setItemOptions([]);
+                setItemError(error?.response?.data?.message ?? 'Gagal mengambil data item.');
+            } finally {
+                setItemLoading(false);
+            }
+        }, 400);
+
+        return () => clearTimeout(timer);
+    }, [itemQuery, canSearchItem, isStockCardReport]);
 
     const reportTypes = [
         { value: 'incoming-items', label: 'Laporan Barang Masuk (Qty & Value)' },
@@ -194,17 +227,57 @@ export default function Index() {
                             </select>
                         )}
 
-                        {(isStockPositionReport || isStockCardReport) && (
+                        {isStockPositionReport && (
                             <select
                                 value={filters.item_id ?? ''}
                                 onChange={(e) => updateFilters({ item_id: e.target.value || null, page: 1 })}
                                 className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
                             >
-                                <option value="">{isStockCardReport ? 'Pilih Item (Wajib)' : 'Semua Item'}</option>
+                                <option value="">Semua Item</option>
                                 {items.map((item) => (
                                     <option key={item.id} value={item.id}>{item.sku} - {item.name}</option>
                                 ))}
                             </select>
+                        )}
+                        {isStockCardReport && (
+                            <div className="relative lg:col-span-2">
+                                <input
+                                    type="text"
+                                    value={itemQuery}
+                                    onChange={(e) => setItemQuery(e.target.value)}
+                                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
+                                    placeholder={selectedItem ? `${selectedItem.sku} - ${selectedItem.name}` : 'Pilih Item (Wajib) - ketik min. 3 karakter'}
+                                />
+                                {filters.item_id && selectedItem && (
+                                    <div className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
+                                        Terpilih: {selectedItem.sku} - {selectedItem.name}{' '}
+                                        <button type="button" className="text-rose-600" onClick={() => updateFilters({ item_id: null, page: 1 })}>Hapus</button>
+                                    </div>
+                                )}
+                                {!canSearchItem && (
+                                    <div className="mt-1 text-xs text-gray-500">Ketik minimal 3 karakter untuk mencari item.</div>
+                                )}
+                                {itemLoading && <div className="mt-1 text-xs text-gray-500">Mencari item...</div>}
+                                {itemError && <div className="mt-1 text-xs text-rose-600">{itemError}</div>}
+                                {!itemLoading && canSearchItem && !itemError && itemOptions.length > 0 && (
+                                    <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-md dark:border-gray-800 dark:bg-gray-900">
+                                        {itemOptions.map((item) => (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    updateFilters({ item_id: item.id, page: 1 });
+                                                    setItemQuery('');
+                                                    setItemOptions([]);
+                                                }}
+                                                className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+                                            >
+                                                {item.sku} - {item.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         )}
 
                         {(isIncomingReport || isUsageReport) && (
