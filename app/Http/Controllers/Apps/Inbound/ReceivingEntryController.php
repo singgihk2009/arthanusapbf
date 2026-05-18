@@ -192,8 +192,10 @@ class ReceivingEntryController extends Controller
                 'reference' => $validated['reference'] ?? null,
                 'vendor_name' => $validated['vendor_name'] ?? null,
                 'vendor_id' => $validated['vendor_id'] ?? null,
-                'source_type' => $validated['source_type'] ?? null,
-                'source_id' => $validated['source_id'] ?? null,
+                // Keep existing PO linkage unless source fields are explicitly submitted.
+                // Edit form for manual receiving does not post source fields.
+                'source_type' => array_key_exists('source_type', $validated) ? ($validated['source_type'] ?? null) : ($entry->source_type ?? null),
+                'source_id' => array_key_exists('source_id', $validated) ? ($validated['source_id'] ?? null) : ($entry->source_id ?? null),
                 'notes' => $validated['notes'] ?? null,
                 'updated_at' => now(),
             ];
