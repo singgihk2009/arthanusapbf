@@ -255,6 +255,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw('SUM(CASE WHEN trx_datetime BETWEEN "'.$startDate->format('Y-m-d H:i:s').'" AND "'.$endDate->format('Y-m-d H:i:s').'" THEN qty_base ELSE 0 END) as movement_qty'),
             ])
             ->where('trx_datetime', '<=', $endDate)
+            ->when($filters['facility_scheme_id'], fn ($query, $facilitySchemeId) => $query->where('facility_scheme_id', $facilitySchemeId))
             ->groupBy('warehouse_id', 'item_id');
 
         return DB::table('stock_balances')
@@ -268,10 +269,13 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_balances.warehouse_id', $warehouseId))
             ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('items.category_id', $categoryId))
             ->when($filters['item_id'], fn ($query, $itemId) => $query->where('stock_balances.item_id', $itemId))
-            ->where(function ($query) {
-                $query->whereNotNull('ledger_sums.item_id')
-                    ->orWhere('stock_balances.on_hand_base', '!=', 0)
-                    ->orWhere('stock_balances.reserved_base', '!=', 0);
+            ->where(function ($query) use ($filters) {
+                $query->whereNotNull('ledger_sums.item_id');
+
+                if (! $filters['facility_scheme_id']) {
+                    $query->orWhere('stock_balances.on_hand_base', '!=', 0)
+                        ->orWhere('stock_balances.reserved_base', '!=', 0);
+                }
             })
             ->when($filters['search'] !== '', function ($query) use ($filters) {
                 $keyword = '%'.$filters['search'].'%';
@@ -312,6 +316,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             ])
             ->where('item_id', $filters['item_id'])
             ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('warehouse_id', $warehouseId))
+            ->when($filters['facility_scheme_id'], fn ($query, $facilitySchemeId) => $query->where('facility_scheme_id', $facilitySchemeId))
             ->where('trx_datetime', '<', $startDate)
             ->groupBy('warehouse_id');
 
@@ -323,6 +328,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             })
             ->where('stock_ledgers.item_id', $filters['item_id'])
             ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_ledgers.warehouse_id', $warehouseId))
+            ->when($filters['facility_scheme_id'], fn ($query, $facilitySchemeId) => $query->where('stock_ledgers.facility_scheme_id', $facilitySchemeId))
             ->whereBetween('stock_ledgers.trx_datetime', [$startDate, $endDate])
             ->when($filters['search'] !== '', function ($query) use ($filters) {
                 $keyword = '%'.$filters['search'].'%';

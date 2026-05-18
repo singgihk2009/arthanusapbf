@@ -220,7 +220,7 @@ export default function Index() {
                         )}
 
 
-                        {(isIncomingReport || isUsageReport) && (
+                        {(isIncomingReport || isUsageReport || isStockPositionReport || isStockCardReport) && (
                             <select
                                 value={filters.facility_scheme_id ?? ''}
                                 onChange={(e) => updateFilters({ facility_scheme_id: e.target.value || null, page: 1 })}
