@@ -8,6 +8,11 @@ export default function Index() {
     const [processingId, setProcessingId] = useState(null);
     const isPosted = (status) => String(status || '').toLowerCase() === 'posted';
 
+    const extractErrorMessage = (error, fallbackMessage) => {
+        return error?.response?.data?.message || fallbackMessage;
+    };
+
+
     const handleDelete = async (id) => {
         if (!window.confirm('Yakin hapus receiving entry ini?')) {
             return;
@@ -17,6 +22,8 @@ export default function Index() {
         try {
             await window.axios.delete(route('apps.inbound.receiving.destroy', id));
             window.location.reload();
+        } catch (error) {
+            window.alert(extractErrorMessage(error, 'Gagal menghapus receiving entry.'));
         } finally {
             setProcessingId(null);
         }
@@ -32,6 +39,8 @@ export default function Index() {
         try {
             await window.axios.post(route('apps.inventory.posting.receiving', id));
             window.location.reload();
+        } catch (error) {
+            window.alert(extractErrorMessage(error, 'Gagal posting receiving entry.'));
         } finally {
             setProcessingId(null);
         }
@@ -47,6 +56,8 @@ export default function Index() {
         try {
             await window.axios.post(route('apps.inventory.unposting.receiving', id));
             window.location.reload();
+        } catch (error) {
+            window.alert(extractErrorMessage(error, 'Gagal unpost receiving entry.'));
         } finally {
             setProcessingId(null);
         }
