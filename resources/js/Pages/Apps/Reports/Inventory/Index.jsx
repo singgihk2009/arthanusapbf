@@ -18,6 +18,12 @@ const formatDate = (value) => {
 
 export default function Index() {
     const { filters, warehouses, categories, items, selectedItem, facilitySchemes, reportData } = usePage().props;
+    const isIncomingReport = filters.type === 'incoming-items';
+    const isUsageReport = filters.type === 'item-usage';
+    const isStockPositionReport = filters.type === 'stock-position';
+    const isStockCardReport = filters.type === 'stock-card-movement';
+    const isDateRangeReport = isIncomingReport || isUsageReport || isStockPositionReport || isStockCardReport;
+
     const [itemQuery, setItemQuery] = useState('');
     const [itemOptions, setItemOptions] = useState([]);
     const [itemLoading, setItemLoading] = useState(false);
@@ -58,12 +64,6 @@ export default function Index() {
         { value: 'stock-position', label: 'Laporan Posisi Stok' },
         { value: 'stock-card-movement', label: 'Laporan Kartu Stok Movement per Item' },
     ];
-
-    const isIncomingReport = filters.type === 'incoming-items';
-    const isUsageReport = filters.type === 'item-usage';
-    const isStockPositionReport = filters.type === 'stock-position';
-    const isStockCardReport = filters.type === 'stock-card-movement';
-    const isDateRangeReport = isIncomingReport || isUsageReport || isStockPositionReport || isStockCardReport;
 
     const columns = useMemo(() => {
         if (isStockPositionReport) {
