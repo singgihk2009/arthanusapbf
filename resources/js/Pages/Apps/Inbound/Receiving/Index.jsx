@@ -1,4 +1,5 @@
 import AppLayout from '@/Layouts/AppLayout';
+import Pagination from '@/Components/Pagination';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -114,6 +115,15 @@ export default function Index() {
                             </tbody>
                         </table>
                     </div>
+
+                    {entries?.links?.length > 0 && (
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600 dark:text-gray-300">
+                            <p>
+                                Menampilkan {entries.from ?? 0} - {entries.to ?? 0} dari {entries.total ?? 0} data
+                            </p>
+                            <Pagination links={entries.links} />
+                        </div>
+                    )}
                 </div>
             </div>
         </>
