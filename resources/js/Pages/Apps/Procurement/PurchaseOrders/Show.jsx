@@ -22,6 +22,45 @@ export default function Show({ purchaseOrder }) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 
+    const formatDisplayDate = (value) => {
+        if (!value) return '-';
+
+        const parsedDate = new Date(value);
+        if (Number.isNaN(parsedDate.getTime())) return value;
+
+        return parsedDate.toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        });
+    };
+
+    const createdBy = purchaseOrder.created_by_name
+        || purchaseOrder.created_by?.name
+        || purchaseOrder.creator?.name
+        || purchaseOrder.createdBy?.name
+        || purchaseOrder.created_by
+        || '-';
+
+    const approvedBy = purchaseOrder.approved_by_name
+        || purchaseOrder.approved_by?.name
+        || purchaseOrder.approver?.name
+        || purchaseOrder.approvedBy?.name
+        || purchaseOrder.approved_by
+        || '-';
+
+    const receivedBy = (purchaseOrder.goods_receipts || [])
+        .map((gr) => gr.received_by_name || gr.received_by?.name || gr.receiver?.name || gr.receivedBy?.name || gr.received_by || gr.created_by_name || gr.created_by?.name)
+        .filter(Boolean)
+        .filter((value, index, arr) => arr.indexOf(value) === index)
+        .join(', ') || '-';
+
+    const warehouseInfo = (purchaseOrder.goods_receipts || [])
+        .map((gr) => gr.warehouse_name || gr.warehouse?.name || gr.warehouse_code || gr.warehouse_id)
+        .filter(Boolean)
+        .filter((value, index, arr) => arr.indexOf(value) === index)
+        .join(', ') || '-';
+
     const handlePrintPo = () => {
         const linesHtml = (purchaseOrder.items || []).map((item, index) => {
             const productName = escapeHtml(item.product?.name || item.product_name || '-');
@@ -75,7 +114,7 @@ export default function Show({ purchaseOrder }) {
 
                     <div class="po-meta">
                         <div><span class="label">PO Number</span>: ${escapeHtml(purchaseOrder.po_number)}</div>
-                        <div><span class="label">PO Date</span>: ${escapeHtml(purchaseOrder.po_date)}</div>
+                        <div><span class="label">PO Date</span>: ${escapeHtml(formatDisplayDate(purchaseOrder.po_date))}</div>
                         <div><span class="label">Vendor</span>: ${escapeHtml(purchaseOrder.vendor?.name || '-')}</div>
                         <div><span class="label">Expected Delivery</span>: ${escapeHtml(purchaseOrder.expected_delivery_date || '-')}</div>
                         <div><span class="label">Currency</span>: IDR</div>
@@ -173,26 +212,56 @@ export default function Show({ purchaseOrder }) {
 
                 <div className='mb-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-2'>
                     <div><span className='font-semibold'>Vendor:</span> {purchaseOrder.vendor?.name ?? '-'}</div>
-                    <div><span className='font-semibold'>PO Date:</span> {purchaseOrder.po_date}</div>
-                    <div><span className='font-semibold'>Expected Delivery:</span> {purchaseOrder.expected_delivery_date ?? '-'}</div>
+                    <div><span className='font-semibold'>PO Date:</span> {formatDisplayDate(purchaseOrder.po_date)}</div>
+                    <div><span className='font-semibold'>Expected Delivery:</span> {formatDisplayDate(purchaseOrder.expected_delivery_date)}</div>
                     <div><span className='font-semibold'>Approval Status:</span> {poStatus || '-'} </div>
                     <div><span className='font-semibold'>Receiving Status:</span> {fulfillmentLabel || '-'} </div>
                     <div><span className='font-semibold'>Total Ordered Qty:</span> {purchaseOrder.items.reduce((sum, i) => sum + Number(i.qty_ordered || 0), 0)}</div>
                     <div><span className='font-semibold'>Total Received Qty:</span> {purchaseOrder.items.reduce((sum, i) => sum + Number(i.received_qty ?? i.qty_received ?? 0), 0)}</div>
                     <div><span className='font-semibold'>Total Remaining Qty:</span> {purchaseOrder.items.reduce((sum, i) => sum + Number(i.remaining_qty ?? (Number(i.qty_ordered || 0) - Number(i.received_qty ?? i.qty_received ?? 0))), 0)}</div>
                     <div><span className='font-semibold'>Grand Total:</span> {Number(purchaseOrder.grand_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div><span className='font-semibold'>PO Created By:</span> {createdBy}</div>
+                    <div><span className='font-semibold'>PO Approved By:</span> {approvedBy}</div>
+                    <div><span className='font-semibold'>Received By:</span> {receivedBy}</div>
+                    <div><span className='font-semibold'>Warehouse:</span> {warehouseInfo}</div>
                 </div>
 
 
                 <h3 className='mt-6 mb-2 text-sm font-semibold'>Receiving History</h3>
                 <Table>
-                    <Table.Thead><tr><Table.Th>Reference No</Table.Th><Table.Th>Tanggal Penerimaan</Table.Th><Table.Th>Status</Table.Th><Table.Th>Received Qty</Table.Th><Table.Th>Total Value</Table.Th></tr></Table.Thead>
-                    <Table.Tbody>{(purchaseOrder.goods_receipts || []).length ? (purchaseOrder.goods_receipts || []).map((gr) => <tr key={gr.id}><Table.Td>{gr.gr_number || gr.number || '-'}</Table.Td><Table.Td>{gr.received_date || gr.document_date || '-'}</Table.Td><Table.Td>{gr.status}</Table.Td><Table.Td>{gr.total_qty ?? '-'}</Table.Td><Table.Td>{Number(gr.total_value ?? 0).toLocaleString('id-ID')}</Table.Td></tr>) : <tr><Table.Td colSpan={5} className='text-center text-gray-500'>Belum ada receiving history.</Table.Td></tr>}</Table.Tbody>
+                    <Table.Thead><tr><Table.Th>Reference No</Table.Th><Table.Th>Tanggal Penerimaan</Table.Th><Table.Th>Warehouse</Table.Th><Table.Th>Status</Table.Th><Table.Th>Received Qty</Table.Th><Table.Th>Total Value</Table.Th></tr></Table.Thead>
+                    <Table.Tbody>{(purchaseOrder.goods_receipts || []).length ? (purchaseOrder.goods_receipts || []).map((gr) => <tr key={gr.id}><Table.Td>{gr.gr_number || gr.number || '-'}</Table.Td><Table.Td>{formatDisplayDate(gr.received_date || gr.document_date)}</Table.Td><Table.Td>{gr.warehouse_name || gr.warehouse?.name || gr.warehouse_code || gr.warehouse_id || '-'}</Table.Td><Table.Td>{gr.status}</Table.Td><Table.Td>{formatNumber(gr.total_qty ?? 0, 2)}</Table.Td><Table.Td>{Number(gr.total_value ?? 0).toLocaleString('id-ID')}</Table.Td></tr>) : <tr><Table.Td colSpan={6} className='text-center text-gray-500'>Belum ada receiving history.</Table.Td></tr>}</Table.Tbody>
                 </Table>
 
                 <Table>
-                    <Table.Thead><tr><Table.Th>Product</Table.Th><Table.Th>Qty Ordered</Table.Th><Table.Th>Qty Received</Table.Th><Table.Th>Remaining Qty</Table.Th><Table.Th>Line Total</Table.Th></tr></Table.Thead>
-                    <Table.Tbody>{purchaseOrder.items.map((i) => <tr key={i.id}><Table.Td>{i.product?.name || i.product_name || '-'}</Table.Td><Table.Td>{i.qty_ordered}</Table.Td><Table.Td>{i.received_qty ?? i.qty_received}</Table.Td><Table.Td>{i.remaining_qty ?? ((+i.qty_ordered) - (+(i.received_qty ?? i.qty_received)))}</Table.Td><Table.Td>{Number(i.line_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Table.Td></tr>)}</Table.Tbody>
+                    <Table.Thead>
+                        <tr>
+                            <Table.Th>Product</Table.Th>
+                            <Table.Th>Fasilitas</Table.Th>
+                            <Table.Th>Nomor Fasilitas</Table.Th>
+                            <Table.Th>Batch Number</Table.Th>
+                            <Table.Th>Expired Date</Table.Th>
+                            <Table.Th>Qty Ordered</Table.Th>
+                            <Table.Th>Qty Received</Table.Th>
+                            <Table.Th>Remaining Qty</Table.Th>
+                            <Table.Th>Line Total</Table.Th>
+                        </tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                        {purchaseOrder.items.map((i) => (
+                            <tr key={i.id}>
+                                <Table.Td>{i.product?.name || i.product_name || '-'}</Table.Td>
+                                <Table.Td>{i.facility_name || i.facility_type || i.facility_scheme_name || '-'}</Table.Td>
+                                <Table.Td>{i.facility_reference_no || i.facility_number || '-'}</Table.Td>
+                                <Table.Td>{i.batch_number || i.batch_no || '-'}</Table.Td>
+                                <Table.Td>{formatDisplayDate(i.expired_date || i.expiry_date)}</Table.Td>
+                                <Table.Td>{i.qty_ordered}</Table.Td>
+                                <Table.Td>{formatNumber(i.received_qty ?? i.qty_received, 2)}</Table.Td>
+                                <Table.Td>{formatNumber(i.remaining_qty ?? ((+i.qty_ordered) - (+(i.received_qty ?? i.qty_received))), 2)}</Table.Td>
+                                <Table.Td>{Number(i.line_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Table.Td>
+                            </tr>
+                        ))}
+                    </Table.Tbody>
                 </Table>
             </Card>
         </>
