@@ -50,7 +50,13 @@ export default function Show({ purchaseOrder }) {
         || '-';
 
     const receivedBy = (purchaseOrder.goods_receipts || [])
-        .map((gr) => gr.received_by_name || gr.received_by?.name || gr.receiver?.name || gr.receivedBy?.name || gr.received_by)
+        .map((gr) => gr.received_by_name || gr.received_by?.name || gr.receiver?.name || gr.receivedBy?.name || gr.received_by || gr.created_by_name || gr.created_by?.name)
+        .filter(Boolean)
+        .filter((value, index, arr) => arr.indexOf(value) === index)
+        .join(', ') || '-';
+
+    const warehouseInfo = (purchaseOrder.goods_receipts || [])
+        .map((gr) => gr.warehouse_name || gr.warehouse?.name || gr.warehouse_code || gr.warehouse_id)
         .filter(Boolean)
         .filter((value, index, arr) => arr.indexOf(value) === index)
         .join(', ') || '-';
@@ -217,13 +223,14 @@ export default function Show({ purchaseOrder }) {
                     <div><span className='font-semibold'>PO Created By:</span> {createdBy}</div>
                     <div><span className='font-semibold'>PO Approved By:</span> {approvedBy}</div>
                     <div><span className='font-semibold'>Received By:</span> {receivedBy}</div>
+                    <div><span className='font-semibold'>Warehouse:</span> {warehouseInfo}</div>
                 </div>
 
 
                 <h3 className='mt-6 mb-2 text-sm font-semibold'>Receiving History</h3>
                 <Table>
-                    <Table.Thead><tr><Table.Th>Reference No</Table.Th><Table.Th>Tanggal Penerimaan</Table.Th><Table.Th>Status</Table.Th><Table.Th>Received Qty</Table.Th><Table.Th>Total Value</Table.Th></tr></Table.Thead>
-                    <Table.Tbody>{(purchaseOrder.goods_receipts || []).length ? (purchaseOrder.goods_receipts || []).map((gr) => <tr key={gr.id}><Table.Td>{gr.gr_number || gr.number || '-'}</Table.Td><Table.Td>{formatDisplayDate(gr.received_date || gr.document_date)}</Table.Td><Table.Td>{gr.status}</Table.Td><Table.Td>{gr.total_qty ?? '-'}</Table.Td><Table.Td>{Number(gr.total_value ?? 0).toLocaleString('id-ID')}</Table.Td></tr>) : <tr><Table.Td colSpan={5} className='text-center text-gray-500'>Belum ada receiving history.</Table.Td></tr>}</Table.Tbody>
+                    <Table.Thead><tr><Table.Th>Reference No</Table.Th><Table.Th>Tanggal Penerimaan</Table.Th><Table.Th>Warehouse</Table.Th><Table.Th>Status</Table.Th><Table.Th>Received Qty</Table.Th><Table.Th>Total Value</Table.Th></tr></Table.Thead>
+                    <Table.Tbody>{(purchaseOrder.goods_receipts || []).length ? (purchaseOrder.goods_receipts || []).map((gr) => <tr key={gr.id}><Table.Td>{gr.gr_number || gr.number || '-'}</Table.Td><Table.Td>{formatDisplayDate(gr.received_date || gr.document_date)}</Table.Td><Table.Td>{gr.warehouse_name || gr.warehouse?.name || gr.warehouse_code || gr.warehouse_id || '-'}</Table.Td><Table.Td>{gr.status}</Table.Td><Table.Td>{formatNumber(gr.total_qty ?? 0, 2)}</Table.Td><Table.Td>{Number(gr.total_value ?? 0).toLocaleString('id-ID')}</Table.Td></tr>) : <tr><Table.Td colSpan={6} className='text-center text-gray-500'>Belum ada receiving history.</Table.Td></tr>}</Table.Tbody>
                 </Table>
 
                 <Table>
@@ -249,8 +256,8 @@ export default function Show({ purchaseOrder }) {
                                 <Table.Td>{i.batch_number || i.batch_no || '-'}</Table.Td>
                                 <Table.Td>{formatDisplayDate(i.expired_date || i.expiry_date)}</Table.Td>
                                 <Table.Td>{i.qty_ordered}</Table.Td>
-                                <Table.Td>{i.received_qty ?? i.qty_received}</Table.Td>
-                                <Table.Td>{i.remaining_qty ?? ((+i.qty_ordered) - (+(i.received_qty ?? i.qty_received)))}</Table.Td>
+                                <Table.Td>{formatNumber(i.received_qty ?? i.qty_received, 2)}</Table.Td>
+                                <Table.Td>{formatNumber(i.remaining_qty ?? ((+i.qty_ordered) - (+(i.received_qty ?? i.qty_received))), 2)}</Table.Td>
                                 <Table.Td>{Number(i.line_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Table.Td>
                             </tr>
                         ))}

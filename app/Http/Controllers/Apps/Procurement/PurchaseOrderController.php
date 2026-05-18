@@ -128,6 +128,9 @@ class PurchaseOrderController extends Controller
             ->get();
 
         if ($goodsReceipts->isEmpty()) {
+            $userNames = DB::table('users')->pluck('name', 'id');
+            $warehouseNames = DB::table('warehouses')->pluck('name', 'id');
+
             $receivingEntries = DB::table('receiving_entries')
                 ->where(function ($query) use ($purchaseOrder) {
                     $query->where(function ($q) use ($purchaseOrder) {
@@ -137,7 +140,7 @@ class PurchaseOrderController extends Controller
                 })
                 ->latest('transaction_date')
                 ->get()
-                ->map(function (object $entry): object {
+                ->map(function (object $entry) use ($userNames, $warehouseNames): object {
                     $lineForeignKey = Schema::hasColumn('receiving_entry_lines', 'receiving_entry_id')
                         ? 'receiving_entry_id'
                         : (Schema::hasColumn('receiving_entry_lines', 'entry_id') ? 'entry_id' : 'receiving_id');
@@ -153,6 +156,8 @@ class PurchaseOrderController extends Controller
                     $entry->status = $entry->status ?? 'posted';
                     $entry->total_qty = (float) ($totals->total_qty ?? 0);
                     $entry->total_value = (float) ($totals->total_value ?? 0);
+                    $entry->received_by_name = $userNames->get((int) ($entry->created_by ?? 0)) ?? null;
+                    $entry->warehouse_name = $warehouseNames->get((int) ($entry->warehouse_id ?? 0)) ?? null;
 
                     return $entry;
                 });
@@ -162,7 +167,13 @@ class PurchaseOrderController extends Controller
 
         $purchaseOrder->setRelation('goodsReceipts', $goodsReceipts);
 
-        $purchaseOrder->goodsReceipts->each(function ($gr) {
+        $userNames = DB::table('users')->pluck('name', 'id');
+        $warehouseNames = DB::table('warehouses')->pluck('name', 'id');
+
+        $purchaseOrder->goodsReceipts->each(function ($gr) use ($userNames, $warehouseNames) {
+            $gr->received_by_name = $gr->received_by_name ?? ($userNames->get((int) ($gr->created_by ?? 0)) ?? null);
+            $gr->warehouse_name = $gr->warehouse_name ?? ($warehouseNames->get((int) ($gr->warehouse_id ?? 0)) ?? null);
+
             if ($gr instanceof GoodsReceipt) {
                 $gr->total_qty = $gr->items()->sum('received_qty');
                 $gr->total_value = $gr->items()->sum('inventory_total_cost');
