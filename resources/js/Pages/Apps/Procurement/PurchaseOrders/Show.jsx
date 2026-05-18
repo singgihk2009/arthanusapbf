@@ -191,8 +191,34 @@ export default function Show({ purchaseOrder }) {
                 </Table>
 
                 <Table>
-                    <Table.Thead><tr><Table.Th>Product</Table.Th><Table.Th>Qty Ordered</Table.Th><Table.Th>Qty Received</Table.Th><Table.Th>Remaining Qty</Table.Th><Table.Th>Line Total</Table.Th></tr></Table.Thead>
-                    <Table.Tbody>{purchaseOrder.items.map((i) => <tr key={i.id}><Table.Td>{i.product?.name || i.product_name || '-'}</Table.Td><Table.Td>{i.qty_ordered}</Table.Td><Table.Td>{i.received_qty ?? i.qty_received}</Table.Td><Table.Td>{i.remaining_qty ?? ((+i.qty_ordered) - (+(i.received_qty ?? i.qty_received)))}</Table.Td><Table.Td>{Number(i.line_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Table.Td></tr>)}</Table.Tbody>
+                    <Table.Thead>
+                        <tr>
+                            <Table.Th>Product</Table.Th>
+                            <Table.Th>Fasilitas</Table.Th>
+                            <Table.Th>Nomor Fasilitas</Table.Th>
+                            <Table.Th>Batch Number</Table.Th>
+                            <Table.Th>Expired Date</Table.Th>
+                            <Table.Th>Qty Ordered</Table.Th>
+                            <Table.Th>Qty Received</Table.Th>
+                            <Table.Th>Remaining Qty</Table.Th>
+                            <Table.Th>Line Total</Table.Th>
+                        </tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                        {purchaseOrder.items.map((i) => (
+                            <tr key={i.id}>
+                                <Table.Td>{i.product?.name || i.product_name || '-'}</Table.Td>
+                                <Table.Td>{i.facility_name || i.facility_type || i.facility_scheme_name || '-'}</Table.Td>
+                                <Table.Td>{i.facility_reference_no || i.facility_number || '-'}</Table.Td>
+                                <Table.Td>{i.batch_number || i.batch_no || '-'}</Table.Td>
+                                <Table.Td>{i.expired_date || i.expiry_date || '-'}</Table.Td>
+                                <Table.Td>{i.qty_ordered}</Table.Td>
+                                <Table.Td>{i.received_qty ?? i.qty_received}</Table.Td>
+                                <Table.Td>{i.remaining_qty ?? ((+i.qty_ordered) - (+(i.received_qty ?? i.qty_received)))}</Table.Td>
+                                <Table.Td>{Number(i.line_total ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Table.Td>
+                            </tr>
+                        ))}
+                    </Table.Tbody>
                 </Table>
             </Card>
         </>
