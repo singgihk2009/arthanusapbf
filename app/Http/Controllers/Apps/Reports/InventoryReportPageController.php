@@ -24,15 +24,48 @@ class InventoryReportPageController extends Controller implements HasMiddleware
     {
         $filters = $this->resolveFilters($request);
         $reportData = $this->resolveReportData($filters);
+        $selectedItem = null;
+
+        if ($filters['item_id']) {
+            $selectedItem = DB::table('items')
+                ->select('id', 'sku', 'name')
+                ->where('id', $filters['item_id'])
+                ->first();
+        }
 
         return inertia('Apps/Reports/Inventory/Index', [
             'filters' => $filters,
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('code')->get(),
             'categories' => DB::table('categories')->select('id', 'name')->orderBy('name')->get(),
-            'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->get(),
+            'items' => DB::table('items')->select('id', 'sku', 'name')->orderBy('name')->limit(200)->get(),
+            'selectedItem' => $selectedItem,
             'facilitySchemes' => DB::table('facility_schemes')->select('id', 'code', 'name')->orderBy('code')->get(),
             'reportData' => $reportData,
         ]);
+    }
+
+    public function searchItems(Request $request)
+    {
+        $validated = $request->validate([
+            'q' => ['required', 'string', 'min:3'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        $query = trim($validated['q']);
+        $limit = $validated['limit'] ?? 20;
+        $keyword = '%'.$query.'%';
+
+        $items = DB::table('items')
+            ->select('id', 'sku', 'name')
+            ->where(function ($subQuery) use ($keyword) {
+                $subQuery->where('name', 'like', $keyword)
+                    ->orWhere('sku', 'like', $keyword);
+            })
+            ->orderBy('name')
+            ->limit($limit)
+            ->get();
+
+        return response()->json(['data' => $items]);
     }
 
     public function exportStockBalanceExcel(Request $request): BinaryFileResponse
