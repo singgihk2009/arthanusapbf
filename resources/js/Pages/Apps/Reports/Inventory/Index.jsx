@@ -396,7 +396,7 @@ export default function Index() {
                                             <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
                                         </>
                                     ) : (
-                                        {(isIncomingReport || isUsageReport) ? (
+                                        (isIncomingReport || isUsageReport) ? (
                                             <>
                                                 <Table.Td>{row.facility_name}</Table.Td>
                                                 <Table.Td>{row.facility_reference_no}</Table.Td>
@@ -425,7 +425,7 @@ export default function Index() {
                                                 <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
                                                 <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
                                             </>
-                                        )}
+                                        )
                                     )}
                                 </tr>
                             )) : (
