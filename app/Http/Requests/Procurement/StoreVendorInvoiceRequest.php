@@ -27,7 +27,8 @@ class StoreVendorInvoiceRequest extends FormRequest
             'wht_tax_base_amount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
-            'lines.*.receipt_line_id' => ['required', 'integer'],
+            'lines.*.source_line_type' => ['required', 'string', 'in:goods_receipt_line,receiving_entry_line'],
+            'lines.*.source_line_id' => ['required', 'integer'],
             'lines.*.qty_invoiced' => ['required', 'numeric', 'gt:0'],
             'lines.*.unit_price' => ['required', 'numeric', 'min:0'],
         ];
