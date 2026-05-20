@@ -92,14 +92,16 @@ class PurchaseOrderController extends Controller
             foreach ($data['items'] as $item) {
                 $this->facilityValidationService->validateFacilityReference(
                     (int) ($item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId),
-                    $item['facility_reference_no'] ?? null
+                    $item['facility_reference_no'] ?? $data['facility_reference_no'] ?? null
                 );
                 $lineBase = (float)$item['qty_ordered'] * (float)$item['unit_price'];
                 $payload = array_merge($item, [
                     'line_total' => $lineBase - (float) ($item['discount_amount'] ?? 0) + (float) ($item['tax_amount'] ?? 0),
                 ]);
 
-                $payload['facility_scheme_id'] = $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
+                $payload['facility_scheme_id'] = $data['facility_scheme_id'] ?? $item['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
+                $payload['facility_reference_no'] = $data['facility_reference_no'] ?? null;
+                $payload['facility_reference_date'] = $data['facility_reference_date'] ?? null;
                 if (! empty($payload['facility_scheme_id']) && in_array('facility_type', $this->purchaseOrderItemColumns(), true)) {
                     $payload['facility_type'] = FacilityScheme::query()->whereKey($payload['facility_scheme_id'])->value('code');
                 }
@@ -231,14 +233,16 @@ class PurchaseOrderController extends Controller
             foreach ($data['items'] as $item) {
                 $this->facilityValidationService->validateFacilityReference(
                     (int) ($item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId),
-                    $item['facility_reference_no'] ?? null
+                    $item['facility_reference_no'] ?? $data['facility_reference_no'] ?? null
                 );
                 $lineBase = (float)$item['qty_ordered'] * (float)$item['unit_price'];
                 $payload = array_merge($item, [
                     'line_total' => $lineBase - (float) ($item['discount_amount'] ?? 0) + (float) ($item['tax_amount'] ?? 0),
                 ]);
 
-                $payload['facility_scheme_id'] = $item['facility_scheme_id'] ?? $data['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
+                $payload['facility_scheme_id'] = $data['facility_scheme_id'] ?? $item['facility_scheme_id'] ?? $defaultFacilitySchemeId ?: null;
+                $payload['facility_reference_no'] = $data['facility_reference_no'] ?? null;
+                $payload['facility_reference_date'] = $data['facility_reference_date'] ?? null;
                 if (! empty($payload['facility_scheme_id']) && in_array('facility_type', $this->purchaseOrderItemColumns(), true)) {
                     $payload['facility_type'] = FacilityScheme::query()->whereKey($payload['facility_scheme_id'])->value('code');
                 }
@@ -280,6 +284,8 @@ class PurchaseOrderController extends Controller
             'items.*.discount_amount' => ['nullable','numeric','min:0'],
             'items.*.tax_amount' => ['nullable','numeric','min:0'],
             'facility_scheme_id' => ['nullable','exists:facility_schemes,id'],
+            'facility_reference_no' => ['nullable','string','max:120'],
+            'facility_reference_date' => ['nullable','date'],
             'items.*.facility_scheme_id' => ['nullable','exists:facility_schemes,id'],
             'items.*.facility_reference_no' => ['nullable','string','max:120'],
             'items.*.facility_reference_date' => ['nullable','date'],
