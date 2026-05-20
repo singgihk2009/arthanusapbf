@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Inventory;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Schema;
 
 class InternalUsageRequest extends FormRequest
 {
@@ -13,7 +14,7 @@ class InternalUsageRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        $rules = [
             'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
             'facility_scheme_id' => ['required', 'integer', 'exists:facility_schemes,id'],
             'document_date' => ['required', 'date'],
@@ -30,5 +31,25 @@ class InternalUsageRequest extends FormRequest
             'lines.*.uom_id' => ['required', 'integer', 'exists:uoms,id'],
             'lines.*.notes' => ['nullable', 'string'],
         ];
+
+        if (Schema::hasTable('facility_schemes') && Schema::hasColumn('internal_usages', 'facility_scheme_id')) {
+            $rules['facility_scheme_id'] = ['required', 'integer', 'exists:facility_schemes,id'];
+        } else {
+            $rules['facility_scheme_id'] = ['nullable'];
+        }
+
+        if (Schema::hasColumn('internal_usages', 'outbound_number')) {
+            $rules['outbound_number'] = ['nullable', 'string', 'max:100'];
+        } else {
+            $rules['outbound_number'] = ['nullable'];
+        }
+
+        if (Schema::hasColumn('internal_usages', 'sender_receiver_name')) {
+            $rules['sender_receiver_name'] = ['nullable', 'string', 'max:255'];
+        } else {
+            $rules['sender_receiver_name'] = ['nullable'];
+        }
+
+        return $rules;
     }
 }
