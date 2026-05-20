@@ -138,7 +138,6 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
 
 
     // inventory item list + 360 inventory card
-    Route::get('/inventory/items', [ItemController::class, 'index'])->name('inventory.items.index');
     Route::get('/inventory/item-cards/{item}', [ItemController::class, 'inventoryCard'])->name('inventory.items.card');
 
     // opening balance page + import tools

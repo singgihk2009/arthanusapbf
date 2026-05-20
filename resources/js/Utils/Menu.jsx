@@ -84,7 +84,7 @@ export default function Menu() {
                 { title: 'Stock Adjustment', href: '/apps/outbound/stock-adjustment', icon: <IconExchange size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/outbound/stock-adjustment'), permissions: true },
                 { title: 'Stock Opname', href: '/apps/outbound/stock-opname', icon: <IconClipboardCheck size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/outbound/stock-opname'), permissions: true },
                 { title: 'Saldo Awal', href: '/apps/inventory/opening-balance', icon: <IconClipboardCheck size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/inventory/opening-balance'), permissions: true },
-                { title: 'Item', href: '/apps/inventory/items', icon: <IconBox size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/inventory/items') || url.startsWith('/apps/inventory/item-cards'), permissions: true },
+                { title: 'Item', href: '/apps/master-data/items', icon: <IconBox size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/items') || url.startsWith('/apps/inventory/item-cards'), permissions: true },
             ],
         },
         {
