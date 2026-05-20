@@ -186,7 +186,7 @@ export default function Index() {
                                 <Table.Td className="text-center">{++i + (items.current_page - 1) * items.per_page}</Table.Td>
                                 <Table.Td>{item.sku}</Table.Td>
                                 <Table.Td>{item.nie ?? '-'}</Table.Td>
-                                <Table.Td>{item.name}</Table.Td>
+                                <Table.Td><a href={`/apps/inventory/item-cards/${item.id}`} className="text-indigo-600 hover:underline">{item.name}</a></Table.Td>
                                 <Table.Td>{item.category?.name ?? '-'}</Table.Td>
                                 <Table.Td>{item.base_uom?.code ?? '-'}</Table.Td>
                                 <Table.Td>{Number(item.minimum_stock_base ?? 0).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 6 })}</Table.Td>

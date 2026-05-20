@@ -137,6 +137,9 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::post('/inventory/posting/opening-balance', [InventoryPostingController::class, 'postOpeningBalance'])->name('inventory.posting.opening-balance');
 
 
+    // inventory item list + 360 inventory card
+    Route::get('/inventory/item-cards/{item}', [ItemController::class, 'inventoryCard'])->name('inventory.items.card');
+
     // opening balance page + import tools
     Route::get('/inventory/opening-balance', [InventoryPostingController::class, 'openingBalancePage'])->name('inventory.opening-balance.index');
     Route::post('/inventory/opening-balance/import', [InventoryPostingController::class, 'importOpeningBalance'])->name('inventory.opening-balance.import');

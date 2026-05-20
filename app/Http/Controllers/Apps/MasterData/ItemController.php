@@ -235,6 +235,41 @@ class ItemController extends Controller implements HasMiddleware
         ]);
     }
 
+
+    public function inventoryCard(Request $request, Item $item)
+    {
+        $item->load(['category:id,name', 'baseUom:id,code,name']);
+
+        $currentTab = $request->string('tab')->toString() ?: 'overview';
+        $allowedTabs = ['overview', 'item', 'barang-masuk', 'barang-keluar', 'dokumen', 'ledger'];
+        if (! in_array($currentTab, $allowedTabs, true)) {
+            $currentTab = 'overview';
+        }
+
+        $summary = [
+            'on_hand_total' => (float) DB::table('stock_balances')->where('item_id', $item->id)->sum('on_hand_base'),
+            'warehouse_count' => (int) DB::table('stock_balances')->where('item_id', $item->id)->distinct('warehouse_id')->count('warehouse_id'),
+            'incoming_total' => (float) DB::table('stock_ledgers')->where('item_id', $item->id)->where('qty_base', '>', 0)->sum('qty_base'),
+            'outgoing_total' => (float) DB::table('stock_ledgers')->where('item_id', $item->id)->where('qty_base', '<', 0)->sum(DB::raw('ABS(qty_base)')),
+            'ledger_rows' => (int) DB::table('stock_ledgers')->where('item_id', $item->id)->count(),
+        ];
+
+        $ledgers = DB::table('stock_ledgers as sl')
+            ->leftJoin('warehouses as w', 'w.id', '=', 'sl.warehouse_id')
+            ->select('sl.id', 'sl.trx_type', 'sl.trx_id', 'sl.qty_base', 'sl.unit_cost', 'sl.trx_datetime', 'w.name as warehouse_name')
+            ->where('sl.item_id', $item->id)
+            ->orderByDesc('sl.trx_datetime')
+            ->limit(50)
+            ->get();
+
+        return inertia('Apps/Inventory/Items/Show', [
+            'item' => $item,
+            'currentTab' => $currentTab,
+            'summary' => $summary,
+            'ledgers' => $ledgers,
+        ]);
+    }
+
     public function create()
     {
         return inertia('Apps/MasterData/Items/Create', [
