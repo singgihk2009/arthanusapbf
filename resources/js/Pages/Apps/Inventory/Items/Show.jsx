@@ -23,7 +23,7 @@ export default function Show() {
 
             <div className="mb-4 flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-900 dark:bg-gray-950">
                 {tabs.map(([key, label]) => (
-                    <button key={key} onClick={() => router.get(route('apps.inventory.items.card', item.id), { tab: key }, { preserveState: true, preserveScroll: true })} className={`rounded px-3 py-1 text-sm ${currentTab === key ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-100'}`}>{label}</button>
+                    <button key={key} onClick={() => router.get(`/apps/inventory/item-cards/${item.id}`, { tab: key }, { preserveState: true, preserveScroll: true })} className={`rounded px-3 py-1 text-sm ${currentTab === key ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-100'}`}>{label}</button>
                 ))}
             </div>
 
