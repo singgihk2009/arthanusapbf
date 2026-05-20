@@ -110,10 +110,10 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         } elseif ($isIncoming || $isUsage) {
             $xlsxRows = [[
                 'Jenis Dok',
-                'Nomor Daftar',
+                $isUsage ? 'No Daftar Pengeluaran Barang' : 'Nomor Daftar',
                 'Tgl Daftar',
-                'No Penerimaan Barang',
-                'Tanggal Terima',
+                $isUsage ? 'Nomor Bukti Pengeluaran Barang' : 'No Penerimaan Barang',
+                $isUsage ? 'Tanggal Keluar' : 'Tanggal Terima',
                 'Nama Pengirim Barang',
                 'Kode Barang',
                 'Kategory Barang',
@@ -171,9 +171,9 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             } elseif ($isIncoming || $isUsage) {
                 $line = [
                     $row->facility_name,
-                    $row->facility_reference_no,
+                    $isUsage ? $row->gr_number : $row->facility_reference_no,
                     $row->facility_reference_date,
-                    $row->gr_number,
+                    $isUsage ? $row->facility_reference_no : $row->gr_number,
                     $row->trx_datetime,
                     $row->vendor_name,
                     $row->sku,
@@ -541,6 +541,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                     ->where('source_receiving_entries.source_type', '=', 'purchase_order');
             })
             ->leftJoin('facility_schemes as source_facility_schemes', 'source_facility_schemes.id', '=', 'source_receiving_lines.facility_scheme_id')
+            ->leftJoin('facility_schemes as usage_facility_schemes', 'usage_facility_schemes.id', '=', 'internal_usages.facility_scheme_id')
             ->leftJoin('categories', 'categories.id', '=', 'items.category_id')
             ->where('stock_ledgers.trx_type', 'USAGE_OUT')
             ->where('stock_ledgers.qty_base', '<', 0)
@@ -567,20 +568,20 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw('COALESCE(categories.name, \'-\') as category_name'),
                 'items.sku',
                 DB::raw("COALESCE(uoms.code, uoms.name) as uom_name"),
-                DB::raw("DATE_FORMAT(stock_ledgers.trx_datetime, '%Y-%m-%d %H:%i:%s') as trx_datetime"),
+                DB::raw("COALESCE(DATE_FORMAT(internal_usages.document_date, '%Y-%m-%d'), DATE_FORMAT(stock_ledgers.trx_datetime, '%Y-%m-%d %H:%i:%s')) as trx_datetime"),
                 DB::raw("COALESCE(internal_usages.transaction_code, '-') as transaction_code"),
                 DB::raw("CONCAT(stock_ledgers.trx_type, '-', stock_ledgers.trx_id) as reference"),
                 DB::raw('ABS(COALESCE(stock_ledgers.unit_cost, 0) * (stock_ledgers.qty_base / NULLIF(stock_ledgers.qty_input, 0))) as unit_price'),
                 DB::raw('ABS(stock_ledgers.qty_input) as qty'),
                 DB::raw('ABS(stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0)) as value'),
-                DB::raw("COALESCE(source_purchase_orders.number, '-') as gr_number"),
-                DB::raw("COALESCE(source_receiving_entries.vendor_name, '-') as vendor_name"),
+                DB::raw("COALESCE(internal_usages.outbound_number, '-') as gr_number"),
+                DB::raw("COALESCE(internal_usages.sender_receiver_name, '-') as vendor_name"),
                 'source_receiving_entries.vendor_id as vendor_id',
                 'source_purchase_orders.id as purchase_order_id',
                 DB::raw("COALESCE(DATE_FORMAT(source_purchase_orders.po_date, '%Y-%m-%d'), '-') as po_date"),
-                DB::raw("COALESCE(source_facility_schemes.name, source_facility_schemes.code, '-') as facility_name"),
-                DB::raw("COALESCE(source_receiving_lines.facility_reference_no, '-') as facility_reference_no"),
-                DB::raw("COALESCE(DATE_FORMAT(source_receiving_lines.facility_reference_date, '%Y-%m-%d'), '-') as facility_reference_date"),
+                DB::raw("COALESCE(usage_facility_schemes.name, usage_facility_schemes.code, source_facility_schemes.name, source_facility_schemes.code, '-') as facility_name"),
+                DB::raw("COALESCE(internal_usages.number, '-') as facility_reference_no"),
+                DB::raw("COALESCE(DATE_FORMAT(internal_usages.document_date, '%Y-%m-%d'), '-') as facility_reference_date"),
                 DB::raw("COALESCE(source_receiving_entries.status, '-') as status"),
             ])
             ->orderBy($sortColumn, $filters['sort_dir'])
