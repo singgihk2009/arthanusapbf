@@ -38,6 +38,7 @@ use App\Http\Controllers\Apps\Procurement\VendorContactController;
 use App\Http\Controllers\Apps\DocumentRequirementController;
 use App\Http\Controllers\Apps\DocumentMonitoringController;
 use App\Http\Controllers\Apps\DocumentCenterDocumentController;
+use App\Http\Controllers\Apps\CompanyProfileController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -50,6 +51,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
+
+Route::middleware(['auth'])->group(function () {
+    Route::redirect('/setup/company-profile', '/apps/setup/company-profile', 301);
+    Route::put('/setup/company-profile', [CompanyProfileController::class, 'update'])->name('setup.company-profile.update.alias');
+    Route::post('/setup/company-profile/logo', [CompanyProfileController::class, 'uploadLogo'])->name('setup.company-profile.logo.upload.alias');
+    Route::delete('/setup/company-profile/logo', [CompanyProfileController::class, 'deleteLogo'])->name('setup.company-profile.logo.delete.alias');
 });
 
 Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 'restrict_inventory_reports_access']], function(){
@@ -191,6 +200,12 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
 
 
     // integration finance hub
+    
+    Route::get('/setup/company-profile', [CompanyProfileController::class, 'index'])->name('setup.company-profile.index');
+    Route::put('/setup/company-profile', [CompanyProfileController::class, 'update'])->name('setup.company-profile.update');
+    Route::post('/setup/company-profile/logo', [CompanyProfileController::class, 'uploadLogo'])->name('setup.company-profile.logo.upload');
+    Route::delete('/setup/company-profile/logo', [CompanyProfileController::class, 'deleteLogo'])->name('setup.company-profile.logo.delete');
+
     Route::get('/integration', [IntegrationController::class, 'index'])->name('integration.index');
     Route::get('/integration/export/csv', [IntegrationController::class, 'exportCsv'])->name('integration.export.csv');
     Route::post('/integration/{transactionId}/retry', [IntegrationController::class, 'retry'])->name('integration.retry');

@@ -107,6 +107,9 @@ class PermissionTableSeeder extends Seeder
             'document.verify',
             'document.reject',
             'document.audit.view',
+            'setup.company_profile.view',
+            'setup.company_profile.update',
+            'setup.company_profile.upload_logo',
         ];
 
         foreach ($permissions as $permission) {
