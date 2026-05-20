@@ -95,36 +95,36 @@ export default function Index() {
         }
 
         return [
-            { key: 'number', label: 'No' },
-            { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
-            { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
-            { key: 'reference', label: 'Referensi' },
-            ...((isIncomingReport || isUsageReport) ? [{ key: 'gr_number', label: 'Nomor PO' }] : []),
-            { key: 'transaction_code', label: 'Kode Transaksi' },
-            ...((isIncomingReport || isUsageReport) ? [{ key: 'po_date', label: 'Tanggal PO' }] : []),
-            { key: 'item_name', label: 'Item', sortKey: 'item' },
-            { key: 'category_name', label: 'Kategori', sortKey: 'category' },
-            { key: 'sku', label: 'SKU' },
-            { key: 'uom_name', label: 'UoM' },
-            { key: 'unit_price', label: 'Unit Price', sortKey: 'unit_price' },
-            {
-                key: 'qty',
-                label: isIncomingReport ? 'Qty Masuk' : 'Qty Keluar',
-                sortKey: 'qty',
-            },
-            {
-                key: 'value',
-                label: isIncomingReport ? 'Value' : 'Value',
-                sortKey: 'value',
-            },
+            { key: 'number', label: 'No.' },
             ...((isIncomingReport || isUsageReport)
                 ? [
-                    { key: 'status', label: 'Status', sortKey: 'status' },
-                    { key: 'vendor_name', label: 'Vendor', sortKey: 'vendor' },
-                    { key: 'facility_name', label: 'Fasilitas' },
-                    { key: 'facility_reference_no', label: 'No Fasilitas' },
+                    { key: 'facility_name', label: 'Jenis Dok' },
+                    { key: 'facility_reference_no', label: 'Nomor Daftar' },
+                    { key: 'po_date', label: 'Tgl Daftar' },
+                    { key: 'gr_number', label: 'No.' },
+                    { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
+                    { key: 'vendor_name', label: 'Nama Pengirim Barang', sortKey: 'vendor' },
+                    { key: 'sku', label: 'Kode Barang' },
+                    { key: 'category_name', label: 'Kategory Barang', sortKey: 'category' },
+                    { key: 'item_name', label: 'Nama Barang', sortKey: 'item' },
+                    { key: 'uom_name', label: 'Satuan' },
+                    { key: 'qty', label: 'Jumlah Barang', sortKey: 'qty' },
+                    { key: 'unit_price', label: 'Harga Satuan', sortKey: 'unit_price' },
+                    { key: 'value', label: 'Total Harga', sortKey: 'value' },
                 ]
-                : []),
+                : [
+                    { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
+                    { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
+                    { key: 'reference', label: 'Referensi' },
+                    { key: 'transaction_code', label: 'Kode Transaksi' },
+                    { key: 'item_name', label: 'Item', sortKey: 'item' },
+                    { key: 'category_name', label: 'Kategori', sortKey: 'category' },
+                    { key: 'sku', label: 'SKU' },
+                    { key: 'uom_name', label: 'UoM' },
+                    { key: 'unit_price', label: 'Unit Price', sortKey: 'unit_price' },
+                    { key: 'qty', label: isIncomingReport ? 'Qty Masuk' : 'Qty Keluar', sortKey: 'qty' },
+                    { key: 'value', label: 'Value', sortKey: 'value' },
+                ]),
         ];
     }, [isIncomingReport, isUsageReport, isStockCardReport, isStockPositionReport]);
 
@@ -396,28 +396,36 @@ export default function Index() {
                                             <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
                                         </>
                                     ) : (
-                                        <>
-                                            <Table.Td>{formatDate(row.trx_datetime)}</Table.Td>
-                                            <Table.Td>{row.reference}</Table.Td>
-                                            {(isIncomingReport || isUsageReport) && <Table.Td>{poLink(row)}</Table.Td>}
-                                            <Table.Td>{row.transaction_code}</Table.Td>
-                                            {(isIncomingReport || isUsageReport) && <Table.Td>{formatDate(row.po_date)}</Table.Td>}
-                                            <Table.Td>{row.item_name}</Table.Td>
-                                            <Table.Td>{row.category_name}</Table.Td>
-                                            <Table.Td>{row.sku}</Table.Td>
-                                            <Table.Td>{row.uom_name}</Table.Td>
-                                            <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
-                                            <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
-                                            <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
-                                            {(isIncomingReport || isUsageReport) && (
-                                                <>
-                                                    <Table.Td>{row.status}</Table.Td>
-                                                    <Table.Td>{vendorLink(row)}</Table.Td>
-                                                    <Table.Td>{row.facility_name}</Table.Td>
-                                                    <Table.Td>{row.facility_reference_no}</Table.Td>
-                                                </>
-                                            )}
-                                        </>
+                                        (isIncomingReport || isUsageReport) ? (
+                                            <>
+                                                <Table.Td>{row.facility_name}</Table.Td>
+                                                <Table.Td>{row.facility_reference_no}</Table.Td>
+                                                <Table.Td>{formatDate(row.po_date)}</Table.Td>
+                                                <Table.Td>{poLink(row)}</Table.Td>
+                                                <Table.Td>{formatDate(row.trx_datetime)}</Table.Td>
+                                                <Table.Td>{vendorLink(row)}</Table.Td>
+                                                <Table.Td>{row.sku}</Table.Td>
+                                                <Table.Td>{row.category_name}</Table.Td>
+                                                <Table.Td>{row.item_name}</Table.Td>
+                                                <Table.Td>{row.uom_name}</Table.Td>
+                                                <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
+                                                <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
+                                                <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Table.Td>{formatDate(row.trx_datetime)}</Table.Td>
+                                                <Table.Td>{row.reference}</Table.Td>
+                                                <Table.Td>{row.transaction_code}</Table.Td>
+                                                <Table.Td>{row.item_name}</Table.Td>
+                                                <Table.Td>{row.category_name}</Table.Td>
+                                                <Table.Td>{row.sku}</Table.Td>
+                                                <Table.Td>{row.uom_name}</Table.Td>
+                                                <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
+                                                <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
+                                                <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
+                                            </>
+                                        )
                                     )}
                                 </tr>
                             )) : (
