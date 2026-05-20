@@ -267,6 +267,8 @@ class ItemController extends Controller implements HasMiddleware
         $incomingReportData = $this->inventoryCardIncomingReportData($item->id, $incomingFilters);
         $outgoingFilters = $this->inventoryCardOutgoingFilters($request);
         $outgoingReportData = $this->inventoryCardOutgoingReportData($item->id, $outgoingFilters);
+        $ledgerFilters = $this->inventoryCardLedgerFilters($request);
+        $ledgerReportData = $this->inventoryCardLedgerReportData($item->id, $ledgerFilters);
 
         return inertia('Apps/Inventory/Items/Show', [
             'item' => $item,
@@ -277,6 +279,8 @@ class ItemController extends Controller implements HasMiddleware
             'incomingReportData' => $incomingReportData,
             'outgoingFilters' => $outgoingFilters,
             'outgoingReportData' => $outgoingReportData,
+            'ledgerFilters' => $ledgerFilters,
+            'ledgerReportData' => $ledgerReportData,
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('code')->get(),
             'categories' => DB::table('categories')->select('id', 'name')->orderBy('name')->get(),
             'facilitySchemes' => DB::table('facility_schemes')->select('id', 'code', 'name')->orderBy('code')->get(),
@@ -556,6 +560,95 @@ class ItemController extends Controller implements HasMiddleware
             ])
             ->orderBy($sortColumn, $filters['sort_dir'])
             ->orderBy('stock_ledgers.id', 'desc');
+    }
+
+
+    private function inventoryCardLedgerFilters(Request $request): array
+    {
+        $filters = $this->inventoryCardIncomingFilters($request);
+        if (! in_array($filters['sort_by'], ['trx_datetime', 'warehouse', 'qty', 'unit_price', 'value', 'running_balance'], true)) {
+            $filters['sort_by'] = 'trx_datetime';
+        }
+
+        return $filters;
+    }
+
+    private function inventoryCardLedgerReportData(int $itemId, array $filters): array
+    {
+        $rows = $this->inventoryCardLedgerQuery($itemId, $filters)
+            ->paginate($filters['per_page'])
+            ->withQueryString();
+
+        return [
+            'rows' => $rows->items(),
+            'pagination' => [
+                'current_page' => $rows->currentPage(),
+                'last_page' => $rows->lastPage(),
+                'per_page' => $rows->perPage(),
+                'total' => $rows->total(),
+                'from' => $rows->firstItem(),
+                'to' => $rows->lastItem(),
+            ],
+        ];
+    }
+
+    private function inventoryCardLedgerQuery(int $itemId, array $filters)
+    {
+        $startDate = $filters['start_date'].' 00:00:00';
+        $endDate = $filters['end_date'].' 23:59:59';
+
+        $openingBalancePerWarehouse = DB::table('stock_ledgers')
+            ->select(['warehouse_id', DB::raw('SUM(qty_base) as opening_balance')])
+            ->where('item_id', $itemId)
+            ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('warehouse_id', $warehouseId))
+            ->when($filters['facility_scheme_id'], fn ($query, $facilitySchemeId) => $query->where('facility_scheme_id', $facilitySchemeId))
+            ->where('trx_datetime', '<', $startDate)
+            ->groupBy('warehouse_id');
+
+        $sortable = [
+            'trx_datetime' => 'stock_ledgers.trx_datetime',
+            'warehouse' => 'warehouses.name',
+            'qty' => 'stock_ledgers.qty_base',
+            'unit_price' => DB::raw('COALESCE(stock_ledgers.unit_cost, 0)'),
+            'value' => DB::raw('(stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0))'),
+            'running_balance' => DB::raw('(COALESCE(opening_balances.opening_balance, 0) + SUM(stock_ledgers.qty_base) OVER (PARTITION BY stock_ledgers.warehouse_id ORDER BY stock_ledgers.trx_datetime, stock_ledgers.id))'),
+        ];
+
+        $sortColumn = $sortable[$filters['sort_by']] ?? $sortable['trx_datetime'];
+
+        return DB::table('stock_ledgers')
+            ->join('warehouses', 'warehouses.id', '=', 'stock_ledgers.warehouse_id')
+            ->join('items', 'items.id', '=', 'stock_ledgers.item_id')
+            ->leftJoinSub($openingBalancePerWarehouse, 'opening_balances', function ($join) {
+                $join->on('opening_balances.warehouse_id', '=', 'stock_ledgers.warehouse_id');
+            })
+            ->where('stock_ledgers.item_id', $itemId)
+            ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_ledgers.warehouse_id', $warehouseId))
+            ->when($filters['facility_scheme_id'], fn ($query, $facilitySchemeId) => $query->where('stock_ledgers.facility_scheme_id', $facilitySchemeId))
+            ->whereBetween('stock_ledgers.trx_datetime', [$startDate, $endDate])
+            ->when($filters['search'] !== '', function ($query) use ($filters) {
+                $keyword = '%'.$filters['search'].'%';
+                $query->where(function ($subQuery) use ($keyword) {
+                    $subQuery->where('warehouses.name', 'like', $keyword)
+                        ->orWhere('items.name', 'like', $keyword)
+                        ->orWhere('items.sku', 'like', $keyword)
+                        ->orWhere('stock_ledgers.trx_type', 'like', $keyword)
+                        ->orWhereRaw('CAST(stock_ledgers.trx_id AS CHAR) like ?', [$keyword]);
+                });
+            })
+            ->select([
+                'warehouses.name as warehouse_name',
+                'items.name as item_name',
+                'items.sku',
+                DB::raw("DATE_FORMAT(stock_ledgers.trx_datetime, '%Y-%m-%d %H:%i:%s') as trx_datetime"),
+                DB::raw("CONCAT(stock_ledgers.trx_type, '-', stock_ledgers.trx_id) as reference"),
+                DB::raw('stock_ledgers.qty_base as qty'),
+                DB::raw('COALESCE(stock_ledgers.unit_cost, 0) as unit_price'),
+                DB::raw('stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0) as value'),
+                DB::raw('(COALESCE(opening_balances.opening_balance, 0) + SUM(stock_ledgers.qty_base) OVER (PARTITION BY stock_ledgers.warehouse_id ORDER BY stock_ledgers.trx_datetime, stock_ledgers.id)) as running_balance'),
+            ])
+            ->orderBy($sortColumn, $filters['sort_dir'])
+            ->orderBy('stock_ledgers.id');
     }
 
     public function create()

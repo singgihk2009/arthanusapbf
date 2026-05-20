@@ -53,6 +53,20 @@ const outgoingColumns = [
     { key: 'facility_reference_no', label: 'No Fasilitas' },
 ];
 
+
+const ledgerColumns = [
+    { key: 'number', label: 'No' },
+    { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
+    { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
+    { key: 'reference', label: 'Referensi' },
+    { key: 'item_name', label: 'Item' },
+    { key: 'sku', label: 'SKU' },
+    { key: 'qty', label: 'Qty Movement', sortKey: 'qty' },
+    { key: 'running_balance', label: 'Saldo Berjalan', sortKey: 'running_balance' },
+    { key: 'unit_price', label: 'Unit Cost', sortKey: 'unit_price' },
+    { key: 'value', label: 'Value Movement', sortKey: 'value' },
+];
+
 const formatDate = (value) => {
     if (!value || value === '-') return '-';
     const date = new Date(value);
@@ -62,7 +76,7 @@ const formatDate = (value) => {
 };
 
 export default function Show() {
-    const { item, currentTab, summary, ledgers, incomingFilters, incomingReportData, outgoingFilters, outgoingReportData, warehouses = [], categories = [], facilitySchemes = [] } = usePage().props;
+    const { item, currentTab, summary, incomingFilters, incomingReportData, outgoingFilters, outgoingReportData, ledgerFilters, ledgerReportData, warehouses = [], categories = [], facilitySchemes = [] } = usePage().props;
 
     const updateIncomingFilters = (nextFilters) => {
         router.get(`/apps/inventory/item-cards/${item.id}`, { tab: 'barang-masuk', ...incomingFilters, ...nextFilters }, { preserveState: true, preserveScroll: true, replace: true });
@@ -70,6 +84,10 @@ export default function Show() {
 
     const updateOutgoingFilters = (nextFilters) => {
         router.get(`/apps/inventory/item-cards/${item.id}`, { tab: 'barang-keluar', ...outgoingFilters, ...nextFilters }, { preserveState: true, preserveScroll: true, replace: true });
+    };
+
+    const updateLedgerFilters = (nextFilters) => {
+        router.get(`/apps/inventory/item-cards/${item.id}`, { tab: 'ledger', ...ledgerFilters, ...nextFilters }, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     return (
@@ -145,7 +163,7 @@ export default function Show() {
                 )}
 
                 {currentTab !== 'overview' && currentTab !== 'ledger' && currentTab !== 'barang-masuk' && currentTab !== 'barang-keluar' && <p className="text-sm text-gray-500">Tab {tabs.find(([k]) => k === currentTab)?.[1]} siap dipakai untuk pengembangan data 360 view.</p>}
-                {currentTab === 'ledger' && <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr className="border-b"><th className="px-2 py-2 text-left">Tanggal</th><th className="px-2 py-2 text-left">Tipe</th><th className="px-2 py-2 text-left">Gudang</th><th className="px-2 py-2 text-right">Qty</th></tr></thead><tbody>{ledgers.map((row) => <tr key={row.id} className="border-b"><td className="px-2 py-2">{row.trx_datetime ?? '-'}</td><td className="px-2 py-2">{row.trx_type}</td><td className="px-2 py-2">{row.warehouse_name ?? '-'}</td><td className="px-2 py-2 text-right">{Number(row.qty_base ?? 0).toLocaleString('id-ID')}</td></tr>)}</tbody></table></div>}
+                {currentTab === 'ledger' && (<div className="space-y-4"><div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-6"><select value={ledgerFilters.warehouse_id ?? ''} onChange={(e) => updateLedgerFilters({ warehouse_id: e.target.value || null, page: 1 })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><option value="">Semua Gudang</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} - {warehouse.name}</option>)}</select><select value={ledgerFilters.facility_scheme_id ?? ''} onChange={(e) => updateLedgerFilters({ facility_scheme_id: e.target.value || null, page: 1 })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><option value="">Semua Fasilitas</option>{facilitySchemes.map((facility) => <option key={facility.id} value={facility.id}>{facility.code} - {facility.name}</option>)}</select><input type="date" value={ledgerFilters.start_date ?? ''} onChange={(e) => updateLedgerFilters({ start_date: e.target.value, page: 1 })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" /><input type="date" value={ledgerFilters.end_date ?? ''} onChange={(e) => updateLedgerFilters({ end_date: e.target.value, page: 1 })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" /><input type="text" value={ledgerFilters.search ?? ''} onChange={(e) => updateLedgerFilters({ search: e.target.value, page: 1 })} placeholder="Cari warehouse/item/sku" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" /><select value={ledgerFilters.per_page ?? 15} onChange={(e) => updateLedgerFilters({ per_page: Number(e.target.value), page: 1 })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">{[15, 50, 100].map((size) => <option key={size} value={size}>Show {size}</option>)}</select></div><div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr className="border-b">{ledgerColumns.map((column) => <th key={column.key} className="px-2 py-2 text-left">{column.sortKey ? <button type="button" onClick={() => updateLedgerFilters({ sort_by: column.sortKey, sort_dir: ledgerFilters.sort_by === column.sortKey && ledgerFilters.sort_dir === 'asc' ? 'desc' : 'asc', page: 1 })}>{column.label}{ledgerFilters.sort_by === column.sortKey ? (ledgerFilters.sort_dir === 'asc' ? '↑' : '↓') : ''}</button> : column.label}</th>)}</tr></thead><tbody>{ledgerReportData?.rows?.length ? ledgerReportData.rows.map((row, index) => <tr key={`${row.reference ?? row.sku}-${index}`} className="border-b"><td className="px-2 py-2">{(ledgerReportData.pagination?.from ?? 1) + index}</td><td className="px-2 py-2">{row.warehouse_name}</td><td className="px-2 py-2">{formatDate(row.trx_datetime)}</td><td className="px-2 py-2">{row.reference}</td><td className="px-2 py-2">{row.item_name}</td><td className="px-2 py-2">{row.sku}</td><td className="px-2 py-2">{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</td><td className="px-2 py-2">{Number(row.running_balance).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</td><td className="px-2 py-2">{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</td><td className="px-2 py-2">{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</td></tr>) : <tr><td colSpan={ledgerColumns.length} className="px-2 py-4 text-center text-gray-500">Tidak ada data report.</td></tr>}</tbody></table></div>{ledgerReportData?.pagination && <div className="flex items-center justify-between text-sm"><div>Menampilkan {ledgerReportData.pagination.from ?? 0} - {ledgerReportData.pagination.to ?? 0} dari {ledgerReportData.pagination.total} data</div><div className="flex items-center gap-2"><button type="button" onClick={() => updateLedgerFilters({ page: ledgerReportData.pagination.current_page - 1 })} disabled={ledgerReportData.pagination.current_page <= 1} className="rounded border px-3 py-1 disabled:opacity-40">Prev</button><span>Page {ledgerReportData.pagination.current_page} / {ledgerReportData.pagination.last_page}</span><button type="button" onClick={() => updateLedgerFilters({ page: ledgerReportData.pagination.current_page + 1 })} disabled={ledgerReportData.pagination.current_page >= ledgerReportData.pagination.last_page} className="rounded border px-3 py-1 disabled:opacity-40">Next</button></div></div>}</div>)}
             </div>
         </>
     );
