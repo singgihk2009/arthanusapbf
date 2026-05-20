@@ -15,6 +15,12 @@ const emptyLine = {
 
 const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 const lineInputClassName = 'rounded border border-gray-300 bg-white px-2 py-1 text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
+const extractErrorMessage = (error, fallbackMessage) => {
+    const responseMessage = error?.response?.data?.message;
+    const firstError = Object.values(error?.response?.data?.errors ?? {})[0]?.[0];
+
+    return responseMessage || firstError || fallbackMessage;
+};
 
 export default function Edit() {
     const { entry, lines, items, uoms, warehouses, transactionCodes } = usePage().props;
@@ -70,9 +76,15 @@ export default function Edit() {
         } catch (error) {
             if (error.response?.status === 422) {
                 setErrors(error.response.data.errors ?? {});
-                setMessage({ type: 'error', text: 'Validasi gagal. Cek field yang ditandai.' });
+                const hasFieldErrors = Object.keys(error.response.data.errors ?? {}).length > 0;
+                setMessage({
+                    type: 'error',
+                    text: hasFieldErrors
+                        ? 'Validasi gagal. Cek field yang ditandai.'
+                        : extractErrorMessage(error, 'Gagal memperbarui receiving entry.'),
+                });
             } else {
-                setMessage({ type: 'error', text: 'Gagal memperbarui receiving entry.' });
+                setMessage({ type: 'error', text: extractErrorMessage(error, 'Gagal memperbarui receiving entry.') });
             }
             setLoading(false);
         }
