@@ -450,7 +450,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'items.sku',
                 DB::raw("DATE_FORMAT(receiving_entries.transaction_date, '%Y-%m-%d') as trx_datetime"),
                 DB::raw("COALESCE(receiving_entries.transaction_code, '-') as transaction_code"),
-                DB::raw("COALESCE(purchase_orders.number, '-') as gr_number"),
+                DB::raw("COALESCE(receiving_entries.number, receiving_entries.reference, '-') as gr_number"),
                 DB::raw("COALESCE(receiving_entries.reference, receiving_entries.number) as reference"),
                 DB::raw("COALESCE(DATE_FORMAT(purchase_orders.po_date, '%Y-%m-%d'), '-') as po_date"),
                 DB::raw('COALESCE(uoms.code, uoms.name) as uom_name'),
@@ -463,6 +463,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'purchase_orders.id as purchase_order_id',
                 DB::raw("COALESCE(facility_schemes.name, facility_schemes.code, '-') as facility_name"),
                 DB::raw("COALESCE(receiving_entry_lines.facility_reference_no, '-') as facility_reference_no"),
+                DB::raw("COALESCE(DATE_FORMAT(receiving_entry_lines.facility_reference_date, '%Y-%m-%d'), '-') as facility_reference_date"),
             ])
             ->orderBy($sortColumn, $filters['sort_dir'])
             ->orderBy('receiving_entry_lines.id', 'desc');
@@ -562,6 +563,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw("COALESCE(DATE_FORMAT(source_purchase_orders.po_date, '%Y-%m-%d'), '-') as po_date"),
                 DB::raw("COALESCE(source_facility_schemes.name, source_facility_schemes.code, '-') as facility_name"),
                 DB::raw("COALESCE(source_receiving_lines.facility_reference_no, '-') as facility_reference_no"),
+                DB::raw("COALESCE(DATE_FORMAT(source_receiving_lines.facility_reference_date, '%Y-%m-%d'), '-') as facility_reference_date"),
                 DB::raw("COALESCE(source_receiving_entries.status, '-') as status"),
             ])
             ->orderBy($sortColumn, $filters['sort_dir'])
