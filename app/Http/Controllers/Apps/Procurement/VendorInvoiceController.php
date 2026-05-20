@@ -8,6 +8,7 @@ use App\Models\Procurement\Vendor;
 use App\Models\Procurement\VendorInvoice;
 use App\Models\Procurement\VendorInvoiceLine;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -181,7 +182,7 @@ class VendorInvoiceController extends Controller
                 'line_total' => (float) $r->qty_available_to_invoice * (float) $r->unit_price_default,
             ]);
 
-        $receivingEntryLines = DB::table('receiving_entry_lines as rel')
+        $receivingEntryLinesQuery = DB::table('receiving_entry_lines as rel')
             ->join('receiving_entries as re', 're.id', '=', 'rel.receiving_entry_id')
             ->leftJoin('purchase_orders as po', function ($join) {
                 $join->on('po.id', '=', 're.source_id')->where('re.source_type', '=', 'purchase_order');
@@ -190,8 +191,15 @@ class VendorInvoiceController extends Controller
             ->leftJoin('vendor_invoice_lines as vil', 'vil.receiving_entry_line_id', '=', 'rel.id')
             ->leftJoin('vendor_invoices as vi', 'vi.id', '=', 'vil.vendor_invoice_id')
             ->whereRaw('COALESCE(re.vendor_id, po.vendor_id) = ?', [$vendorId])
-            ->whereRaw('COALESCE(re.business_id, 1) = ?', [$companyId])
-            ->whereIn(DB::raw('LOWER(re.status)'), ['posted', 'completed'])
+            ->whereIn(DB::raw('LOWER(re.status)'), ['posted', 'completed']);
+
+        if (Schema::hasColumn('receiving_entries', 'business_id')) {
+            $receivingEntryLinesQuery->whereRaw('COALESCE(re.business_id, 1) = ?', [$companyId]);
+        } elseif (Schema::hasColumn('receiving_entries', 'company_id')) {
+            $receivingEntryLinesQuery->whereRaw('COALESCE(re.company_id, 1) = ?', [$companyId]);
+        }
+
+        $receivingEntryLines = $receivingEntryLinesQuery
             ->groupBy('rel.id', 'rel.item_id', 'rel.qty', 'rel.price', 're.number', 'po.po_no', 'i.name', 'i.sku')
             ->selectRaw('rel.id as receiving_entry_line_id, rel.item_id, rel.source_item_id as po_line_id, rel.qty as qty_received')
             ->selectRaw('COALESCE(SUM(CASE WHEN vi.deleted_at IS NULL THEN vil.qty_invoiced ELSE 0 END),0) as qty_already_invoiced')
