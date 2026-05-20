@@ -16,8 +16,11 @@ class InternalUsageRequest extends FormRequest
     {
         $rules = [
             'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+            'facility_scheme_id' => ['required', 'integer', 'exists:facility_schemes,id'],
             'document_date' => ['required', 'date'],
             'transaction_code' => ['required', 'string', 'in:PENJUALAN,RETUR,DAMAGED,SAMPLE,INTERNAL_USE'],
+            'outbound_number' => ['nullable', 'string', 'max:100'],
+            'sender_receiver_name' => ['nullable', 'string', 'max:255'],
             'department' => ['nullable', 'string', 'max:100'],
             'cost_center' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],

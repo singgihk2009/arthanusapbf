@@ -78,7 +78,10 @@ class InternalUsageController extends Controller
             $entryPayload = [
                 'number' => $this->generateNumber(),
                 'warehouse_id' => $validated['warehouse_id'],
+                'facility_scheme_id' => $validated['facility_scheme_id'],
                 'transaction_code' => $validated['transaction_code'],
+                'outbound_number' => $validated['outbound_number'] ?? null,
+                'sender_receiver_name' => $validated['sender_receiver_name'] ?? null,
                 'department' => $validated['department'] ?? null,
                 'cost_center' => $validated['cost_center'] ?? null,
                 'document_date' => $validated['document_date'],
@@ -156,7 +159,10 @@ class InternalUsageController extends Controller
 
             $entryPayload = [
                 'warehouse_id' => $validated['warehouse_id'],
+                'facility_scheme_id' => $validated['facility_scheme_id'],
                 'transaction_code' => $validated['transaction_code'],
+                'outbound_number' => $validated['outbound_number'] ?? null,
+                'sender_receiver_name' => $validated['sender_receiver_name'] ?? null,
                 'department' => $validated['department'] ?? null,
                 'cost_center' => $validated['cost_center'] ?? null,
                 'document_date' => $validated['document_date'],
