@@ -50,7 +50,6 @@ export default function Menu() {
             details: [
                 { title: 'Warehouse', href: '/apps/master-data/warehouses', icon: <IconBuildingWarehouse size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/warehouses'), permissions: true },
                 { title: 'Kategory', href: '/apps/master-data/categories', icon: <IconCategory size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/categories'), permissions: true },
-                { title: 'Item', href: '/apps/master-data/items', icon: <IconBox size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/items'), permissions: true },
                 { title: 'UOM', href: '/apps/master-data/uoms', icon: <IconRulerMeasure size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/uoms'), permissions: true },
                 { title: 'Conversion', href: '/apps/master-data/conversions', icon: <IconExchange size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/conversions'), permissions: true },
                 { title: 'Barcode', href: '/apps/master-data/barcodes', icon: <IconFileBarcode size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/barcodes'), permissions: true },
@@ -85,6 +84,7 @@ export default function Menu() {
                 { title: 'Stock Adjustment', href: '/apps/outbound/stock-adjustment', icon: <IconExchange size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/outbound/stock-adjustment'), permissions: true },
                 { title: 'Stock Opname', href: '/apps/outbound/stock-opname', icon: <IconClipboardCheck size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/outbound/stock-opname'), permissions: true },
                 { title: 'Saldo Awal', href: '/apps/inventory/opening-balance', icon: <IconClipboardCheck size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/inventory/opening-balance'), permissions: true },
+                { title: 'Item', href: '/apps/inventory/items', icon: <IconBox size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/inventory/items') || url.startsWith('/apps/inventory/item-cards'), permissions: true },
             ],
         },
         {
