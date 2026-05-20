@@ -463,6 +463,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'purchase_orders.id as purchase_order_id',
                 DB::raw("COALESCE(facility_schemes.name, facility_schemes.code, '-') as facility_name"),
                 DB::raw("COALESCE(receiving_entry_lines.facility_reference_no, '-') as facility_reference_no"),
+                DB::raw("COALESCE(DATE_FORMAT(receiving_entry_lines.facility_reference_date, '%Y-%m-%d'), '-') as facility_reference_date"),
             ])
             ->orderBy($sortColumn, $filters['sort_dir'])
             ->orderBy('receiving_entry_lines.id', 'desc');
@@ -562,6 +563,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw("COALESCE(DATE_FORMAT(source_purchase_orders.po_date, '%Y-%m-%d'), '-') as po_date"),
                 DB::raw("COALESCE(source_facility_schemes.name, source_facility_schemes.code, '-') as facility_name"),
                 DB::raw("COALESCE(source_receiving_lines.facility_reference_no, '-') as facility_reference_no"),
+                DB::raw("COALESCE(DATE_FORMAT(source_receiving_lines.facility_reference_date, '%Y-%m-%d'), '-') as facility_reference_date"),
                 DB::raw("COALESCE(source_receiving_entries.status, '-') as status"),
             ])
             ->orderBy($sortColumn, $filters['sort_dir'])
