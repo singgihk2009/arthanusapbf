@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 export default function Index() {
     const { entries, flash } = usePage().props;
+    const [localEntries, setLocalEntries] = useState(entries);
     const [processingId, setProcessingId] = useState(null);
     const isPosted = (status) => String(status || '').toLowerCase() === 'posted';
 
@@ -20,8 +21,13 @@ export default function Index() {
 
         setProcessingId(id);
         try {
-            await window.axios.delete(route('apps.inbound.receiving.destroy', id));
-            window.location.reload();
+            await window.axios.delete(route('apps.inbound.receiving.destroy', { receivingEntry: id }));
+            setLocalEntries((prev) => ({
+                ...prev,
+                data: (prev?.data || []).filter((entry) => entry.id !== id),
+                total: Math.max(0, Number(prev?.total || 0) - 1),
+                to: Math.max(0, Number(prev?.to || 0) - 1),
+            }));
         } catch (error) {
             window.alert(extractErrorMessage(error, 'Gagal menghapus receiving entry.'));
         } finally {
@@ -98,14 +104,14 @@ export default function Index() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                {entries.data.length === 0 && (
+                                {localEntries.data.length === 0 && (
                                     <tr>
                                         <td colSpan={9} className="px-3 py-4 text-center text-gray-500">Belum ada data receiving.</td>
                                     </tr>
                                 )}
-                                {entries.data.map((entry, idx) => (
+                                {localEntries.data.map((entry, idx) => (
                                     <tr key={entry.id} className="text-gray-800 dark:text-gray-100">
-                                        <td className="px-3 py-2">{entries.from ? entries.from + idx : idx + 1}</td>
+                                        <td className="px-3 py-2">{localEntries.from ? localEntries.from + idx : idx + 1}</td>
                                         <td className="px-3 py-2">{entry.number}</td>
                                         <td className="px-3 py-2">{entry.transaction_date}</td>
                                         <td className="px-3 py-2">{entry.warehouse_label}</td>
@@ -127,12 +133,12 @@ export default function Index() {
                         </table>
                     </div>
 
-                    {entries?.links?.length > 0 && (
+                    {localEntries?.links?.length > 0 && (
                         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600 dark:text-gray-300">
                             <p>
-                                Menampilkan {entries.from ?? 0} - {entries.to ?? 0} dari {entries.total ?? 0} data
+                                Menampilkan {localEntries.from ?? 0} - {localEntries.to ?? 0} dari {localEntries.total ?? 0} data
                             </p>
-                            <Pagination links={entries.links} />
+                            <Pagination links={localEntries.links} />
                         </div>
                     )}
                 </div>
