@@ -327,9 +327,13 @@ class ReceivingEntryController extends Controller
         $totalValue = 0;
         $isPoSource = ($header['source_type'] ?? null) === 'purchase_order';
         $poItemsById = collect();
+        $poItemsByProductId = collect();
         if ($isPoSource) {
             abort_unless(! empty($header['source_id']), 422, 'source_id wajib untuk receiving dari PO.');
             $poItemsById = DB::table('purchase_order_items')->where('purchase_order_id', $header['source_id'])->get()->keyBy('id');
+            $poItemsByProductId = $poItemsById
+                ->groupBy(fn (object $item) => (int) $item->product_id)
+                ->map(fn (Collection $items): object => $items->sortBy('id')->first());
         }
 
         foreach ($lines as $line) {
@@ -340,6 +344,10 @@ class ReceivingEntryController extends Controller
 
             if ($isPoSource) {
                 $sourceItemId = (int) ($line['source_item_id'] ?? 0);
+                if ($sourceItemId <= 0) {
+                    $matchedPoItem = $poItemsByProductId->get((int) ($line['item_id'] ?? 0));
+                    $sourceItemId = (int) ($matchedPoItem->id ?? 0);
+                }
                 abort_if($sourceItemId <= 0, 422, 'source_item_id wajib untuk setiap item PO.');
                 $poItem = $poItemsById->get($sourceItemId);
                 abort_if(! $poItem, 422, 'Item PO tidak valid untuk source yang dipilih.');
