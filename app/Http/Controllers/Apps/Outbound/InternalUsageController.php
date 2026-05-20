@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\InternalUsageRequest;
 use App\Services\WarehouseAccessService;
 use App\Services\Inventory\UomConversionService;
+use App\Models\Inventory\FacilityScheme;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -62,6 +64,7 @@ class InternalUsageController extends Controller
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
             'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
+            'facilitySchemes' => $this->getFacilitySchemes(),
             'transactionCodes' => self::TRANSACTION_CODE_OPTIONS,
         ]);
     }
@@ -72,7 +75,7 @@ class InternalUsageController extends Controller
         $this->warehouseAccessService->assertWarehouseAccess($request->user(), $validated['warehouse_id']);
 
         DB::transaction(function () use ($validated): void {
-            $entryId = DB::table('internal_usages')->insertGetId([
+            $entryPayload = [
                 'number' => $this->generateNumber(),
                 'warehouse_id' => $validated['warehouse_id'],
                 'transaction_code' => $validated['transaction_code'],
@@ -83,7 +86,9 @@ class InternalUsageController extends Controller
                 'notes' => $validated['notes'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
+            $entryPayload = $this->appendDispatchHeaderPayload($entryPayload, $validated);
+            $entryId = DB::table('internal_usages')->insertGetId($entryPayload);
 
             $this->replaceLines($entryId, $validated['lines']);
         });
@@ -116,7 +121,10 @@ class InternalUsageController extends Controller
             'entry' => [
                 'id' => $entry->id,
                 'warehouse_id' => (string) $entry->warehouse_id,
+                'facility_scheme_id' => (string) ($entry->facility_scheme_id ?? ''),
                 'document_date' => (string) $entry->document_date,
+                'outbound_number' => (string) ($entry->outbound_number ?? ''),
+                'sender_receiver_name' => (string) ($entry->sender_receiver_name ?? ''),
                 'department' => (string) ($entry->department ?? ''),
                 'cost_center' => (string) ($entry->cost_center ?? ''),
                 'transaction_code' => (string) ($entry->transaction_code ?? ''),
@@ -128,6 +136,7 @@ class InternalUsageController extends Controller
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
             'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
+            'facilitySchemes' => $this->getFacilitySchemes(),
             'transactionCodes' => self::TRANSACTION_CODE_OPTIONS,
         ]);
     }
@@ -145,7 +154,7 @@ class InternalUsageController extends Controller
             $linked = DB::table('inv_transactions')->where('source_table', 'internal_usages')->where('source_id', $entry->id)->exists();
             abort_if($linked, 422, 'Dokumen sudah terikat GL, gunakan reversal/adjustment.');
 
-            DB::table('internal_usages')->where('id', $internalUsage)->update([
+            $entryPayload = [
                 'warehouse_id' => $validated['warehouse_id'],
                 'transaction_code' => $validated['transaction_code'],
                 'department' => $validated['department'] ?? null,
@@ -153,7 +162,9 @@ class InternalUsageController extends Controller
                 'document_date' => $validated['document_date'],
                 'notes' => $validated['notes'] ?? null,
                 'updated_at' => now(),
-            ]);
+            ];
+            $entryPayload = $this->appendDispatchHeaderPayload($entryPayload, $validated);
+            DB::table('internal_usages')->where('id', $internalUsage)->update($entryPayload);
 
             $this->replaceLines($internalUsage, $validated['lines']);
         });
@@ -215,5 +226,34 @@ class InternalUsageController extends Controller
         $sequence = str_pad((string) ($lastSequence + 1), 4, '0', STR_PAD_LEFT);
 
         return "$prefix-$datePart-$sequence";
+    }
+
+    private function appendDispatchHeaderPayload(array $payload, array $validated): array
+    {
+        if (Schema::hasColumn('internal_usages', 'facility_scheme_id')) {
+            $payload['facility_scheme_id'] = $validated['facility_scheme_id'] ?? null;
+        }
+
+        if (Schema::hasColumn('internal_usages', 'outbound_number')) {
+            $payload['outbound_number'] = $validated['outbound_number'] ?? null;
+        }
+
+        if (Schema::hasColumn('internal_usages', 'sender_receiver_name')) {
+            $payload['sender_receiver_name'] = $validated['sender_receiver_name'] ?? null;
+        }
+
+        return $payload;
+    }
+
+    private function getFacilitySchemes()
+    {
+        if (! Schema::hasTable('facility_schemes')) {
+            return collect();
+        }
+
+        return FacilityScheme::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'code', 'name']);
     }
 }
