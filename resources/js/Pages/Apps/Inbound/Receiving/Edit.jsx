@@ -3,6 +3,7 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import React, { useMemo, useState } from 'react';
 
 const emptyLine = {
+    source_item_id: '',
     item_id: '',
     qty: '',
     uom_id: '',
