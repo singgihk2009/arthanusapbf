@@ -80,12 +80,16 @@ class VendorInvoiceController extends Controller
             $linePayloads = [];
             foreach ($linesBySource as $sourceKey => $line) {
                 $src = $available[$sourceKey];
+                $poLineId = $src['po_line_id'] ?? null;
+                if ($poLineId !== null && ! DB::table('purchase_order_lines')->where('id', $poLineId)->exists()) {
+                    $poLineId = null;
+                }
                 $lineTotal = (float) $line['qty_invoiced'] * (float) $line['unit_price'];
                 $subtotal += $lineTotal;
                 $linePayloads[] = [
                     'receipt_line_id' => $src['source_line_type'] === 'goods_receipt_line' ? $src['source_line_id'] : null,
                     'receiving_entry_line_id' => $src['source_line_type'] === 'receiving_entry_line' ? $src['source_line_id'] : null,
-                    'po_line_id' => $src['po_line_id'],
+                    'po_line_id' => $poLineId,
                     'item_id' => $src['item_id'],
                     'description' => $src['item_name'],
                     'qty_invoiced' => $line['qty_invoiced'],
@@ -201,7 +205,7 @@ class VendorInvoiceController extends Controller
 
         $receivingEntryLines = $receivingEntryLinesQuery
             ->groupBy('rel.id', 'rel.item_id', 'rel.qty', 'rel.price', 're.number', 'po.po_no', 'i.name', 'i.sku')
-            ->selectRaw('rel.id as receiving_entry_line_id, rel.item_id, rel.source_item_id as po_line_id, rel.qty as qty_received')
+            ->selectRaw('rel.id as receiving_entry_line_id, rel.item_id, null as po_line_id, rel.qty as qty_received')
             ->selectRaw('COALESCE(SUM(CASE WHEN vi.deleted_at IS NULL THEN vil.qty_invoiced ELSE 0 END),0) as qty_already_invoiced')
             ->selectRaw('(rel.qty - COALESCE(SUM(CASE WHEN vi.deleted_at IS NULL THEN vil.qty_invoiced ELSE 0 END),0)) as qty_available_to_invoice')
             ->selectRaw('COALESCE(po.po_no, "-") as po_no, COALESCE(re.number, re.reference, "-") as receiving_no, COALESCE(i.name, i.sku, "-") as item_name, i.sku')
