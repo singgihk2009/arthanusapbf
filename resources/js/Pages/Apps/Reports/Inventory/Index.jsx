@@ -100,7 +100,7 @@ export default function Index() {
                 ? [
                     { key: 'facility_name', label: 'Jenis Dok' },
                     { key: 'facility_reference_no', label: 'Nomor Daftar' },
-                    { key: 'po_date', label: 'Tgl Daftar' },
+                    { key: 'facility_reference_date', label: 'Tgl Daftar' },
                     { key: 'gr_number', label: 'No.' },
                     { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
                     { key: 'vendor_name', label: 'Nama Pengirim Barang', sortKey: 'vendor' },
@@ -401,7 +401,7 @@ export default function Index() {
                                             <>
                                                 <Table.Td>{row.facility_name}</Table.Td>
                                                 <Table.Td>{row.facility_reference_no}</Table.Td>
-                                                <Table.Td>{formatDate(row.po_date)}</Table.Td>
+                                                <Table.Td>{formatDate(row.facility_reference_date)}</Table.Td>
                                                 <Table.Td>{poLink(row)}</Table.Td>
                                                 <Table.Td>{formatDate(row.trx_datetime)}</Table.Td>
                                                 <Table.Td>{vendorLink(row)}</Table.Td>
