@@ -107,14 +107,31 @@ class InventoryReportPageController extends Controller implements HasMiddleware
 
             $numberColumns = [5, 6, 7, 8];
             $dateColumns = [1];
+        } elseif ($isIncoming || $isUsage) {
+            $xlsxRows = [[
+                'Jenis Dok',
+                'Nomor Daftar',
+                'Tgl Daftar',
+                'No Penerimaan Barang',
+                'Tanggal Terima',
+                'Nama Pengirim Barang',
+                'Kode Barang',
+                'Kategory Barang',
+                'Nama Barang',
+                'Satuan',
+                'Jumlah Barang',
+                'Harga Satuan',
+                'Total Harga',
+            ]];
+
+            $numberColumns = [10, 11, 12];
+            $dateColumns = [2, 4];
         } else {
             $xlsxRows = [[
                 'Warehouse',
                 'Tanggal',
                 'Referensi',
-                'Nomor PO',
                 'Kode Transaksi',
-                'Tanggal PO',
                 'Item',
                 'Kategori',
                 'SKU',
@@ -124,15 +141,8 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'Value',
             ]];
 
-            $numberColumns = [10, 11, 12];
-            $dateColumns = [1, 5];
-
-            if ($isIncoming || $isUsage) {
-                $xlsxRows[0][] = 'Status';
-                $xlsxRows[0][] = 'Vendor';
-                $xlsxRows[0][] = 'Fasilitas';
-                $xlsxRows[0][] = 'No Fasilitas';
-            }
+            $numberColumns = [8, 9, 10];
+            $dateColumns = [1];
         }
 
         foreach ($rows as $row) {
@@ -158,14 +168,28 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                     (float) $row->unit_price,
                     (float) $row->value,
                 ];
+            } elseif ($isIncoming || $isUsage) {
+                $line = [
+                    $row->facility_name,
+                    $row->facility_reference_no,
+                    $row->facility_reference_date,
+                    $row->gr_number,
+                    $row->trx_datetime,
+                    $row->vendor_name,
+                    $row->sku,
+                    $row->category_name,
+                    $row->item_name,
+                    $row->uom_name,
+                    (float) $row->qty,
+                    (float) $row->unit_price,
+                    (float) $row->value,
+                ];
             } else {
                 $line = [
                     $row->warehouse_name,
                     $row->trx_datetime,
                     $row->reference,
-                    $row->gr_number,
                     $row->transaction_code,
-                    $row->po_date,
                     $row->item_name,
                     $row->category_name,
                     $row->sku,
@@ -174,13 +198,6 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                     (float) $row->qty,
                     (float) $row->value,
                 ];
-
-                if ($isIncoming || $isUsage) {
-                    $line[] = $row->status;
-                    $line[] = $row->vendor_name;
-                    $line[] = $row->facility_name;
-                    $line[] = $row->facility_reference_no;
-                }
             }
 
             $xlsxRows[] = $line;
@@ -450,7 +467,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'items.sku',
                 DB::raw("DATE_FORMAT(receiving_entries.transaction_date, '%Y-%m-%d') as trx_datetime"),
                 DB::raw("COALESCE(receiving_entries.transaction_code, '-') as transaction_code"),
-                DB::raw("COALESCE(purchase_orders.number, '-') as gr_number"),
+                DB::raw("COALESCE(receiving_entries.number, receiving_entries.reference, '-') as gr_number"),
                 DB::raw("COALESCE(receiving_entries.reference, receiving_entries.number) as reference"),
                 DB::raw("COALESCE(DATE_FORMAT(purchase_orders.po_date, '%Y-%m-%d'), '-') as po_date"),
                 DB::raw('COALESCE(uoms.code, uoms.name) as uom_name'),
@@ -463,6 +480,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'purchase_orders.id as purchase_order_id',
                 DB::raw("COALESCE(facility_schemes.name, facility_schemes.code, '-') as facility_name"),
                 DB::raw("COALESCE(receiving_entry_lines.facility_reference_no, '-') as facility_reference_no"),
+                DB::raw("COALESCE(DATE_FORMAT(receiving_entry_lines.facility_reference_date, '%Y-%m-%d'), '-') as facility_reference_date"),
             ])
             ->orderBy($sortColumn, $filters['sort_dir'])
             ->orderBy('receiving_entry_lines.id', 'desc');
@@ -562,6 +580,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 DB::raw("COALESCE(DATE_FORMAT(source_purchase_orders.po_date, '%Y-%m-%d'), '-') as po_date"),
                 DB::raw("COALESCE(source_facility_schemes.name, source_facility_schemes.code, '-') as facility_name"),
                 DB::raw("COALESCE(source_receiving_lines.facility_reference_no, '-') as facility_reference_no"),
+                DB::raw("COALESCE(DATE_FORMAT(source_receiving_lines.facility_reference_date, '%Y-%m-%d'), '-') as facility_reference_date"),
                 DB::raw("COALESCE(source_receiving_entries.status, '-') as status"),
             ])
             ->orderBy($sortColumn, $filters['sort_dir'])
