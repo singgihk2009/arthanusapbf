@@ -262,12 +262,152 @@ class ItemController extends Controller implements HasMiddleware
             ->limit(50)
             ->get();
 
+
+        $incomingFilters = $this->inventoryCardIncomingFilters($request);
+        $incomingReportData = $this->inventoryCardIncomingReportData($item->id, $incomingFilters);
+
         return inertia('Apps/Inventory/Items/Show', [
             'item' => $item,
             'currentTab' => $currentTab,
             'summary' => $summary,
             'ledgers' => $ledgers,
+            'incomingFilters' => $incomingFilters,
+            'incomingReportData' => $incomingReportData,
+            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->orderBy('code')->get(),
+            'categories' => DB::table('categories')->select('id', 'name')->orderBy('name')->get(),
+            'facilitySchemes' => DB::table('facility_schemes')->select('id', 'code', 'name')->orderBy('code')->get(),
         ]);
+    }
+
+    private function inventoryCardIncomingFilters(Request $request): array
+    {
+        $sortBy = $request->string('sort_by')->toString() ?: 'trx_datetime';
+        if (! in_array($sortBy, ['trx_datetime', 'warehouse', 'item', 'category', 'qty', 'value', 'unit_price', 'status', 'vendor'], true)) {
+            $sortBy = 'trx_datetime';
+        }
+
+        $sortDir = strtolower($request->string('sort_dir')->toString() ?: 'desc');
+        if (! in_array($sortDir, ['asc', 'desc'], true)) {
+            $sortDir = 'desc';
+        }
+
+        $perPage = $request->integer('per_page', 15);
+        if (! in_array($perPage, [15, 50, 100], true)) {
+            $perPage = 15;
+        }
+
+        return [
+            'warehouse_id' => $request->integer('warehouse_id') ?: null,
+            'category_id' => $request->integer('category_id') ?: null,
+            'search' => trim((string) $request->string('search')->toString()),
+            'sort_by' => $sortBy,
+            'sort_dir' => $sortDir,
+            'per_page' => $perPage,
+            'status' => strtolower($request->string('status')->toString() ?: 'all'),
+            'facility_scheme_id' => $request->integer('facility_scheme_id') ?: null,
+            'start_date' => $request->date('start_date')?->toDateString() ?? now()->startOfYear()->toDateString(),
+            'end_date' => $request->date('end_date')?->toDateString() ?? now()->toDateString(),
+        ];
+    }
+
+    private function inventoryCardIncomingReportData(int $itemId, array $filters): array
+    {
+        $rows = $this->inventoryCardIncomingItemsQuery($itemId, $filters)
+            ->paginate($filters['per_page'])
+            ->withQueryString();
+
+        return [
+            'rows' => $rows->items(),
+            'pagination' => [
+                'current_page' => $rows->currentPage(),
+                'last_page' => $rows->lastPage(),
+                'per_page' => $rows->perPage(),
+                'total' => $rows->total(),
+                'from' => $rows->firstItem(),
+                'to' => $rows->lastItem(),
+            ],
+        ];
+    }
+
+    private function inventoryCardIncomingItemsQuery(int $itemId, array $filters)
+    {
+        $sortable = [
+            'trx_datetime' => 'receiving_entries.transaction_date',
+            'warehouse' => 'warehouses.name',
+            'item' => 'items.name',
+            'category' => 'categories.name',
+            'qty' => 'receiving_entry_lines.qty',
+            'value' => 'receiving_entry_lines.value',
+            'unit_price' => 'receiving_entry_lines.price',
+            'status' => 'receiving_entries.status',
+            'vendor' => 'receiving_entries.vendor_name',
+        ];
+
+        $sortColumn = $sortable[$filters['sort_by']] ?? $sortable['trx_datetime'];
+        $status = in_array($filters['status'], ['posted', 'unposted', 'all'], true) ? $filters['status'] : 'all';
+
+        return DB::table('receiving_entry_lines')
+            ->join('receiving_entries', 'receiving_entries.id', '=', 'receiving_entry_lines.receiving_entry_id')
+            ->join('warehouses', 'warehouses.id', '=', 'receiving_entries.warehouse_id')
+            ->join('items', 'items.id', '=', 'receiving_entry_lines.item_id')
+            ->join('uoms', 'uoms.id', '=', 'receiving_entry_lines.uom_id')
+            ->leftJoin('categories', 'categories.id', '=', 'items.category_id')
+            ->leftJoin('facility_schemes', 'facility_schemes.id', '=', 'receiving_entry_lines.facility_scheme_id')
+            ->leftJoin('purchase_orders', function ($join) {
+                $join->on('purchase_orders.id', '=', 'receiving_entries.source_id')
+                    ->where('receiving_entries.source_type', '=', 'purchase_order');
+            })
+            ->where('receiving_entry_lines.item_id', $itemId)
+            ->when($status !== 'all', function ($query) use ($status) {
+                if ($status === 'posted') {
+                    $query->where('receiving_entries.status', 'POSTED');
+
+                    return;
+                }
+
+                $query->where('receiving_entries.status', '!=', 'POSTED');
+            })
+            ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('receiving_entries.warehouse_id', $warehouseId))
+            ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('items.category_id', $categoryId))
+            ->when($filters['facility_scheme_id'], fn ($query, $facilitySchemeId) => $query->where('receiving_entry_lines.facility_scheme_id', $facilitySchemeId))
+            ->whereBetween('receiving_entries.transaction_date', [$filters['start_date'], $filters['end_date']])
+            ->when($filters['search'] !== '', function ($query) use ($filters) {
+                $keyword = '%'.$filters['search'].'%';
+                $query->where(function ($subQuery) use ($keyword) {
+                    $subQuery->where('warehouses.name', 'like', $keyword)
+                        ->orWhere('items.name', 'like', $keyword)
+                        ->orWhere('items.sku', 'like', $keyword)
+                        ->orWhere('categories.name', 'like', $keyword)
+                        ->orWhere('receiving_entries.reference', 'like', $keyword)
+                        ->orWhere('receiving_entries.vendor_name', 'like', $keyword)
+                        ->orWhere('receiving_entries.number', 'like', $keyword)
+                        ->orWhere('uoms.name', 'like', $keyword)
+                        ->orWhere('uoms.code', 'like', $keyword);
+                });
+            })
+            ->select([
+                'warehouses.name as warehouse_name',
+                'items.name as item_name',
+                DB::raw('COALESCE(categories.name, "-") as category_name'),
+                'items.sku',
+                DB::raw("DATE_FORMAT(receiving_entries.transaction_date, '%Y-%m-%d') as trx_datetime"),
+                DB::raw("COALESCE(receiving_entries.transaction_code, '-') as transaction_code"),
+                DB::raw("COALESCE(purchase_orders.number, '-') as gr_number"),
+                DB::raw("COALESCE(receiving_entries.reference, receiving_entries.number) as reference"),
+                DB::raw("COALESCE(DATE_FORMAT(purchase_orders.po_date, '%Y-%m-%d'), '-') as po_date"),
+                DB::raw('COALESCE(uoms.code, uoms.name) as uom_name'),
+                DB::raw('COALESCE(receiving_entry_lines.price, 0) as unit_price'),
+                DB::raw('ABS(receiving_entry_lines.qty) as qty'),
+                DB::raw('ABS(COALESCE(receiving_entry_lines.value, receiving_entry_lines.qty * COALESCE(receiving_entry_lines.price, 0))) as value'),
+                DB::raw("COALESCE(receiving_entries.status, 'DRAFT') as status"),
+                DB::raw("COALESCE(receiving_entries.vendor_name, '-') as vendor_name"),
+                'receiving_entries.vendor_id as vendor_id',
+                'purchase_orders.id as purchase_order_id',
+                DB::raw("COALESCE(facility_schemes.name, facility_schemes.code, '-') as facility_name"),
+                DB::raw("COALESCE(receiving_entry_lines.facility_reference_no, '-') as facility_reference_no"),
+            ])
+            ->orderBy($sortColumn, $filters['sort_dir'])
+            ->orderBy('receiving_entry_lines.id', 'desc');
     }
 
     public function create()
