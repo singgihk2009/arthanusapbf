@@ -107,14 +107,31 @@ class InventoryReportPageController extends Controller implements HasMiddleware
 
             $numberColumns = [5, 6, 7, 8];
             $dateColumns = [1];
+        } elseif ($isIncoming || $isUsage) {
+            $xlsxRows = [[
+                'Jenis Dok',
+                'Nomor Daftar',
+                'Tgl Daftar',
+                'No Penerimaan Barang',
+                'Tanggal Terima',
+                'Nama Pengirim Barang',
+                'Kode Barang',
+                'Kategory Barang',
+                'Nama Barang',
+                'Satuan',
+                'Jumlah Barang',
+                'Harga Satuan',
+                'Total Harga',
+            ]];
+
+            $numberColumns = [10, 11, 12];
+            $dateColumns = [2, 4];
         } else {
             $xlsxRows = [[
                 'Warehouse',
                 'Tanggal',
                 'Referensi',
-                'Nomor PO',
                 'Kode Transaksi',
-                'Tanggal PO',
                 'Item',
                 'Kategori',
                 'SKU',
@@ -124,15 +141,8 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'Value',
             ]];
 
-            $numberColumns = [10, 11, 12];
-            $dateColumns = [1, 5];
-
-            if ($isIncoming || $isUsage) {
-                $xlsxRows[0][] = 'Status';
-                $xlsxRows[0][] = 'Vendor';
-                $xlsxRows[0][] = 'Fasilitas';
-                $xlsxRows[0][] = 'No Fasilitas';
-            }
+            $numberColumns = [8, 9, 10];
+            $dateColumns = [1];
         }
 
         foreach ($rows as $row) {
@@ -158,14 +168,28 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                     (float) $row->unit_price,
                     (float) $row->value,
                 ];
+            } elseif ($isIncoming || $isUsage) {
+                $line = [
+                    $row->facility_name,
+                    $row->facility_reference_no,
+                    $row->facility_reference_date,
+                    $row->gr_number,
+                    $row->trx_datetime,
+                    $row->vendor_name,
+                    $row->sku,
+                    $row->category_name,
+                    $row->item_name,
+                    $row->uom_name,
+                    (float) $row->qty,
+                    (float) $row->unit_price,
+                    (float) $row->value,
+                ];
             } else {
                 $line = [
                     $row->warehouse_name,
                     $row->trx_datetime,
                     $row->reference,
-                    $row->gr_number,
                     $row->transaction_code,
-                    $row->po_date,
                     $row->item_name,
                     $row->category_name,
                     $row->sku,
@@ -174,13 +198,6 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                     (float) $row->qty,
                     (float) $row->value,
                 ];
-
-                if ($isIncoming || $isUsage) {
-                    $line[] = $row->status;
-                    $line[] = $row->vendor_name;
-                    $line[] = $row->facility_name;
-                    $line[] = $row->facility_reference_no;
-                }
             }
 
             $xlsxRows[] = $line;
