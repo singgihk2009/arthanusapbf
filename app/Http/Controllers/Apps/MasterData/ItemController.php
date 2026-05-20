@@ -64,7 +64,7 @@ class ItemController extends Controller implements HasMiddleware
             ->paginate(10)
             ->withQueryString();
 
-        return inertia('Apps/MasterData/Items/Index', [
+        return inertia('Apps/Inventory/Items/Index', [
             'items' => $items,
             'filters' => $filters,
         ]);
