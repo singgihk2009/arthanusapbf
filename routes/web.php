@@ -293,7 +293,9 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
         Route::get('/vendors/{vendor}/documents', [VendorController::class, 'documents'])->name('vendors.documents');
         Route::get('/vendors/{vendor}/purchase-orders', [VendorController::class, 'purchaseOrders'])->name('vendors.purchase-orders');
         Route::get('/vendors/{vendor}/receivings', [VendorController::class, 'receivings'])->name('vendors.receivings');
-        Route::get('/vendors/{vendor}/invoices', [VendorController::class, 'invoices'])->name('vendors.invoices');
+        Route::get('/vendors/{vendor}/invoices', [VendorInvoiceController::class, 'index'])->name('vendors.invoices');
+        Route::get('/vendors/{vendor}/invoices/create', [VendorInvoiceController::class, 'create'])->name('vendors.invoices.create');
+        Route::post('/vendors/{vendor}/invoices', [VendorInvoiceController::class, 'store'])->name('vendors.invoices.store');
         Route::get('/vendors/{vendor}/payments', [VendorController::class, 'payments'])->name('vendors.payments');
         Route::get('/vendors/{vendor}/ledger', [VendorController::class, 'ledger'])->name('vendors.ledger');
         Route::get('/vendors/{vendor}/audit-logs', [VendorController::class, 'auditLogs'])->name('vendors.audit-logs');
