@@ -315,6 +315,13 @@ class ReceivingEntryController extends Controller
         $lineForeignKey = $this->resolveLineForeignKeyColumn();
         $batchColumn = $this->resolveBatchColumn();
 
+        $currentEntrySourceQtyByItem = DB::table('receiving_entry_lines')
+            ->where($lineForeignKey, $entryId)
+            ->whereNotNull('source_item_id')
+            ->select('source_item_id', DB::raw('SUM(qty) as total_qty'))
+            ->groupBy('source_item_id')
+            ->pluck('total_qty', 'source_item_id');
+
         DB::table('receiving_entry_lines')->where($lineForeignKey, $entryId)->delete();
 
         $totalValue = 0;
@@ -339,7 +346,9 @@ class ReceivingEntryController extends Controller
                 abort_if((int) $line['item_id'] !== (int) $poItem->product_id, 422, 'Produk receiving harus sama dengan produk PO item.');
 
                 $orderedQty = (float) $poItem->qty_ordered;
-                $previouslyReceived = (float) ($poItem->received_qty ?? $poItem->qty_received ?? 0);
+                $postedReceivedQty = (float) ($poItem->received_qty ?? $poItem->qty_received ?? 0);
+                $currentEntryQty = (float) ($currentEntrySourceQtyByItem->get($sourceItemId) ?? 0);
+                $previouslyReceived = max(0, $postedReceivedQty - $currentEntryQty);
                 $remainingQty = max(0, $orderedQty - $previouslyReceived);
                 $qty = (float) $line['qty'];
                 abort_if($qty <= 0 || $qty > $remainingQty, 422, 'Qty receiving melebihi sisa qty PO.');
