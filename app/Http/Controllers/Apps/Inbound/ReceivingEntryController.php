@@ -143,6 +143,7 @@ class ReceivingEntryController extends Controller
             ->orderBy('id')
             ->get()
             ->map(fn (object $line): array => [
+                'source_item_id' => $line->source_item_id ? (string) $line->source_item_id : '',
                 'item_id' => (string) $line->item_id,
                 'qty' => (string) $line->qty,
                 'uom_id' => (string) $line->uom_id,
@@ -209,7 +210,11 @@ class ReceivingEntryController extends Controller
                 ->where('id', $receivingEntry)
                 ->update($this->filterColumns('receiving_entries', $headerPayload));
 
-            $this->replaceEntryLines($receivingEntry, $validated['lines'], $validated);
+            $lineHeader = $validated;
+            $lineHeader['source_type'] = $headerPayload['source_type'] ?? null;
+            $lineHeader['source_id'] = $headerPayload['source_id'] ?? null;
+
+            $this->replaceEntryLines($receivingEntry, $validated['lines'], $lineHeader);
         });
 
         if ($request->expectsJson()) {
