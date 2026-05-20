@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\InternalUsageRequest;
 use App\Services\WarehouseAccessService;
 use App\Services\Inventory\UomConversionService;
+use App\Models\Inventory\FacilityScheme;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -62,6 +63,7 @@ class InternalUsageController extends Controller
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
             'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
+            'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
             'transactionCodes' => self::TRANSACTION_CODE_OPTIONS,
         ]);
     }
@@ -75,7 +77,10 @@ class InternalUsageController extends Controller
             $entryId = DB::table('internal_usages')->insertGetId([
                 'number' => $this->generateNumber(),
                 'warehouse_id' => $validated['warehouse_id'],
+                'facility_scheme_id' => $validated['facility_scheme_id'],
                 'transaction_code' => $validated['transaction_code'],
+                'outbound_number' => $validated['outbound_number'] ?? null,
+                'sender_receiver_name' => $validated['sender_receiver_name'] ?? null,
                 'department' => $validated['department'] ?? null,
                 'cost_center' => $validated['cost_center'] ?? null,
                 'document_date' => $validated['document_date'],
@@ -116,7 +121,10 @@ class InternalUsageController extends Controller
             'entry' => [
                 'id' => $entry->id,
                 'warehouse_id' => (string) $entry->warehouse_id,
+                'facility_scheme_id' => (string) ($entry->facility_scheme_id ?? ''),
                 'document_date' => (string) $entry->document_date,
+                'outbound_number' => (string) ($entry->outbound_number ?? ''),
+                'sender_receiver_name' => (string) ($entry->sender_receiver_name ?? ''),
                 'department' => (string) ($entry->department ?? ''),
                 'cost_center' => (string) ($entry->cost_center ?? ''),
                 'transaction_code' => (string) ($entry->transaction_code ?? ''),
@@ -128,6 +136,7 @@ class InternalUsageController extends Controller
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
             'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
+            'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
             'transactionCodes' => self::TRANSACTION_CODE_OPTIONS,
         ]);
     }
@@ -147,7 +156,10 @@ class InternalUsageController extends Controller
 
             DB::table('internal_usages')->where('id', $internalUsage)->update([
                 'warehouse_id' => $validated['warehouse_id'],
+                'facility_scheme_id' => $validated['facility_scheme_id'],
                 'transaction_code' => $validated['transaction_code'],
+                'outbound_number' => $validated['outbound_number'] ?? null,
+                'sender_receiver_name' => $validated['sender_receiver_name'] ?? null,
                 'department' => $validated['department'] ?? null,
                 'cost_center' => $validated['cost_center'] ?? null,
                 'document_date' => $validated['document_date'],

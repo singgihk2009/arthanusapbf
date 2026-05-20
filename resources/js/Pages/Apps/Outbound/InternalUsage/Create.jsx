@@ -7,11 +7,14 @@ const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 p
 const lineInputClassName = 'rounded border border-gray-300 bg-white px-2 py-1 text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 
 export default function Create() {
-    const { items, uoms, warehouses, batches, transactionCodes } = usePage().props;
+    const { items, uoms, warehouses, batches, facilitySchemes, transactionCodes } = usePage().props;
     const [form, setForm] = useState({
         warehouse_id: '',
+        facility_scheme_id: '',
         document_date: new Date().toISOString().slice(0, 10),
         transaction_code: 'PENJUALAN',
+        outbound_number: '',
+        sender_receiver_name: '',
         department: '',
         cost_center: '',
         notes: '',
@@ -65,7 +68,10 @@ export default function Create() {
             setForm((prev) => ({
                 ...prev,
                 warehouse_id: '',
+                facility_scheme_id: '',
                 transaction_code: 'PENJUALAN',
+                outbound_number: '',
+                sender_receiver_name: '',
                 department: '',
                 cost_center: '',
                 notes: '',
@@ -96,7 +102,9 @@ export default function Create() {
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Warehouse</label><select value={form.warehouse_id} onChange={(e) => updateHeader('warehouse_id', e.target.value)} className={inputClassName}><option value="">Pilih Warehouse</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} - {warehouse.name}</option>)}</select>{errors.warehouse_id && <p className="mt-1 text-xs text-red-500">{errors.warehouse_id[0]}</p>}</div>
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Tanggal Dokumen</label><input type="date" value={form.document_date} onChange={(e) => updateHeader('document_date', e.target.value)} className={inputClassName} />{errors.document_date && <p className="mt-1 text-xs text-red-500">{errors.document_date[0]}</p>}</div>
-                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Kode Transaksi</label><select value={form.transaction_code} onChange={(e) => updateHeader('transaction_code', e.target.value)} className={inputClassName}><option value="">Pilih Kode Transaksi</option>{transactionCodes.map((transactionCode) => <option key={transactionCode.value} value={transactionCode.value}>{transactionCode.label}</option>)}</select>{errors.transaction_code && <p className="mt-1 text-xs text-red-500">{errors.transaction_code[0]}</p>}</div>
+                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Jenis Dokumen Keluar</label><select value={form.facility_scheme_id} onChange={(e) => updateHeader('facility_scheme_id', e.target.value)} className={inputClassName}><option value="">Pilih Jenis Dokumen</option>{facilitySchemes.map((scheme) => <option key={scheme.id} value={scheme.id}>{scheme.code} - {scheme.name}</option>)}</select>{errors.facility_scheme_id && <p className="mt-1 text-xs text-red-500">{errors.facility_scheme_id[0]}</p>}</div><div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Kode Transaksi</label><select value={form.transaction_code} onChange={(e) => updateHeader('transaction_code', e.target.value)} className={inputClassName}><option value="">Pilih Kode Transaksi</option>{transactionCodes.map((transactionCode) => <option key={transactionCode.value} value={transactionCode.value}>{transactionCode.label}</option>)}</select>{errors.transaction_code && <p className="mt-1 text-xs text-red-500">{errors.transaction_code[0]}</p>}</div>
+                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Nomor Pengeluaran</label><input value={form.outbound_number} onChange={(e) => updateHeader('outbound_number', e.target.value)} className={inputClassName} />{errors.outbound_number && <p className="mt-1 text-xs text-red-500">{errors.outbound_number[0]}</p>}</div>
+                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Nama Pengirim/ Penerima Barang</label><input value={form.sender_receiver_name} onChange={(e) => updateHeader('sender_receiver_name', e.target.value)} className={inputClassName} />{errors.sender_receiver_name && <p className="mt-1 text-xs text-red-500">{errors.sender_receiver_name[0]}</p>}</div>
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Department</label><input value={form.department} onChange={(e) => updateHeader('department', e.target.value)} className={inputClassName} /></div>
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Cost Center</label><input value={form.cost_center} onChange={(e) => updateHeader('cost_center', e.target.value)} className={inputClassName} /></div>
                             <div className="md:col-span-2"><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Keterangan</label><input value={form.notes} onChange={(e) => updateHeader('notes', e.target.value)} className={inputClassName} /></div>
