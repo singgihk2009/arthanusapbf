@@ -2,7 +2,6 @@
 namespace App\Http\Controllers\Apps;
 
 use App\Http\Controllers\Controller;
-use App\Models\Core\Party;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Services\CompanyProfileService;
@@ -12,6 +11,12 @@ use Inertia\Inertia;
 
 class CompanyProfileController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('permission:setup.company_profile.view')->only(['index']);
+        $this->middleware('permission:setup.company_profile.update')->only(['update']);
+        $this->middleware('permission:setup.company_profile.upload_logo')->only(['uploadLogo', 'deleteLogo']);
+    }
     public function index(CompanyProfileService $service)
     {
         $profile = $service->getDefaultCompanyProfile();

@@ -53,6 +53,14 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
+
+Route::middleware(['auth'])->group(function () {
+    Route::redirect('/setup/company-profile', '/apps/setup/company-profile', 301);
+    Route::put('/setup/company-profile', [CompanyProfileController::class, 'update'])->name('setup.company-profile.update.alias');
+    Route::post('/setup/company-profile/logo', [CompanyProfileController::class, 'uploadLogo'])->name('setup.company-profile.logo.upload.alias');
+    Route::delete('/setup/company-profile/logo', [CompanyProfileController::class, 'deleteLogo'])->name('setup.company-profile.logo.delete.alias');
+});
+
 Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 'restrict_inventory_reports_access']], function(){
     // dashboard route
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
