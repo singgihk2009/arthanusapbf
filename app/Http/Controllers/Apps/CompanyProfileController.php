@@ -6,16 +6,20 @@ use App\Models\Document;
 use App\Models\DocumentType;
 use App\Services\CompanyProfileService;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
-class CompanyProfileController extends Controller
+class CompanyProfileController extends Controller implements HasMiddleware
 {
-    public function __construct()
+    public static function middleware(): array
     {
-        $this->middleware('permission:setup.company_profile.view')->only(['index']);
-        $this->middleware('permission:setup.company_profile.update')->only(['update']);
-        $this->middleware('permission:setup.company_profile.upload_logo')->only(['uploadLogo', 'deleteLogo']);
+        return [
+            new Middleware('permission:setup.company_profile.view', only: ['index']),
+            new Middleware('permission:setup.company_profile.update', only: ['update']),
+            new Middleware('permission:setup.company_profile.upload_logo', only: ['uploadLogo', 'deleteLogo']),
+        ];
     }
     public function index(CompanyProfileService $service)
     {
