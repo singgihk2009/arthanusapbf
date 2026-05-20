@@ -31,6 +31,28 @@ const incomingColumns = [
     { key: 'facility_reference_no', label: 'No Fasilitas' },
 ];
 
+
+const outgoingColumns = [
+    { key: 'number', label: 'No' },
+    { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
+    { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
+    { key: 'reference', label: 'Referensi' },
+    { key: 'gr_number', label: 'Nomor PO' },
+    { key: 'transaction_code', label: 'Kode Transaksi' },
+    { key: 'po_date', label: 'Tanggal PO' },
+    { key: 'item_name', label: 'Item', sortKey: 'item' },
+    { key: 'category_name', label: 'Kategori', sortKey: 'category' },
+    { key: 'sku', label: 'SKU' },
+    { key: 'uom_name', label: 'UoM' },
+    { key: 'unit_price', label: 'Unit Price', sortKey: 'unit_price' },
+    { key: 'qty', label: 'Qty Keluar', sortKey: 'qty' },
+    { key: 'value', label: 'Value', sortKey: 'value' },
+    { key: 'status', label: 'Status', sortKey: 'status' },
+    { key: 'vendor_name', label: 'Vendor', sortKey: 'vendor' },
+    { key: 'facility_name', label: 'Fasilitas' },
+    { key: 'facility_reference_no', label: 'No Fasilitas' },
+];
+
 const formatDate = (value) => {
     if (!value || value === '-') return '-';
     const date = new Date(value);
@@ -40,10 +62,14 @@ const formatDate = (value) => {
 };
 
 export default function Show() {
-    const { item, currentTab, summary, ledgers, incomingFilters, incomingReportData, warehouses = [], categories = [], facilitySchemes = [] } = usePage().props;
+    const { item, currentTab, summary, ledgers, incomingFilters, incomingReportData, outgoingFilters, outgoingReportData, warehouses = [], categories = [], facilitySchemes = [] } = usePage().props;
 
     const updateIncomingFilters = (nextFilters) => {
         router.get(`/apps/inventory/item-cards/${item.id}`, { tab: 'barang-masuk', ...incomingFilters, ...nextFilters }, { preserveState: true, preserveScroll: true, replace: true });
+    };
+
+    const updateOutgoingFilters = (nextFilters) => {
+        router.get(`/apps/inventory/item-cards/${item.id}`, { tab: 'barang-keluar', ...outgoingFilters, ...nextFilters }, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     return (
@@ -100,7 +126,25 @@ export default function Show() {
                     </div>
                 )}
 
-                {currentTab !== 'overview' && currentTab !== 'ledger' && currentTab !== 'barang-masuk' && <p className="text-sm text-gray-500">Tab {tabs.find(([k]) => k === currentTab)?.[1]} siap dipakai untuk pengembangan data 360 view.</p>}
+                {currentTab === 'barang-keluar' && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-7">
+                            <select value={outgoingFilters.warehouse_id ?? ''} onChange={(e) => updateOutgoingFilters({ warehouse_id: e.target.value || null, page: 1 })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><option value="">Semua Gudang</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} - {warehouse.name}</option>)}</select>
+                            <select value={outgoingFilters.category_id ?? ''} onChange={(e) => updateOutgoingFilters({ category_id: e.target.value || null, page: 1 })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><option value="">Semua Kategori</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
+                            <select value={outgoingFilters.status ?? 'all'} onChange={(e) => updateOutgoingFilters({ status: e.target.value, page: 1 })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><option value="all">Semua Status</option><option value="posted">Posted</option><option value="unposted">Belum Posted</option></select>
+                            <select value={outgoingFilters.facility_scheme_id ?? ''} onChange={(e) => updateOutgoingFilters({ facility_scheme_id: e.target.value || null, page: 1 })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><option value="">Semua Fasilitas</option>{facilitySchemes.map((facility) => <option key={facility.id} value={facility.id}>{facility.code} - {facility.name}</option>)}</select>
+                            <input type="date" value={outgoingFilters.start_date ?? ''} onChange={(e) => updateOutgoingFilters({ start_date: e.target.value, page: 1 })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" />
+                            <input type="date" value={outgoingFilters.end_date ?? ''} onChange={(e) => updateOutgoingFilters({ end_date: e.target.value, page: 1 })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" />
+                            <input type="text" value={outgoingFilters.search ?? ''} onChange={(e) => updateOutgoingFilters({ search: e.target.value, page: 1 })} placeholder="Cari warehouse/item/sku" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" />
+                            <select value={outgoingFilters.per_page ?? 15} onChange={(e) => updateOutgoingFilters({ per_page: Number(e.target.value), page: 1 })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">{[15, 50, 100].map((size) => <option key={size} value={size}>Show {size}</option>)}</select>
+                        </div>
+                        <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr className="border-b">{outgoingColumns.map((column) => <th key={column.key} className="px-2 py-2 text-left">{column.sortKey ? <button type="button" onClick={() => updateOutgoingFilters({ sort_by: column.sortKey, sort_dir: outgoingFilters.sort_by === column.sortKey && outgoingFilters.sort_dir === 'asc' ? 'desc' : 'asc', page: 1 })}>{column.label}{outgoingFilters.sort_by === column.sortKey ? (outgoingFilters.sort_dir === 'asc' ? '↑' : '↓') : ''}</button> : column.label}</th>)}</tr></thead>
+                        <tbody>{outgoingReportData?.rows?.length ? outgoingReportData.rows.map((row, index) => <tr key={`${row.reference ?? row.sku}-${index}`} className="border-b"><td className="px-2 py-2">{(outgoingReportData.pagination?.from ?? 1) + index}</td><td className="px-2 py-2">{row.warehouse_name}</td><td className="px-2 py-2">{formatDate(row.trx_datetime)}</td><td className="px-2 py-2">{row.reference}</td><td className="px-2 py-2">{row.gr_number}</td><td className="px-2 py-2">{row.transaction_code}</td><td className="px-2 py-2">{formatDate(row.po_date)}</td><td className="px-2 py-2">{row.item_name}</td><td className="px-2 py-2">{row.category_name}</td><td className="px-2 py-2">{row.sku}</td><td className="px-2 py-2">{row.uom_name}</td><td className="px-2 py-2">{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</td><td className="px-2 py-2">{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</td><td className="px-2 py-2">{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</td><td className="px-2 py-2">{row.status}</td><td className="px-2 py-2">{row.vendor_name}</td><td className="px-2 py-2">{row.facility_name}</td><td className="px-2 py-2">{row.facility_reference_no}</td></tr>) : <tr><td colSpan={outgoingColumns.length} className="px-2 py-4 text-center text-gray-500">Tidak ada data report.</td></tr>}</tbody></table></div>
+                        {outgoingReportData?.pagination && <div className="flex items-center justify-between text-sm"><div>Menampilkan {outgoingReportData.pagination.from ?? 0} - {outgoingReportData.pagination.to ?? 0} dari {outgoingReportData.pagination.total} data</div><div className="flex items-center gap-2"><button type="button" onClick={() => updateOutgoingFilters({ page: outgoingReportData.pagination.current_page - 1 })} disabled={outgoingReportData.pagination.current_page <= 1} className="rounded border px-3 py-1 disabled:opacity-40">Prev</button><span>Page {outgoingReportData.pagination.current_page} / {outgoingReportData.pagination.last_page}</span><button type="button" onClick={() => updateOutgoingFilters({ page: outgoingReportData.pagination.current_page + 1 })} disabled={outgoingReportData.pagination.current_page >= outgoingReportData.pagination.last_page} className="rounded border px-3 py-1 disabled:opacity-40">Next</button></div></div>}
+                    </div>
+                )}
+
+                {currentTab !== 'overview' && currentTab !== 'ledger' && currentTab !== 'barang-masuk' && currentTab !== 'barang-keluar' && <p className="text-sm text-gray-500">Tab {tabs.find(([k]) => k === currentTab)?.[1]} siap dipakai untuk pengembangan data 360 view.</p>}
                 {currentTab === 'ledger' && <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr className="border-b"><th className="px-2 py-2 text-left">Tanggal</th><th className="px-2 py-2 text-left">Tipe</th><th className="px-2 py-2 text-left">Gudang</th><th className="px-2 py-2 text-right">Qty</th></tr></thead><tbody>{ledgers.map((row) => <tr key={row.id} className="border-b"><td className="px-2 py-2">{row.trx_datetime ?? '-'}</td><td className="px-2 py-2">{row.trx_type}</td><td className="px-2 py-2">{row.warehouse_name ?? '-'}</td><td className="px-2 py-2 text-right">{Number(row.qty_base ?? 0).toLocaleString('id-ID')}</td></tr>)}</tbody></table></div>}
             </div>
         </>
