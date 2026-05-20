@@ -111,6 +111,7 @@ export default function Index() {
                     { key: 'qty', label: 'Jumlah Barang', sortKey: 'qty' },
                     { key: 'unit_price', label: 'Harga Satuan', sortKey: 'unit_price' },
                     { key: 'value', label: 'Total Harga', sortKey: 'value' },
+                    { key: 'facility_remarks', label: 'Keterangan' },
                 ]
                 : [
                     { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
@@ -374,7 +375,7 @@ export default function Index() {
                             {reportData.rows?.length ? reportData.rows.map((row, index) => (
                                 <tr key={`${row.reference ?? row.sku}-${index}`} className="hover:bg-gray-100 dark:hover:bg-gray-900">
                                     <Table.Td>{(pagination?.from ?? 1) + index}</Table.Td>
-                                    <Table.Td>{row.warehouse_name}</Table.Td>
+                                    {!(isIncomingReport || isUsageReport) && <Table.Td>{row.warehouse_name}</Table.Td>}
                                     {isStockPositionReport ? (
                                         <>
                                             <Table.Td>{row.item_name}</Table.Td>
@@ -411,6 +412,7 @@ export default function Index() {
                                                 <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
                                                 <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
                                                 <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
+                                                <Table.Td>{row.facility_name ?? '-'}</Table.Td>
                                             </>
                                         ) : (
                                             <>
