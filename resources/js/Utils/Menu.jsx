@@ -21,6 +21,7 @@ import {
     IconShoppingCart,
     IconStack2,
     IconUsers,
+    IconBuilding,
 } from '@tabler/icons-react';
 
 export default function Menu() {
@@ -105,6 +106,7 @@ export default function Menu() {
             title: 'SETUP',
             permissions: true,
             details: [
+                { title: 'Company Profile', href: '/apps/setup/company-profile', icon: <IconBuilding size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/setup/company-profile'), permissions: true },
                 { title: 'User Management', href: '/apps/users', icon: <IconUsers size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/users'), permissions: true },
             ],
         },

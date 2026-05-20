@@ -34,6 +34,9 @@ class RoleTableSeeder extends Seeder
 
         Role::firstOrCreate(['name' => 'super-admin']);
 
+        $admin = Role::firstOrCreate(['name' => 'admin']);
+        $admin->givePermissionTo(Permission::whereIn('name', ['setup.company_profile.view','setup.company_profile.update','setup.company_profile.upload_logo'])->get());
+
         $stockkeeper = Role::firstOrCreate(['name' => 'Stockkeeper']);
         $stockkeeperPermissions = Permission::whereIn('name', [
             'dashboard-data','inventory.view','inventory.dashboard.view','inventory.stock_card.view','inventory.stock_ledger.view','inventory.movement.view',
