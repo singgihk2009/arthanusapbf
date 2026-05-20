@@ -110,9 +110,9 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         } elseif ($isIncoming || $isUsage) {
             $xlsxRows = [[
                 'Jenis Dok',
-                'Nomor Daftar',
+                $isUsage ? 'No Daftar Pengeluaran Barang' : 'Nomor Daftar',
                 'Tgl Daftar',
-                $isUsage ? 'No Pengeluaran Barang' : 'No Penerimaan Barang',
+                $isUsage ? 'Nomor Bukti Pengeluaran Barang' : 'No Penerimaan Barang',
                 $isUsage ? 'Tanggal Keluar' : 'Tanggal Terima',
                 'Nama Pengirim Barang',
                 'Kode Barang',
@@ -171,9 +171,9 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             } elseif ($isIncoming || $isUsage) {
                 $line = [
                     $row->facility_name,
-                    $row->facility_reference_no,
+                    $isUsage ? $row->gr_number : $row->facility_reference_no,
                     $row->facility_reference_date,
-                    $row->gr_number,
+                    $isUsage ? $row->facility_reference_no : $row->gr_number,
                     $row->trx_datetime,
                     $row->vendor_name,
                     $row->sku,

@@ -97,21 +97,37 @@ export default function Index() {
         return [
             { key: 'number', label: 'No.' },
             ...((isIncomingReport || isUsageReport)
-                ? [
-                    { key: 'facility_name', label: 'Jenis Dok' },
-                    { key: 'facility_reference_no', label: 'Nomor Daftar' },
-                    { key: 'facility_reference_date', label: 'Tgl Daftar' },
-                    { key: 'gr_number', label: isUsageReport ? 'No Pengeluaran Barang' : 'No Penerimaan Barang' },
-                    { key: 'trx_datetime', label: isUsageReport ? 'Tanggal Keluar' : 'Tanggal Terima', sortKey: 'trx_datetime' },
-                    { key: 'vendor_name', label: 'Nama Pengirim Barang', sortKey: 'vendor' },
-                    { key: 'sku', label: 'Kode Barang' },
-                    { key: 'category_name', label: 'Kategory Barang', sortKey: 'category' },
-                    { key: 'item_name', label: 'Nama Barang', sortKey: 'item' },
-                    { key: 'uom_name', label: 'Satuan' },
-                    { key: 'qty', label: 'Jumlah Barang', sortKey: 'qty' },
-                    { key: 'unit_price', label: 'Harga Satuan', sortKey: 'unit_price' },
-                    { key: 'value', label: 'Total Harga', sortKey: 'value' },
-                ]
+                ? (isUsageReport
+                    ? [
+                        { key: 'facility_name', label: 'Jenis Dok' },
+                        { key: 'gr_number', label: 'No Daftar Pengeluaran Barang' },
+                        { key: 'facility_reference_date', label: 'Tgl Daftar' },
+                        { key: 'facility_reference_no', label: 'Nomor Bukti Pengeluaran Barang' },
+                        { key: 'trx_datetime', label: 'Tanggal Keluar', sortKey: 'trx_datetime' },
+                        { key: 'vendor_name', label: 'Nama Pengirim Barang', sortKey: 'vendor' },
+                        { key: 'sku', label: 'Kode Barang' },
+                        { key: 'category_name', label: 'Kategory Barang', sortKey: 'category' },
+                        { key: 'item_name', label: 'Nama Barang', sortKey: 'item' },
+                        { key: 'uom_name', label: 'Satuan' },
+                        { key: 'qty', label: 'Jumlah Barang', sortKey: 'qty' },
+                        { key: 'unit_price', label: 'Harga Satuan', sortKey: 'unit_price' },
+                        { key: 'value', label: 'Total Harga', sortKey: 'value' },
+                    ]
+                    : [
+                        { key: 'facility_name', label: 'Jenis Dok' },
+                        { key: 'facility_reference_no', label: 'Nomor Daftar' },
+                        { key: 'facility_reference_date', label: 'Tgl Daftar' },
+                        { key: 'gr_number', label: 'No Penerimaan Barang' },
+                        { key: 'trx_datetime', label: 'Tanggal Terima', sortKey: 'trx_datetime' },
+                        { key: 'vendor_name', label: 'Nama Pengirim Barang', sortKey: 'vendor' },
+                        { key: 'sku', label: 'Kode Barang' },
+                        { key: 'category_name', label: 'Kategory Barang', sortKey: 'category' },
+                        { key: 'item_name', label: 'Nama Barang', sortKey: 'item' },
+                        { key: 'uom_name', label: 'Satuan' },
+                        { key: 'qty', label: 'Jumlah Barang', sortKey: 'qty' },
+                        { key: 'unit_price', label: 'Harga Satuan', sortKey: 'unit_price' },
+                        { key: 'value', label: 'Total Harga', sortKey: 'value' },
+                    ])
                 : [
                     { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
                     { key: 'trx_datetime', label: 'Tanggal', sortKey: 'trx_datetime' },
