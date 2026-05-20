@@ -100,9 +100,9 @@ export default function Index() {
                 ? (isUsageReport
                     ? [
                         { key: 'facility_name', label: 'Jenis Dok' },
-                        { key: 'gr_number', label: 'No Daftar Pengeluaran Barang' },
+                        { key: 'facility_reference_no', label: 'No Daftar Pengeluaran Barang' },
                         { key: 'facility_reference_date', label: 'Tgl Daftar' },
-                        { key: 'facility_reference_no', label: 'Nomor Bukti Pengeluaran Barang' },
+                        { key: 'gr_number', label: 'Nomor Bukti Pengeluaran Barang' },
                         { key: 'trx_datetime', label: 'Tanggal Keluar', sortKey: 'trx_datetime' },
                         { key: 'vendor_name', label: 'Nama Pengirim Barang', sortKey: 'vendor' },
                         { key: 'sku', label: 'Kode Barang' },
