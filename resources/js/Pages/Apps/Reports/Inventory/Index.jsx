@@ -401,7 +401,7 @@ export default function Index() {
                                                 <Table.Td>{row.facility_name}</Table.Td>
                                                 <Table.Td>{row.facility_reference_no}</Table.Td>
                                                 <Table.Td>{formatDate(row.facility_reference_date)}</Table.Td>
-                                                <Table.Td>{row.reference ?? '-'}</Table.Td>
+                                                <Table.Td>{row.gr_number ?? '-'}</Table.Td>
                                                 <Table.Td>{formatDate(row.trx_datetime)}</Table.Td>
                                                 <Table.Td>{vendorLink(row)}</Table.Td>
                                                 <Table.Td>{row.sku}</Table.Td>

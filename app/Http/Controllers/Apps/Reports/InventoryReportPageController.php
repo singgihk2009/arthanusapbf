@@ -450,7 +450,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'items.sku',
                 DB::raw("DATE_FORMAT(receiving_entries.transaction_date, '%Y-%m-%d') as trx_datetime"),
                 DB::raw("COALESCE(receiving_entries.transaction_code, '-') as transaction_code"),
-                DB::raw("COALESCE(purchase_orders.number, '-') as gr_number"),
+                DB::raw("COALESCE(receiving_entries.number, receiving_entries.reference, '-') as gr_number"),
                 DB::raw("COALESCE(receiving_entries.reference, receiving_entries.number) as reference"),
                 DB::raw("COALESCE(DATE_FORMAT(purchase_orders.po_date, '%Y-%m-%d'), '-') as po_date"),
                 DB::raw('COALESCE(uoms.code, uoms.name) as uom_name'),
