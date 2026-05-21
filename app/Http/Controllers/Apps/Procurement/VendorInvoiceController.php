@@ -9,6 +9,7 @@ use App\Models\Procurement\VendorInvoice;
 use App\Models\Procurement\VendorInvoiceLine;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -148,6 +149,52 @@ class VendorInvoiceController extends Controller
             ->with('success', 'Vendor invoice berhasil dibuat.');
     }
 
+
+    public function show(VendorInvoice $vendorInvoice)
+    {
+        $invoice = $this->authorizedInvoice($vendorInvoice);
+
+        return Inertia::render('Apps/Procurement/VendorInvoices/Show', [
+            'invoice' => $invoice,
+        ]);
+    }
+
+    public function edit(VendorInvoice $vendorInvoice)
+    {
+        $invoice = $this->authorizedInvoice($vendorInvoice);
+
+        return Inertia::render('Apps/Procurement/VendorInvoices/Edit', [
+            'invoice' => $invoice,
+        ]);
+    }
+
+    public function approve(VendorInvoice $vendorInvoice): RedirectResponse
+    {
+        $invoice = $this->authorizedInvoice($vendorInvoice);
+
+        if (strtolower((string) $invoice->status) !== 'draft') {
+            return back()->with('error', 'Hanya invoice draft yang bisa di-approve.');
+        }
+
+        $invoice->status = 'APPROVED';
+        $invoice->save();
+
+        return back()->with('success', 'Vendor invoice berhasil di-approve.');
+    }
+
+    public function destroy(VendorInvoice $vendorInvoice): RedirectResponse
+    {
+        $invoice = $this->authorizedInvoice($vendorInvoice);
+
+        if (strtolower((string) $invoice->status) !== 'draft') {
+            return back()->with('error', 'Hanya invoice draft yang bisa dihapus.');
+        }
+
+        $invoice->delete();
+
+        return back()->with('success', 'Vendor invoice berhasil dihapus.');
+    }
+
     private function availableReceivingLines(int $vendorId, int $companyId): array
     {
         $goodsReceiptLines = DB::table('goods_receipt_lines as grl')
@@ -230,6 +277,16 @@ class VendorInvoiceController extends Controller
             ]);
 
         return $goodsReceiptLines->concat($receivingEntryLines)->values()->all();
+    }
+
+
+    private function authorizedInvoice(VendorInvoice $vendorInvoice): VendorInvoice
+    {
+        $companyId = (int) (auth()->user()?->company_id ?? 1);
+
+        abort_unless((int) $vendorInvoice->company_id === $companyId, 404);
+
+        return $vendorInvoice;
     }
 
     private function nextInternalNo(): string
