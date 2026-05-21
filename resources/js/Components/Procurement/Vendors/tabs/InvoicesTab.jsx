@@ -93,51 +93,6 @@ export default function Tab({ data, vendor, documentTypes = [] }) {
         </table>
       </div>
 
-      <div className='rounded border p-4'>
-        <div className='mb-3 text-sm font-semibold'>Upload Supporting Dokumen Invoice (Multiple)</div>
-        <div className='grid gap-3 md:grid-cols-5'>
-          <select value={form.document_type_id} onChange={(e) => setForm((prev) => ({ ...prev, document_type_id: e.target.value }))} className='rounded border px-2 py-2'>
-            <option value=''>Pilih Document Type</option>
-            {documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name} ({type.code})</option>)}
-          </select>
-          <input value={form.document_number} onChange={(e) => setForm((prev) => ({ ...prev, document_number: e.target.value }))} placeholder='No Dokumen (opsional)' className='rounded border px-2 py-2' />
-          <input type='date' value={form.issue_date} onChange={(e) => setForm((prev) => ({ ...prev, issue_date: e.target.value }))} className='rounded border px-2 py-2' />
-          <input type='date' value={form.expiry_date} onChange={(e) => setForm((prev) => ({ ...prev, expiry_date: e.target.value }))} className='rounded border px-2 py-2' />
-          <input value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder='Keterangan (opsional)' className='rounded border px-2 py-2' />
-        </div>
-        <div className='mt-3 flex flex-col gap-2 md:flex-row md:items-center'>
-          <input ref={fileInputRef} type='file' multiple accept='.pdf,.jpg,.jpeg,.png' className='w-full rounded border px-2 py-2' />
-          <button type='button' onClick={uploadSupportingDocuments} disabled={uploading} className='rounded border border-blue-300 px-3 py-2 text-xs text-blue-700 disabled:cursor-not-allowed disabled:opacity-50'>
-            {uploading ? 'Uploading...' : 'Upload Dokumen'}
-          </button>
-        </div>
-      </div>
-
-      <div className='overflow-auto rounded border p-3'>
-        <table className='min-w-full text-sm border'>
-          <thead>
-            <tr className='bg-gray-100'><th className='px-3 py-2 border text-left' colSpan={5}>Daftar Supporting Dokumen Vendor</th></tr>
-            <tr className='bg-gray-50'>
-              <th className='border px-3 py-2 text-left font-medium'>Document Type</th>
-              <th className='border px-3 py-2 text-left font-medium'>No Dokumen</th>
-              <th className='border px-3 py-2 text-left font-medium'>Issue Date</th>
-              <th className='border px-3 py-2 text-left font-medium'>Status</th>
-              <th className='border px-3 py-2 text-left font-medium'>File</th>
-            </tr>
-          </thead>
-          <tbody>
-            {supportingDocs.length ? supportingDocs.map((doc) => <tr key={doc.id}>
-              <td className='border px-3 py-2'>{doc.document_type?.name || '-'}</td>
-              <td className='border px-3 py-2'>{doc.document_number || '-'}</td>
-              <td className='border px-3 py-2'>{formatDate(doc.issue_date)}</td>
-              <td className='border px-3 py-2'>{doc.status || 'draft'}</td>
-              <td className='border px-3 py-2'>
-                <a href={route('apps.procurement.vendors.documents.download', [vendor.id, doc.id])} target='_blank' className='rounded border border-gray-300 px-2 py-1 text-xs'>View</a>
-              </td>
-            </tr>) : <tr><td colSpan={5} className='border px-2 py-3 text-center text-gray-500'>Belum ada supporting dokumen.</td></tr>}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
