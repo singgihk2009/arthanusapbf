@@ -46,7 +46,7 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
     const initialItems = purchaseOrder?.items?.length
         ? purchaseOrder.items.map((item) => normalizeItem(item, initialHeaderFacilitySchemeId))
         : [emptyItem(String(initialHeaderFacilitySchemeId || defaultFacilitySchemeId || ''))];
-    const { data, setData, post, put, processing, errors, isDirty } = useForm({
+    const { data, setData, post, transform, processing, errors, isDirty } = useForm({
         vendor_id: purchaseOrder?.vendor_id || defaultVendorId || '',
         po_date: toDateInputValue(purchaseOrder?.po_date),
         expected_delivery_date: toDateInputValue(purchaseOrder?.expected_delivery_date),
