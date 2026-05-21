@@ -1,4 +1,5 @@
 import { Link, router } from '@inertiajs/react';
+import { useMemo, useRef, useState } from 'react';
 
 const formatCurrency = (value) => {
   const amount = Number(value ?? 0);
@@ -9,8 +10,20 @@ const formatCurrency = (value) => {
   }).format(Number.isFinite(amount) ? amount : 0);
 };
 
-export default function Tab({ data, vendor }) {
+const formatDate = (value) => value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+
+export default function Tab({ data, vendor, documentTypes = [] }) {
   const invoices = data?.invoices?.data ?? [];
+  const docs = vendor?.documents ?? [];
+  const [notice, setNotice] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [form, setForm] = useState({ document_type_id: '', document_number: '', issue_date: '', expiry_date: '', notes: '' });
+  const fileInputRef = useRef(null);
+
+  const supportingDocs = useMemo(
+    () => docs.filter((doc) => doc?.document_type?.code !== 'VENDOR_LEGAL'),
+    [docs],
+  );
 
   const approveInvoice = (invoiceId) => {
     router.post(`/apps/procurement/vendor-invoices/${invoiceId}/approve`);
@@ -21,8 +34,55 @@ export default function Tab({ data, vendor }) {
     router.delete(`/apps/procurement/vendor-invoices/${invoiceId}`);
   };
 
+  const uploadSupportingDocuments = async () => {
+    const selectedFiles = Array.from(fileInputRef.current?.files ?? []);
+
+    if (!form.document_type_id) return setNotice({ type: 'error', text: 'Document Type wajib dipilih.' });
+    if (!selectedFiles.length) return setNotice({ type: 'error', text: 'Pilih minimal 1 file untuk diupload.' });
+
+    setUploading(true);
+    setNotice({ type: 'info', text: `Sedang upload ${selectedFiles.length} dokumen...` });
+
+    try {
+      for (const file of selectedFiles) {
+        const payload = new FormData();
+        payload.append('business_id', String(vendor.business_id ?? ''));
+        payload.append('owner_type', 'vendor');
+        payload.append('owner_id', String(vendor.id));
+        payload.append('document_type_id', String(form.document_type_id));
+        payload.append('document_number', form.document_number || '');
+        payload.append('issue_date', form.issue_date || '');
+        payload.append('expiry_date', form.expiry_date || '');
+        payload.append('notes', form.notes || '');
+        payload.append('file', file);
+
+        const response = await fetch('/apps/document-center/documents', {
+          method: 'POST',
+          body: payload,
+          headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+          credentials: 'same-origin',
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          const firstError = Object.values(error?.errors ?? {}).flat().find(Boolean);
+          throw new Error(firstError || 'Gagal upload dokumen.');
+        }
+      }
+
+      setNotice({ type: 'success', text: `${selectedFiles.length} dokumen berhasil diupload.` });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      router.reload({ only: ['vendor'], preserveScroll: true });
+    } catch (err) {
+      setNotice({ type: 'error', text: err?.message || 'Upload dokumen gagal.' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className='space-y-4'>
+      {notice && <div className={`rounded border px-3 py-2 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : notice.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>{notice.text}</div>}
       <div className='flex justify-end'>
         <Link href={`/apps/procurement/vendors/${vendor.id}/invoices/create`} className='px-3 py-2 bg-indigo-600 text-white rounded'>+ Create Vendor Invoice</Link>
       </div>
