@@ -1,11 +1,12 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { useForm } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 const numberOrZero = (value) => Number(value || 0);
 
 export default function Page({ vendor, receivingLines, internalInvoiceNoPreview, documentTypes = [] }) {
-  const { data, setData, post, processing } = useForm({
+  const [notice, setNotice] = useState(null);
+  const { data, setData, post, processing, transform } = useForm({
     vendor_invoice_no: '',
     invoice_date: '',
     due_date: '',
@@ -50,8 +51,26 @@ export default function Page({ vendor, receivingLines, internalInvoiceNoPreview,
     setData(field, value === '' ? '' : Number(value));
   };
 
+  const submitInvoice = () => {
+    const normalizedDocuments = (data.documents || []).filter((doc) => doc?.file);
+
+    setNotice({ type: 'info', text: 'Sedang menyimpan invoice dan upload dokumen...' });
+    transform(() => ({ ...data, documents: normalizedDocuments }));
+    post(`/apps/procurement/vendors/${vendor.id}/invoices`, {
+      forceFormData: true,
+      onError: (errors) => {
+        const firstError = Object.values(errors ?? {}).flat().find(Boolean);
+        setNotice({ type: 'error', text: firstError || 'Gagal menyimpan invoice atau upload dokumen.' });
+      },
+      onSuccess: () => {
+        setNotice({ type: 'success', text: 'Invoice dan dokumen berhasil diproses.' });
+      },
+    });
+  };
+
   return <AppLayout><div className='p-6 space-y-6'>
     <h1 className='text-xl font-semibold'>Create Vendor Invoice</h1>
+    {notice && <div className={`rounded border px-3 py-2 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : notice.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>{notice.text}</div>}
 
     <div className='grid grid-cols-1 gap-3 bg-white p-4 border rounded md:grid-cols-2'>
       <input disabled value={vendor.vendor_name || vendor.name} className='border p-2 rounded bg-slate-50' />
@@ -121,6 +140,6 @@ export default function Page({ vendor, receivingLines, internalInvoiceNoPreview,
       <button type='button' onClick={() => setData('documents', [...data.documents, { document_type_id: '', title: '', document_number: '', issue_date: '', expiry_date: '', notes: '', file: null }])} className='mt-3 rounded border px-3 py-1 text-sm'>+ Add Dokumen</button>
     </div>
 
-    <button disabled={processing} onClick={() => post(`/apps/procurement/vendors/${vendor.id}/invoices`, { forceFormData: true })} className='px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50'>Submit</button>
+    <button disabled={processing} onClick={submitInvoice} className='px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50'>Submit</button>
   </div></AppLayout>;
 }

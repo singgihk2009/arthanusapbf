@@ -79,7 +79,9 @@ class VendorInvoiceController extends Controller
             throw ValidationException::withMessages(['vendor_invoice_no' => 'Nomor invoice vendor sudah digunakan untuk vendor ini.']);
         }
 
-        DB::transaction(function () use ($data, $vendor, $companyId, $vendorInvoiceNo, $linesBySource, $available) {
+        $uploadedDocumentCount = 0;
+
+        DB::transaction(function () use ($data, $vendor, $companyId, $vendorInvoiceNo, $linesBySource, $available, &$uploadedDocumentCount) {
             $subtotal = 0;
             $linePayloads = [];
             foreach ($linesBySource as $sourceKey => $line) {
@@ -147,11 +149,16 @@ class VendorInvoiceController extends Controller
                 VendorInvoiceLine::create(array_merge($linePayload, ['vendor_invoice_id' => $invoice->id]));
             }
 
-            $this->attachDocumentsToInvoice($invoice, $data['documents'] ?? []);
+            $uploadedDocumentCount = $this->attachDocumentsToInvoice($invoice, $data['documents'] ?? []);
         });
 
+        $message = 'Vendor invoice berhasil dibuat.';
+        if ($uploadedDocumentCount > 0) {
+            $message .= " {$uploadedDocumentCount} dokumen berhasil diupload.";
+        }
+
         return redirect()->route('apps.procurement.vendors.show', ['vendor' => $vendor->id, 'tab' => 'invoices'])
-            ->with('success', 'Vendor invoice berhasil dibuat.');
+            ->with('success', $message);
     }
 
 
@@ -446,8 +453,10 @@ class VendorInvoiceController extends Controller
         return 'VINV-'.now()->format('YmdHis');
     }
 
-    private function attachDocumentsToInvoice(VendorInvoice $invoice, array $documents): void
+    private function attachDocumentsToInvoice(VendorInvoice $invoice, array $documents): int
     {
+        $uploadedCount = 0;
+
         foreach ($documents as $document) {
             if (! isset($document['file'], $document['document_type_id'])) {
                 continue;
@@ -472,6 +481,9 @@ class VendorInvoiceController extends Controller
                 'uploaded_by' => auth()->id(),
                 'status' => 'pending_review',
             ]);
+            $uploadedCount++;
         }
+
+        return $uploadedCount;
     }
 }
