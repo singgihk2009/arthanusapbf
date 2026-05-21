@@ -79,12 +79,28 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
     const submit = (e) => {
         e.preventDefault();
         setNotice(null);
+        const filteredDocuments = (data.documents || []).filter((doc) => doc?.document_type_id && doc?.file);
+        const submitPayload = {
+            ...data,
+            documents: filteredDocuments,
+        };
         const options = {
             forceFormData: true,
             onSuccess: () => setNotice({ type: 'success', text: 'PO dan dokumen berhasil disimpan.' }),
             onError: () => setNotice({ type: 'error', text: 'Gagal menyimpan PO/dokumen. Cek field yang wajib diisi.' }),
         };
-        isEdit ? put(route('apps.procurement.purchase-orders.update', purchaseOrder.id), options) : post(route('apps.procurement.purchase-orders.store'), options);
+        if (isEdit) {
+            post(route('apps.procurement.purchase-orders.update', purchaseOrder.id), {
+                ...options,
+                data: { ...submitPayload, _method: 'put' },
+            });
+            return;
+        }
+
+        post(route('apps.procurement.purchase-orders.store'), {
+            ...options,
+            data: submitPayload,
+        });
     };
     const handleBack = () => {
         const confirmLeave = window.confirm('Pastikan data sudah disimpan. Kembali sekarang dapat menyebabkan data yang belum disimpan hilang.');
@@ -161,8 +177,10 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
                                 docs[idx] = { ...docs[idx], file: e.target.files?.[0] || null };
                                 setData('documents', docs);
                             }} className='rounded border border-gray-200 px-2 py-1 text-sm file:mr-2 file:rounded file:border-0 file:bg-gray-100 file:px-2 file:py-1 dark:border-gray-800 dark:bg-gray-900' />
-                            <button type='button' onClick={() => setData('documents', data.documents.filter((_, rowIndex) => rowIndex !== idx))} className='rounded border border-rose-400 px-2 py-1 text-xs text-rose-600'>Remove</button>
-                            {doc.file && <button type='button' onClick={() => window.open(URL.createObjectURL(doc.file), '_blank', 'noopener,noreferrer')} className='text-left text-xs text-blue-600 underline'>View file terpilih</button>}
+                            <div className='flex items-center gap-2'>
+                                <button type='button' onClick={() => setData('documents', data.documents.filter((_, rowIndex) => rowIndex !== idx))} className='rounded border border-rose-400 px-2 py-1 text-xs text-rose-600'>Remove</button>
+                                {doc.file && <button type='button' onClick={() => window.open(URL.createObjectURL(doc.file), '_blank', 'noopener,noreferrer')} className='rounded border border-blue-300 px-2 py-1 text-xs text-blue-600'>View file terpilih</button>}
+                            </div>
                         </div>
                     ))}
                 </div>
