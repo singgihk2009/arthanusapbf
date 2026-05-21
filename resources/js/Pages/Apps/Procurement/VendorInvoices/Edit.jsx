@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 
 export default function Edit({ vendor, invoice, receivingLines, selectedLines, documentTypes = [], uploadedDocuments = [] }) {
   const [notice, setNotice] = useState(null);
-  const { data, setData, put, processing, transform } = useForm({
+  const { data, setData, post, processing, transform } = useForm({
     vendor_invoice_no: invoice.vendor_invoice_no ?? '',
     invoice_date: invoice.invoice_date ?? '',
     due_date: invoice.due_date ?? '',
@@ -49,8 +49,8 @@ export default function Edit({ vendor, invoice, receivingLines, selectedLines, d
     }
 
     setNotice({ type: 'info', text: 'Sedang update invoice dan upload dokumen...' });
-    transform(() => ({ ...data, documents: normalizedDocuments }));
-    put(`/apps/procurement/vendor-invoices/${invoice.id}`, {
+    transform(() => ({ ...data, documents: normalizedDocuments, _method: 'put' }));
+    post(`/apps/procurement/vendor-invoices/${invoice.id}`, {
       forceFormData: true,
       onError: (errors) => {
         const firstError = Object.values(errors ?? {}).flat().find(Boolean);
