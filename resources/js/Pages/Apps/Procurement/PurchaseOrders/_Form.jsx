@@ -36,7 +36,7 @@ const toDateInputValue = (value) => {
 
 const emptyDocument = () => ({ document_type_id: '', title: '', file: null });
 
-export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], facilitySchemes = [], documentTypes = [], defaultFacilitySchemeId = '', defaultVendorId = null, returnTo = '' }) {
+export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], facilitySchemes = [], documentTypes = [], uploadedDocuments = [], defaultFacilitySchemeId = '', defaultVendorId = null, returnTo = '' }) {
     const [notice, setNotice] = useState(null);
     const isEdit = !!purchaseOrder;
     const initialHeaderFacilitySchemeId = normalizeFacilityId(
@@ -183,6 +183,17 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
                 <button type='button' onClick={() => setData('documents', [...data.documents, emptyDocument()])} className='mt-3 rounded border border-gray-300 px-3 py-1 text-sm'>+ Add Dokumen</button>
                 <div className='mt-2 text-xs text-gray-500'>Dokumen akan di-upload saat klik tombol <span className='font-semibold'>Save Draft</span>.</div>
                 {errors.documents && <small className='mt-2 block text-xs text-red-500'>{errors.documents}</small>}
+                {!!uploadedDocuments.length && <div className='mt-4'>
+                    <h4 className='mb-2 text-xs font-semibold text-gray-700'>Dokumen tersimpan di server</h4>
+                    <div className='overflow-x-auto'>
+                        <table className='min-w-full border border-gray-200 text-xs'>
+                            <thead><tr className='bg-gray-50'><th className='border px-2 py-1 text-left'>Tipe</th><th className='border px-2 py-1 text-left'>Judul</th><th className='border px-2 py-1 text-left'>Status</th><th className='border px-2 py-1 text-left'>Aksi</th></tr></thead>
+                            <tbody>
+                                {uploadedDocuments.map((doc) => <tr key={doc.id}><td className='border px-2 py-1'>{doc.document_type?.name || doc.document_type?.code || '-'}</td><td className='border px-2 py-1'>{doc.title || '-'}</td><td className='border px-2 py-1'>{doc.status || '-'}</td><td className='border px-2 py-1'><a href={route('apps.document-center.documents.download', doc.id)} target='_blank' className='text-blue-600 underline'>View / Download</a></td></tr>)}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>}
             </div>
         </Card>
     </>;

@@ -245,10 +245,16 @@ class PurchaseOrderController extends Controller
                 })
                 ->orderBy('name')
                 ->get(['id', 'code', 'name']),
+            'uploadedDocuments' => Document::query()
+                ->with('documentType:id,name,code')
+                ->where('owner_type', 'purchase_order')
+                ->where('owner_id', $purchaseOrder->id)
+                ->latest('id')
+                ->get(),
         ]);
     }
 
-    public function update(Request $request, PurchaseOrder $purchaseOrder)
+    public function update(Request $request, PurchaseOrder $purchaseOrder, DocumentVersioningService $documentVersioningService)
     {
         abort_unless($purchaseOrder->isEditable(), 422, 'PO hanya dapat diubah ketika draft.');
         $data = $this->validateData($request);
@@ -257,7 +263,7 @@ class PurchaseOrderController extends Controller
             ? Carbon::parse($data['expected_delivery_date'])->toDateString()
             : null;
 
-        DB::transaction(function () use ($purchaseOrder, $data, $poDate, $expectedDeliveryDate) {
+        DB::transaction(function () use ($purchaseOrder, $data, $poDate, $expectedDeliveryDate, $documentVersioningService) {
             $supplierId = $this->resolveSupplierId((int) $data['vendor_id']);
             $purchaseOrder->update([
                 'vendor_id' => $data['vendor_id'],
@@ -290,6 +296,21 @@ class PurchaseOrderController extends Controller
 
                 $purchaseOrder->items()->create($this->sanitizePurchaseOrderItemPayload($payload));
             }
+
+            foreach (($data['documents'] ?? []) as $documentPayload) {
+                if (empty($documentPayload['file']) || empty($documentPayload['document_type_id'])) {
+                    continue;
+                }
+
+                $documentVersioningService->createOriginalDocument([
+                    'business_id' => 1,
+                    'owner_type' => 'purchase_order',
+                    'owner_id' => (int) $purchaseOrder->id,
+                    'document_type_id' => (int) $documentPayload['document_type_id'],
+                    'title' => $documentPayload['title'] ?? null,
+                ], $documentPayload['file']);
+            }
+
             $purchaseOrder->recalculateTotals();
         });
         $returnTo = (string) $request->input('return_to', '');
