@@ -158,8 +158,8 @@ class VendorInvoiceController extends Controller
             $message .= " {$uploadedDocumentCount} dokumen berhasil diupload.";
         }
 
-        return redirect()->route('apps.procurement.vendors.show', ['vendor' => $vendor->id, 'tab' => 'invoices'])
-            ->with('success', $message);
+        return redirect()->route('apps.procurement.vendor-invoices.edit', ['vendor_invoice' => $invoice->id])
+            ->with('success', $message.' Silakan cek daftar dokumen terupload di bawah form.');
     }
 
 
