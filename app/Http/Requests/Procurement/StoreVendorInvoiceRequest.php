@@ -31,6 +31,14 @@ class StoreVendorInvoiceRequest extends FormRequest
             'lines.*.source_line_id' => ['required', 'integer'],
             'lines.*.qty_invoiced' => ['required', 'numeric', 'gt:0'],
             'lines.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'documents' => ['nullable', 'array'],
+            'documents.*.document_type_id' => ['required_with:documents.*.file', 'nullable', 'integer', 'exists:document_types,id'],
+            'documents.*.title' => ['nullable', 'string', 'max:255'],
+            'documents.*.document_number' => ['nullable', 'string', 'max:255'],
+            'documents.*.issue_date' => ['nullable', 'date'],
+            'documents.*.expiry_date' => ['nullable', 'date'],
+            'documents.*.notes' => ['nullable', 'string'],
+            'documents.*.file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
         ];
     }
 }

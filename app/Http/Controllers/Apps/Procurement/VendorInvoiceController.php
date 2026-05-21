@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Apps\Procurement;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Procurement\StoreVendorInvoiceRequest;
+use App\Models\Document;
+use App\Models\DocumentType;
 use App\Models\Procurement\Vendor;
 use App\Models\Procurement\VendorInvoice;
 use App\Models\Procurement\VendorInvoiceLine;
@@ -53,6 +55,7 @@ class VendorInvoiceController extends Controller
             'vendor' => $vendor,
             'internalInvoiceNoPreview' => $this->nextInternalNo(),
             'receivingLines' => $lines,
+            'documentTypes' => DocumentType::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
         ]);
     }
 
@@ -76,7 +79,10 @@ class VendorInvoiceController extends Controller
             throw ValidationException::withMessages(['vendor_invoice_no' => 'Nomor invoice vendor sudah digunakan untuk vendor ini.']);
         }
 
-        DB::transaction(function () use ($data, $vendor, $companyId, $vendorInvoiceNo, $linesBySource, $available) {
+        $uploadedDocumentCount = 0;
+        $documentsPayload = (array) $request->input('documents', []);
+
+        DB::transaction(function () use ($data, $vendor, $companyId, $vendorInvoiceNo, $linesBySource, $available, &$uploadedDocumentCount, $documentsPayload, $request) {
             $subtotal = 0;
             $linePayloads = [];
             foreach ($linesBySource as $sourceKey => $line) {
@@ -143,10 +149,17 @@ class VendorInvoiceController extends Controller
             foreach ($linePayloads as $linePayload) {
                 VendorInvoiceLine::create(array_merge($linePayload, ['vendor_invoice_id' => $invoice->id]));
             }
+
+            $uploadedDocumentCount = $this->attachDocumentsToInvoice($invoice, $documentsPayload, $request);
         });
 
-        return redirect()->route('apps.procurement.vendors.show', ['vendor' => $vendor->id, 'tab' => 'invoices'])
-            ->with('success', 'Vendor invoice berhasil dibuat.');
+        $message = 'Vendor invoice berhasil dibuat.';
+        if ($uploadedDocumentCount > 0) {
+            $message .= " {$uploadedDocumentCount} dokumen berhasil diupload.";
+        }
+
+        return redirect()->route('apps.procurement.vendor-invoices.edit', ['vendor_invoice' => $invoice->id])
+            ->with('success', $message.' Silakan cek daftar dokumen terupload di bawah form.');
     }
 
 
@@ -204,6 +217,8 @@ class VendorInvoiceController extends Controller
             'invoice' => $invoice,
             'receivingLines' => $availableLines->values()->all(),
             'selectedLines' => $selectedLines,
+            'documentTypes' => DocumentType::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
+            'uploadedDocuments' => Document::query()->where('owner_type', 'vendor_invoice')->where('owner_id', $invoice->id)->with('documentType:id,name,code')->latest()->get(),
         ]);
     }
 
@@ -216,6 +231,7 @@ class VendorInvoiceController extends Controller
         }
 
         $data = $request->validated();
+        $documentsPayload = (array) $request->input('documents', []);
         $linesBySource = collect($data['lines'])->keyBy(fn ($line) => $line['source_line_type'].':'.$line['source_line_id']);
         $available = collect($this->availableReceivingLines((int) $invoice->vendor_id, (int) $invoice->company_id))->keyBy('source_key');
 
@@ -248,7 +264,8 @@ class VendorInvoiceController extends Controller
             }
         }
 
-        DB::transaction(function () use ($invoice, $data, $linesBySource, $available) {
+        $uploadedDocumentCount = 0;
+        DB::transaction(function () use ($invoice, $data, $linesBySource, $available, $documentsPayload, $request, &$uploadedDocumentCount) {
             $subtotal = 0;
             $linePayloads = [];
             foreach ($linesBySource as $sourceKey => $line) {
@@ -305,10 +322,17 @@ class VendorInvoiceController extends Controller
             foreach ($linePayloads as $payload) {
                 VendorInvoiceLine::create(array_merge($payload, ['vendor_invoice_id' => $invoice->id]));
             }
+
+            $uploadedDocumentCount = $this->attachDocumentsToInvoice($invoice, $documentsPayload, $request);
         });
 
-        return redirect()->route('apps.procurement.vendors.show', ['vendor' => $invoice->vendor_id, 'tab' => 'invoices'])
-            ->with('success', 'Vendor invoice berhasil diperbarui.');
+        $message = 'Vendor invoice berhasil diperbarui.';
+        if ($uploadedDocumentCount > 0) {
+            $message .= " {$uploadedDocumentCount} dokumen berhasil diupload.";
+        }
+
+        return redirect()->route('apps.procurement.vendor-invoices.edit', ['vendor_invoice' => $invoice->id])
+            ->with('success', $message);
     }
 
     public function approve(VendorInvoice $vendorInvoice): RedirectResponse
@@ -435,5 +459,41 @@ class VendorInvoiceController extends Controller
     private function nextInternalNo(): string
     {
         return 'VINV-'.now()->format('YmdHis');
+    }
+
+    private function attachDocumentsToInvoice(VendorInvoice $invoice, array $documents, StoreVendorInvoiceRequest $request): int
+    {
+        $uploadedCount = 0;
+
+        foreach ($documents as $index => $document) {
+            $file = $request->file("documents.$index.file");
+            $documentTypeId = $document['document_type_id'] ?? null;
+            if (! $file || ! $documentTypeId) {
+                continue;
+            }
+
+            $path = $file->store('documents/vendor-invoices', 'public');
+            Document::create([
+                'business_id' => $invoice->company_id,
+                'owner_type' => 'vendor_invoice',
+                'owner_id' => $invoice->id,
+                'document_type_id' => $documentTypeId,
+                'title' => $document['title'] ?: ('Invoice Document #'.$invoice->invoice_no_internal),
+                'document_number' => $document['document_number'] ?? null,
+                'issue_date' => $document['issue_date'] ?? null,
+                'expiry_date' => $document['expiry_date'] ?? null,
+                'notes' => $document['notes'] ?? null,
+                'file_path' => $path,
+                'storage_disk' => 'public',
+                'original_file_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getClientMimeType(),
+                'file_size' => $file->getSize(),
+                'uploaded_by' => auth()->id(),
+                'status' => 'pending_review',
+            ]);
+            $uploadedCount++;
+        }
+
+        return $uploadedCount;
     }
 }
