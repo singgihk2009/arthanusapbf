@@ -80,9 +80,10 @@ class VendorInvoiceController extends Controller
         }
 
         $uploadedDocumentCount = 0;
+        $createdInvoiceId = null;
         $documentsPayload = (array) $request->input('documents', []);
 
-        DB::transaction(function () use ($data, $vendor, $companyId, $vendorInvoiceNo, $linesBySource, $available, &$uploadedDocumentCount, $documentsPayload, $request) {
+        DB::transaction(function () use ($data, $vendor, $companyId, $vendorInvoiceNo, $linesBySource, $available, &$uploadedDocumentCount, $documentsPayload, $request, &$createdInvoiceId) {
             $subtotal = 0;
             $linePayloads = [];
             foreach ($linesBySource as $sourceKey => $line) {
@@ -145,6 +146,7 @@ class VendorInvoiceController extends Controller
                 'notes' => $data['notes'] ?? null,
                 'status' => 'DRAFT',
             ]);
+            $createdInvoiceId = $invoice->id;
 
             foreach ($linePayloads as $linePayload) {
                 VendorInvoiceLine::create(array_merge($linePayload, ['vendor_invoice_id' => $invoice->id]));
@@ -158,7 +160,7 @@ class VendorInvoiceController extends Controller
             $message .= " {$uploadedDocumentCount} dokumen berhasil diupload.";
         }
 
-        return redirect()->route('apps.procurement.vendor-invoices.edit', ['vendor_invoice' => $invoice->id])
+        return redirect()->route('apps.procurement.vendor-invoices.edit', ['vendor_invoice' => $createdInvoiceId])
             ->with('success', $message.' Silakan cek daftar dokumen terupload di bawah form.');
     }
 
