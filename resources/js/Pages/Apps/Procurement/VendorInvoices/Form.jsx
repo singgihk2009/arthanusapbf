@@ -1,11 +1,12 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { useForm } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 const numberOrZero = (value) => Number(value || 0);
 
-export default function Page({ vendor, receivingLines, internalInvoiceNoPreview }) {
-  const { data, setData, post, processing } = useForm({
+export default function Page({ vendor, receivingLines, internalInvoiceNoPreview, documentTypes = [] }) {
+  const [notice, setNotice] = useState(null);
+  const { data, setData, post, processing, transform } = useForm({
     vendor_invoice_no: '',
     invoice_date: '',
     due_date: '',
@@ -19,6 +20,7 @@ export default function Page({ vendor, receivingLines, internalInvoiceNoPreview 
     wht_tax_rate: 0,
     wht_tax_base_amount: 0,
     lines: [],
+    documents: [{ document_type_id: '', title: '', document_number: '', issue_date: '', expiry_date: '', notes: '', file: null }],
   });
 
   const selected = useMemo(() => data.lines, [data.lines]);
@@ -49,8 +51,26 @@ export default function Page({ vendor, receivingLines, internalInvoiceNoPreview 
     setData(field, value === '' ? '' : Number(value));
   };
 
+  const submitInvoice = () => {
+    const normalizedDocuments = (data.documents || []).filter((doc) => doc?.file);
+
+    setNotice({ type: 'info', text: 'Sedang menyimpan invoice dan upload dokumen...' });
+    transform(() => ({ ...data, documents: normalizedDocuments }));
+    post(`/apps/procurement/vendors/${vendor.id}/invoices`, {
+      forceFormData: true,
+      onError: (errors) => {
+        const firstError = Object.values(errors ?? {}).flat().find(Boolean);
+        setNotice({ type: 'error', text: firstError || 'Gagal menyimpan invoice atau upload dokumen.' });
+      },
+      onSuccess: () => {
+        setNotice({ type: 'success', text: 'Invoice dan dokumen berhasil diproses.' });
+      },
+    });
+  };
+
   return <AppLayout><div className='p-6 space-y-6'>
     <h1 className='text-xl font-semibold'>Create Vendor Invoice</h1>
+    {notice && <div className={`rounded border px-3 py-2 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : notice.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>{notice.text}</div>}
 
     <div className='grid grid-cols-1 gap-3 bg-white p-4 border rounded md:grid-cols-2'>
       <input disabled value={vendor.vendor_name || vendor.name} className='border p-2 rounded bg-slate-50' />
@@ -106,6 +126,20 @@ export default function Page({ vendor, receivingLines, internalInvoiceNoPreview 
       </div>
     </div>
 
-    <button disabled={processing} onClick={() => post(`/apps/procurement/vendors/${vendor.id}/invoices`)} className='px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50'>Submit</button>
+    <div className='bg-white p-4 border rounded'>
+      <h3 className='text-sm font-semibold text-gray-700'>Upload Dokumen Invoice (Document Center)</h3>
+      {data.documents.map((doc, idx) => <div key={idx} className='mt-3 grid gap-2 md:grid-cols-4'>
+        <select value={doc.document_type_id} onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, document_type_id: e.target.value } : d))} className='rounded border p-2'>
+          <option value=''>Pilih Tipe Dokumen</option>
+          {documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name || type.code}</option>)}
+        </select>
+        <input value={doc.title} onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, title: e.target.value } : d))} placeholder='Judul dokumen' className='rounded border p-2' />
+        <input value={doc.document_number} onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, document_number: e.target.value } : d))} placeholder='No dokumen' className='rounded border p-2' />
+        <input type='file' accept='.pdf,.jpg,.jpeg,.png' onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d))} className='rounded border p-2' />
+      </div>)}
+      <button type='button' onClick={() => setData('documents', [...data.documents, { document_type_id: '', title: '', document_number: '', issue_date: '', expiry_date: '', notes: '', file: null }])} className='mt-3 rounded border px-3 py-1 text-sm'>+ Add Dokumen</button>
+    </div>
+
+    <button disabled={processing} onClick={submitInvoice} className='px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50'>Submit</button>
   </div></AppLayout>;
 }

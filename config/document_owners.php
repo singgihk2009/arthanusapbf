@@ -7,6 +7,12 @@ return array_filter([
         'route_prefix' => 'vendors',
         'name_column' => 'vendor_name',
     ],
+    'vendor_invoice' => [
+        'model' => App\Models\Procurement\VendorInvoice::class,
+        'label' => 'Vendor Invoice',
+        'route_prefix' => 'vendor-invoices',
+        'name_column' => 'invoice_no_internal',
+    ],
     'customer' => class_exists(App\Models\Customer::class) ? [
         'model' => App\Models\Customer::class,
         'label' => 'Customer',
