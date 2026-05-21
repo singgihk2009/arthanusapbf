@@ -302,6 +302,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
         Route::get('/vendors/{vendor}', [VendorController::class, 'show'])->whereNumber('vendor')->name('vendors.show');
         Route::resource('/vendors', VendorController::class)->except(['show']);
         Route::resource('/purchase-orders', PurchaseOrderController::class);
+        Route::delete('/purchase-orders/{purchaseOrder}/documents/{document}', [PurchaseOrderController::class, 'deleteDocument'])->name('purchase-orders.documents.delete');
         Route::post('/purchase-orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->name('purchase-orders.approve');
         Route::post('/purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
         Route::get('/purchase-orders/{purchaseOrder}/goods-receipts/create', [GoodsReceiptController::class, 'createFromPO'])->name('goods-receipts.create-from-po');

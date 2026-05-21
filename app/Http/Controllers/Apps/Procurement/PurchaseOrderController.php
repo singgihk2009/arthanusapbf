@@ -330,6 +330,15 @@ class PurchaseOrderController extends Controller
         return to_route('apps.procurement.purchase-orders.index');
     }
 
+    public function deleteDocument(PurchaseOrder $purchaseOrder, Document $document)
+    {
+        abort_unless($purchaseOrder->isEditable(), 422, 'Dokumen hanya dapat dihapus ketika PO draft.');
+        abort_unless($document->owner_type === 'purchase_order' && (int) $document->owner_id === (int) $purchaseOrder->id, 404, 'Dokumen tidak ditemukan pada PO ini.');
+        $document->delete();
+
+        return back()->with('success', 'Dokumen PO berhasil dihapus.');
+    }
+
     private function validateData(Request $request): array
     {
         return $request->validate([
