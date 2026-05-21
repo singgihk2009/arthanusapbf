@@ -2,7 +2,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import Button from '@/Components/Button';
 import Card from '@/Components/Card';
 import { Head, router, useForm } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 const emptyItem = (defaultFacilitySchemeId = '') => ({ product_id: '', product_name: '', uom_id: '', facility_scheme_id: defaultFacilitySchemeId, facility_reference_no: '', facility_reference_date: '', facility_reference_note: '', qty_ordered: 1, unit_price: 0, discount_amount: 0, tax_amount: 0, line_total: 0, notes: '' });
 const normalizeFacilityId = (value, fallback = '') => {
@@ -37,6 +37,7 @@ const toDateInputValue = (value) => {
 const emptyDocument = () => ({ document_type_id: '', title: '', file: null });
 
 export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], facilitySchemes = [], documentTypes = [], defaultFacilitySchemeId = '', defaultVendorId = null, returnTo = '' }) {
+    const [notice, setNotice] = useState(null);
     const isEdit = !!purchaseOrder;
     const initialHeaderFacilitySchemeId = normalizeFacilityId(
         purchaseOrder?.facility_scheme_id,
@@ -75,7 +76,16 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
     };
 
     const totals = data.items.reduce((a, i) => ({ subtotal: a.subtotal + ((+i.qty_ordered || 0) * (+i.unit_price || 0)), discount: a.discount + (+i.discount_amount || 0), tax: a.tax + (+i.tax_amount || 0), grand: a.grand + (+i.line_total || 0) }), { subtotal: 0, discount: 0, tax: 0, grand: 0 });
-    const submit = (e) => { e.preventDefault(); isEdit ? put(route('apps.procurement.purchase-orders.update', purchaseOrder.id)) : post(route('apps.procurement.purchase-orders.store')); };
+    const submit = (e) => {
+        e.preventDefault();
+        setNotice(null);
+        const options = {
+            forceFormData: true,
+            onSuccess: () => setNotice({ type: 'success', text: 'PO dan dokumen berhasil disimpan.' }),
+            onError: () => setNotice({ type: 'error', text: 'Gagal menyimpan PO/dokumen. Cek field yang wajib diisi.' }),
+        };
+        isEdit ? put(route('apps.procurement.purchase-orders.update', purchaseOrder.id), options) : post(route('apps.procurement.purchase-orders.store'), options);
+    };
     const handleBack = () => {
         const confirmLeave = window.confirm('Pastikan data sudah disimpan. Kembali sekarang dapat menyebabkan data yang belum disimpan hilang.');
         if (!confirmLeave) return;
@@ -96,6 +106,7 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
     return <>
         <Head title={isEdit ? 'Edit Purchase Order' : 'Create Purchase Order'} />
         <Card title={isEdit ? 'Edit Purchase Order' : 'Create Purchase Order'} form={submit} footer={<div className='flex items-center gap-2'><Button type='submit' label='Save Draft' disabled={processing} variant='gray' /><button type='button' onClick={handleBack} className='rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50'>Back</button>{isDirty && <span className='text-xs text-amber-600'>Data belum disimpan.</span>}</div>}>
+            {notice && <div className={`mb-3 rounded border px-3 py-2 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{notice.text}</div>}
             <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Vendor</label><select value={data.vendor_id} onChange={(e) => setData('vendor_id', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300'><option value=''>-</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select>{errors.vendor_id && <small className='text-xs text-red-500'>{errors.vendor_id}</small>}</div>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>PO Date</label><input type='date' value={data.po_date} onChange={(e) => setData('po_date', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' />{errors.po_date && <small className='text-xs text-red-500'>{errors.po_date}</small>}</div>
@@ -151,10 +162,12 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
                                 setData('documents', docs);
                             }} className='rounded border border-gray-200 px-2 py-1 text-sm file:mr-2 file:rounded file:border-0 file:bg-gray-100 file:px-2 file:py-1 dark:border-gray-800 dark:bg-gray-900' />
                             <button type='button' onClick={() => setData('documents', data.documents.filter((_, rowIndex) => rowIndex !== idx))} className='rounded border border-rose-400 px-2 py-1 text-xs text-rose-600'>Remove</button>
+                            {doc.file && <button type='button' onClick={() => window.open(URL.createObjectURL(doc.file), '_blank', 'noopener,noreferrer')} className='text-left text-xs text-blue-600 underline'>View file terpilih</button>}
                         </div>
                     ))}
                 </div>
                 <button type='button' onClick={() => setData('documents', [...data.documents, emptyDocument()])} className='mt-3 rounded border border-gray-300 px-3 py-1 text-sm'>+ Add Dokumen</button>
+                <div className='mt-2 text-xs text-gray-500'>Dokumen akan di-upload saat klik tombol <span className='font-semibold'>Save Draft</span>.</div>
                 {errors.documents && <small className='mt-2 block text-xs text-red-500'>{errors.documents}</small>}
             </div>
         </Card>
