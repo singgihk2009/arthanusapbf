@@ -162,10 +162,153 @@ class VendorInvoiceController extends Controller
     public function edit(VendorInvoice $vendorInvoice)
     {
         $invoice = $this->authorizedInvoice($vendorInvoice);
+        $companyId = (int) (auth()->user()?->company_id ?? 1);
+        $availableLines = collect($this->availableReceivingLines((int) $invoice->vendor_id, $companyId))->keyBy('source_key');
+
+        $selectedLines = $invoice->lines()->get()->map(function ($line) use ($availableLines) {
+            $sourceLineType = $line->receipt_line_id ? 'goods_receipt_line' : 'receiving_entry_line';
+            $sourceLineId = (int) ($line->receipt_line_id ?: $line->receiving_entry_line_id);
+            $sourceKey = $sourceLineType.':'.$sourceLineId;
+            $available = $availableLines->get($sourceKey);
+
+            if (! $available) {
+                $available = [
+                    'source_key' => $sourceKey,
+                    'source_line_type' => $sourceLineType,
+                    'source_line_id' => $sourceLineId,
+                    'po_line_id' => $line->po_line_id,
+                    'item_id' => $line->item_id,
+                    'qty_received' => (float) $line->qty_invoiced,
+                    'qty_already_invoiced' => 0,
+                    'qty_available_to_invoice' => (float) $line->qty_invoiced,
+                    'po_no' => '-',
+                    'receiving_no' => '-',
+                    'item_name' => $line->description,
+                    'sku' => null,
+                    'unit_price' => (float) $line->unit_price,
+                    'line_total' => (float) $line->line_total,
+                ];
+                $availableLines->put($sourceKey, $available);
+            }
+
+            return [
+                'source_line_type' => $sourceLineType,
+                'source_line_id' => $sourceLineId,
+                'qty_invoiced' => (float) $line->qty_invoiced,
+                'unit_price' => (float) $line->unit_price,
+            ];
+        })->values();
 
         return Inertia::render('Apps/Procurement/VendorInvoices/Edit', [
+            'vendor' => $invoice->vendor,
             'invoice' => $invoice,
+            'receivingLines' => $availableLines->values()->all(),
+            'selectedLines' => $selectedLines,
         ]);
+    }
+
+    public function update(StoreVendorInvoiceRequest $request, VendorInvoice $vendorInvoice): RedirectResponse
+    {
+        $invoice = $this->authorizedInvoice($vendorInvoice);
+
+        if (strtolower((string) $invoice->status) !== 'draft') {
+            return back()->with('error', 'Hanya invoice draft yang bisa diedit.');
+        }
+
+        $data = $request->validated();
+        $linesBySource = collect($data['lines'])->keyBy(fn ($line) => $line['source_line_type'].':'.$line['source_line_id']);
+        $available = collect($this->availableReceivingLines((int) $invoice->vendor_id, (int) $invoice->company_id))->keyBy('source_key');
+
+        foreach ($invoice->lines as $existingLine) {
+            $sourceType = $existingLine->receipt_line_id ? 'goods_receipt_line' : 'receiving_entry_line';
+            $sourceId = (int) ($existingLine->receipt_line_id ?: $existingLine->receiving_entry_line_id);
+            $key = $sourceType.':'.$sourceId;
+            if (! $available->has($key)) {
+                $available->put($key, [
+                    'source_key' => $key,
+                    'source_line_type' => $sourceType,
+                    'source_line_id' => $sourceId,
+                    'po_line_id' => $existingLine->po_line_id,
+                    'item_id' => $existingLine->item_id,
+                    'qty_available_to_invoice' => (float) $existingLine->qty_invoiced,
+                    'item_name' => $existingLine->description,
+                ]);
+            } else {
+                $merged = $available->get($key);
+                $merged['qty_available_to_invoice'] = (float) ($merged['qty_available_to_invoice'] ?? 0) + (float) $existingLine->qty_invoiced;
+                $available->put($key, $merged);
+            }
+        }
+
+        foreach ($linesBySource as $sourceKey => $line) {
+            $source = $available->get($sourceKey);
+            if (! $source) throw ValidationException::withMessages(['lines' => 'Receipt line tidak valid untuk vendor/company ini.']);
+            if ((float) $line['qty_invoiced'] > (float) ($source['qty_available_to_invoice'] ?? 0)) {
+                throw ValidationException::withMessages(['lines' => 'Qty invoiced melebihi qty available to invoice.']);
+            }
+        }
+
+        DB::transaction(function () use ($invoice, $data, $linesBySource, $available) {
+            $subtotal = 0;
+            $linePayloads = [];
+            foreach ($linesBySource as $sourceKey => $line) {
+                $src = $available[$sourceKey];
+                $lineTotal = (float) $line['qty_invoiced'] * (float) $line['unit_price'];
+                $subtotal += $lineTotal;
+                $linePayloads[] = [
+                    'receipt_line_id' => $src['source_line_type'] === 'goods_receipt_line' ? $src['source_line_id'] : null,
+                    'receiving_entry_line_id' => $src['source_line_type'] === 'receiving_entry_line' ? $src['source_line_id'] : null,
+                    'po_line_id' => $src['po_line_id'] ?? null,
+                    'item_id' => $src['item_id'] ?? null,
+                    'description' => $src['item_name'] ?? '-',
+                    'qty_invoiced' => $line['qty_invoiced'],
+                    'unit_price' => $line['unit_price'],
+                    'tax_amount' => 0,
+                    'line_total' => $lineTotal,
+                ];
+            }
+
+            $discount = (float) ($data['discount_amount'] ?? 0);
+            $freight = (float) ($data['freight_amount'] ?? 0);
+            $taxRate = (float) ($data['tax_rate'] ?? 11);
+            $taxBase = max(0, $subtotal - $discount);
+            $taxAmount = $taxBase * $taxRate / 100;
+            $grandTotal = $taxBase + $taxAmount + $freight;
+            $whtRate = (float) ($data['wht_tax_rate'] ?? 0);
+            $whtBase = (float) ($data['wht_tax_base_amount'] ?? $taxBase);
+            $whtAmount = $whtBase * $whtRate / 100;
+            $netPayable = $grandTotal - $whtAmount;
+
+            $invoice->update([
+                'vendor_invoice_no' => trim((string) ($data['vendor_invoice_no'] ?? '')) ?: $invoice->vendor_invoice_no,
+                'invoice_date' => $data['invoice_date'],
+                'due_date' => $data['due_date'] ?? $data['invoice_date'],
+                'currency_code' => $data['currency_code'] ?? 'IDR',
+                'exchange_rate' => $data['exchange_rate'] ?? 1,
+                'subtotal' => $subtotal,
+                'discount_amount' => $discount,
+                'tax_rate' => $taxRate,
+                'tax_base_amount' => $taxBase,
+                'tax_amount' => $taxAmount,
+                'freight_amount' => $freight,
+                'grand_total' => $grandTotal,
+                'wht_tax_type' => $data['wht_tax_type'] ?? null,
+                'wht_tax_rate' => $whtRate,
+                'wht_tax_base_amount' => $whtBase,
+                'wht_tax_amount' => $whtAmount,
+                'net_payable_amount' => $netPayable,
+                'outstanding_amount' => $netPayable - (float) $invoice->paid_amount,
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            $invoice->lines()->delete();
+            foreach ($linePayloads as $payload) {
+                VendorInvoiceLine::create(array_merge($payload, ['vendor_invoice_id' => $invoice->id]));
+            }
+        });
+
+        return redirect()->route('apps.procurement.vendors.show', ['vendor' => $invoice->vendor_id, 'tab' => 'invoices'])
+            ->with('success', 'Vendor invoice berhasil diperbarui.');
     }
 
     public function approve(VendorInvoice $vendorInvoice): RedirectResponse
