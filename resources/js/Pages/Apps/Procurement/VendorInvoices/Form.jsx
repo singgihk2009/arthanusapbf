@@ -53,6 +53,12 @@ export default function Page({ vendor, receivingLines, internalInvoiceNoPreview,
 
   const submitInvoice = () => {
     const normalizedDocuments = (data.documents || []).filter((doc) => doc?.file);
+    const invalidDocument = normalizedDocuments.find((doc) => !doc?.document_type_id);
+
+    if (invalidDocument) {
+      setNotice({ type: 'error', text: 'Upload gagal: setiap file wajib memilih Tipe Dokumen.' });
+      return;
+    }
 
     setNotice({ type: 'info', text: 'Sedang menyimpan invoice dan upload dokumen...' });
     transform(() => ({ ...data, documents: normalizedDocuments }));

@@ -80,8 +80,9 @@ class VendorInvoiceController extends Controller
         }
 
         $uploadedDocumentCount = 0;
+        $documentsPayload = (array) $request->input('documents', []);
 
-        DB::transaction(function () use ($data, $vendor, $companyId, $vendorInvoiceNo, $linesBySource, $available, &$uploadedDocumentCount) {
+        DB::transaction(function () use ($data, $vendor, $companyId, $vendorInvoiceNo, $linesBySource, $available, &$uploadedDocumentCount, $documentsPayload, $request) {
             $subtotal = 0;
             $linePayloads = [];
             foreach ($linesBySource as $sourceKey => $line) {
@@ -149,7 +150,7 @@ class VendorInvoiceController extends Controller
                 VendorInvoiceLine::create(array_merge($linePayload, ['vendor_invoice_id' => $invoice->id]));
             }
 
-            $uploadedDocumentCount = $this->attachDocumentsToInvoice($invoice, $data['documents'] ?? []);
+            $uploadedDocumentCount = $this->attachDocumentsToInvoice($invoice, $documentsPayload, $request);
         });
 
         $message = 'Vendor invoice berhasil dibuat.';
@@ -453,21 +454,23 @@ class VendorInvoiceController extends Controller
         return 'VINV-'.now()->format('YmdHis');
     }
 
-    private function attachDocumentsToInvoice(VendorInvoice $invoice, array $documents): int
+    private function attachDocumentsToInvoice(VendorInvoice $invoice, array $documents, StoreVendorInvoiceRequest $request): int
     {
         $uploadedCount = 0;
 
-        foreach ($documents as $document) {
-            if (! isset($document['file'], $document['document_type_id'])) {
+        foreach ($documents as $index => $document) {
+            $file = $request->file("documents.$index.file");
+            $documentTypeId = $document['document_type_id'] ?? null;
+            if (! $file || ! $documentTypeId) {
                 continue;
             }
 
-            $path = $document['file']->store('documents/vendor-invoices', 'public');
+            $path = $file->store('documents/vendor-invoices', 'public');
             Document::create([
                 'business_id' => $invoice->company_id,
                 'owner_type' => 'vendor_invoice',
                 'owner_id' => $invoice->id,
-                'document_type_id' => $document['document_type_id'],
+                'document_type_id' => $documentTypeId,
                 'title' => $document['title'] ?: ('Invoice Document #'.$invoice->invoice_no_internal),
                 'document_number' => $document['document_number'] ?? null,
                 'issue_date' => $document['issue_date'] ?? null,
@@ -475,9 +478,9 @@ class VendorInvoiceController extends Controller
                 'notes' => $document['notes'] ?? null,
                 'file_path' => $path,
                 'storage_disk' => 'public',
-                'original_file_name' => $document['file']->getClientOriginalName(),
-                'mime_type' => $document['file']->getClientMimeType(),
-                'file_size' => $document['file']->getSize(),
+                'original_file_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getClientMimeType(),
+                'file_size' => $file->getSize(),
                 'uploaded_by' => auth()->id(),
                 'status' => 'pending_review',
             ]);
