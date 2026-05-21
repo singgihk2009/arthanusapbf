@@ -231,6 +231,7 @@ class VendorInvoiceController extends Controller
         }
 
         $data = $request->validated();
+        $documentsPayload = (array) $request->input('documents', []);
         $linesBySource = collect($data['lines'])->keyBy(fn ($line) => $line['source_line_type'].':'.$line['source_line_id']);
         $available = collect($this->availableReceivingLines((int) $invoice->vendor_id, (int) $invoice->company_id))->keyBy('source_key');
 
@@ -263,7 +264,8 @@ class VendorInvoiceController extends Controller
             }
         }
 
-        DB::transaction(function () use ($invoice, $data, $linesBySource, $available) {
+        $uploadedDocumentCount = 0;
+        DB::transaction(function () use ($invoice, $data, $linesBySource, $available, $documentsPayload, $request, &$uploadedDocumentCount) {
             $subtotal = 0;
             $linePayloads = [];
             foreach ($linesBySource as $sourceKey => $line) {
@@ -321,11 +323,16 @@ class VendorInvoiceController extends Controller
                 VendorInvoiceLine::create(array_merge($payload, ['vendor_invoice_id' => $invoice->id]));
             }
 
-            $this->attachDocumentsToInvoice($invoice, $data['documents'] ?? []);
+            $uploadedDocumentCount = $this->attachDocumentsToInvoice($invoice, $documentsPayload, $request);
         });
 
-        return redirect()->route('apps.procurement.vendors.show', ['vendor' => $invoice->vendor_id, 'tab' => 'invoices'])
-            ->with('success', 'Vendor invoice berhasil diperbarui.');
+        $message = 'Vendor invoice berhasil diperbarui.';
+        if ($uploadedDocumentCount > 0) {
+            $message .= " {$uploadedDocumentCount} dokumen berhasil diupload.";
+        }
+
+        return redirect()->route('apps.procurement.vendor-invoices.edit', ['vendor_invoice' => $invoice->id])
+            ->with('success', $message);
     }
 
     public function approve(VendorInvoice $vendorInvoice): RedirectResponse

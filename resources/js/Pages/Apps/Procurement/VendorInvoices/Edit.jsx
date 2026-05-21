@@ -1,9 +1,10 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { useForm } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 export default function Edit({ vendor, invoice, receivingLines, selectedLines, documentTypes = [], uploadedDocuments = [] }) {
-  const { data, setData, put, processing } = useForm({
+  const [notice, setNotice] = useState(null);
+  const { data, setData, put, processing, transform } = useForm({
     vendor_invoice_no: invoice.vendor_invoice_no ?? '',
     invoice_date: invoice.invoice_date ?? '',
     due_date: invoice.due_date ?? '',
@@ -39,8 +40,31 @@ export default function Edit({ vendor, invoice, receivingLines, selectedLines, d
     setData(field, value === '' ? '' : Number(value));
   };
 
+  const submitUpdate = () => {
+    const normalizedDocuments = (data.documents || []).filter((doc) => doc?.file);
+    const invalidDocument = normalizedDocuments.find((doc) => !doc?.document_type_id);
+    if (invalidDocument) {
+      setNotice({ type: 'error', text: 'Upload gagal: setiap file wajib memilih Tipe Dokumen.' });
+      return;
+    }
+
+    setNotice({ type: 'info', text: 'Sedang update invoice dan upload dokumen...' });
+    transform(() => ({ ...data, documents: normalizedDocuments }));
+    put(`/apps/procurement/vendor-invoices/${invoice.id}`, {
+      forceFormData: true,
+      onError: (errors) => {
+        const firstError = Object.values(errors ?? {}).flat().find(Boolean);
+        setNotice({ type: 'error', text: firstError || 'Update invoice / upload dokumen gagal.' });
+      },
+      onSuccess: () => {
+        setNotice({ type: 'success', text: 'Update invoice dan upload dokumen berhasil.' });
+      },
+    });
+  };
+
   return <AppLayout><div className='p-6 space-y-6'>
     <h1 className='text-xl font-semibold'>Edit Vendor Invoice</h1>
+    {notice && <div className={`rounded border px-3 py-2 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : notice.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>{notice.text}</div>}
     <div className='grid grid-cols-2 gap-3 bg-white p-4 border rounded'>
       <input disabled value={vendor?.vendor_name || vendor?.name} className='border p-2 rounded' /><input disabled value={invoice.invoice_no_internal} className='border p-2 rounded' />
       <input placeholder='Vendor invoice no' value={data.vendor_invoice_no} onChange={(e) => setData('vendor_invoice_no', e.target.value)} className='border p-2 rounded' /><input type='date' value={data.invoice_date} onChange={(e) => setData('invoice_date', e.target.value)} className='border p-2 rounded' />
@@ -133,6 +157,6 @@ export default function Edit({ vendor, invoice, receivingLines, selectedLines, d
         </div>
       </div>
     </div>
-    <button disabled={processing} onClick={() => put(`/apps/procurement/vendor-invoices/${invoice.id}`, { forceFormData: true })} className='px-4 py-2 bg-indigo-600 text-white rounded'>Update</button>
+    <button disabled={processing} onClick={submitUpdate} className='px-4 py-2 bg-indigo-600 text-white rounded'>Update</button>
   </div></AppLayout>;
 }
