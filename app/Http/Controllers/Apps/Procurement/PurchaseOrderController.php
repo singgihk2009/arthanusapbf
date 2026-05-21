@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Apps\Procurement;
 
 use App\Http\Controllers\Controller;
+use App\Models\Document;
+use App\Models\DocumentType;
 use App\Models\Inventory\Item;
 use App\Models\Inventory\Uom;
 use App\Models\Inventory\Warehouse;
@@ -16,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
+use App\Services\Documents\DocumentVersioningService;
 
 class PurchaseOrderController extends Controller
 {
@@ -56,10 +59,18 @@ class PurchaseOrderController extends Controller
             'returnTo' => $request->string('return_to')->toString(),
             'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('code')->get(['id','code','name','is_restricted','requires_reference_no']),
             'defaultFacilitySchemeId' => FacilityScheme::query()->where('code', 'REGULAR')->value('id'),
+            'documentTypes' => DocumentType::query()
+                ->where('is_active', true)
+                ->where(function ($query) {
+                    $query->whereNull('applicable_owner_types')
+                        ->orWhereJsonContains('applicable_owner_types', 'purchase_order');
+                })
+                ->orderBy('name')
+                ->get(['id', 'code', 'name']),
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, DocumentVersioningService $documentVersioningService)
     {
         $data = $this->validateData($request);
         $poDate = Carbon::parse($data['po_date'])->toDateString();
@@ -108,6 +119,21 @@ class PurchaseOrderController extends Controller
 
                 $po->items()->create($this->sanitizePurchaseOrderItemPayload($payload));
             }
+
+            foreach (($data['documents'] ?? []) as $documentPayload) {
+                if (empty($documentPayload['file']) || empty($documentPayload['document_type_id'])) {
+                    continue;
+                }
+
+                $documentVersioningService->createOriginalDocument([
+                    'business_id' => 1,
+                    'owner_type' => 'purchase_order',
+                    'owner_id' => (int) $po->id,
+                    'document_type_id' => (int) $documentPayload['document_type_id'],
+                    'title' => $documentPayload['title'] ?? null,
+                ], $documentPayload['file']);
+            }
+
             $po->recalculateTotals();
         });
         $returnTo = (string) $request->input('return_to', '');
@@ -120,6 +146,12 @@ class PurchaseOrderController extends Controller
     public function show(PurchaseOrder $purchaseOrder)
     {
         $purchaseOrder->load(['vendor:id,name','items.product:id,name','items.uom:id,name']);
+        $purchaseOrderDocuments = Document::query()
+            ->with('documentType:id,name,code')
+            ->where('owner_type', 'purchase_order')
+            ->where('owner_id', $purchaseOrder->id)
+            ->latest('id')
+            ->get();
 
         $goodsReceipts = GoodsReceipt::query()
             ->where(function ($query) use ($purchaseOrder) {
@@ -181,6 +213,7 @@ class PurchaseOrderController extends Controller
                 $gr->total_value = $gr->items()->sum('inventory_total_cost');
             }
         });
+        $purchaseOrder->setRelation('documents', $purchaseOrderDocuments);
         return Inertia::render('Apps/Procurement/PurchaseOrders/Show', ['purchaseOrder' => $purchaseOrder]);
     }
 
@@ -204,10 +237,24 @@ class PurchaseOrderController extends Controller
             'returnTo' => $request->string('return_to')->toString(),
             'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('code')->get(['id','code','name','is_restricted','requires_reference_no']),
             'defaultFacilitySchemeId' => FacilityScheme::query()->where('code', 'REGULAR')->value('id'),
+            'documentTypes' => DocumentType::query()
+                ->where('is_active', true)
+                ->where(function ($query) {
+                    $query->whereNull('applicable_owner_types')
+                        ->orWhereJsonContains('applicable_owner_types', 'purchase_order');
+                })
+                ->orderBy('name')
+                ->get(['id', 'code', 'name']),
+            'uploadedDocuments' => Document::query()
+                ->with('documentType:id,name,code')
+                ->where('owner_type', 'purchase_order')
+                ->where('owner_id', $purchaseOrder->id)
+                ->latest('id')
+                ->get(),
         ]);
     }
 
-    public function update(Request $request, PurchaseOrder $purchaseOrder)
+    public function update(Request $request, PurchaseOrder $purchaseOrder, DocumentVersioningService $documentVersioningService)
     {
         abort_unless($purchaseOrder->isEditable(), 422, 'PO hanya dapat diubah ketika draft.');
         $data = $this->validateData($request);
@@ -216,7 +263,7 @@ class PurchaseOrderController extends Controller
             ? Carbon::parse($data['expected_delivery_date'])->toDateString()
             : null;
 
-        DB::transaction(function () use ($purchaseOrder, $data, $poDate, $expectedDeliveryDate) {
+        DB::transaction(function () use ($purchaseOrder, $data, $poDate, $expectedDeliveryDate, $documentVersioningService) {
             $supplierId = $this->resolveSupplierId((int) $data['vendor_id']);
             $purchaseOrder->update([
                 'vendor_id' => $data['vendor_id'],
@@ -249,6 +296,21 @@ class PurchaseOrderController extends Controller
 
                 $purchaseOrder->items()->create($this->sanitizePurchaseOrderItemPayload($payload));
             }
+
+            foreach (($data['documents'] ?? []) as $documentPayload) {
+                if (empty($documentPayload['file']) || empty($documentPayload['document_type_id'])) {
+                    continue;
+                }
+
+                $documentVersioningService->createOriginalDocument([
+                    'business_id' => 1,
+                    'owner_type' => 'purchase_order',
+                    'owner_id' => (int) $purchaseOrder->id,
+                    'document_type_id' => (int) $documentPayload['document_type_id'],
+                    'title' => $documentPayload['title'] ?? null,
+                ], $documentPayload['file']);
+            }
+
             $purchaseOrder->recalculateTotals();
         });
         $returnTo = (string) $request->input('return_to', '');
@@ -291,6 +353,10 @@ class PurchaseOrderController extends Controller
             'items.*.facility_reference_date' => ['nullable','date'],
             'items.*.facility_reference_note' => ['nullable','string'],
             'items.*.notes' => ['nullable','string'],
+            'documents' => ['nullable', 'array'],
+            'documents.*.document_type_id' => ['required_with:documents', 'integer', 'exists:document_types,id'],
+            'documents.*.title' => ['nullable', 'string', 'max:255'],
+            'documents.*.file' => ['required_with:documents', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
         ]);
     }
 
