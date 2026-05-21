@@ -308,6 +308,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
         Route::get('/purchase-orders/{purchaseOrder}/goods-receipts/create', [GoodsReceiptController::class, 'createFromPO'])->name('goods-receipts.create-from-po');
         Route::post('/goods-receipts/{goodsReceipt}/post', [GoodsReceiptController::class, 'post'])->name('goods-receipts.post');
         Route::resource('/goods-receipts', GoodsReceiptController::class);
+        Route::post('/vendor-invoices/{vendorInvoice}/approve', [VendorInvoiceController::class, 'approve'])->name('vendor-invoices.approve');
         Route::resource('/vendor-invoices', VendorInvoiceController::class);
         Route::resource('/vendor-payments', VendorPaymentController::class);
         Route::resource('/vendor-ledgers', VendorLedgerController::class)->only(['index','show']);
