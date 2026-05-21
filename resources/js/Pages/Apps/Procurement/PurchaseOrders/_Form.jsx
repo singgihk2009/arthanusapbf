@@ -34,7 +34,9 @@ const toDateInputValue = (value) => {
     return str.length >= 10 ? str.slice(0, 10) : str;
 };
 
-export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], facilitySchemes = [], defaultFacilitySchemeId = '', defaultVendorId = null, returnTo = '' }) {
+const emptyDocument = () => ({ document_type_id: '', title: '', file: null });
+
+export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], facilitySchemes = [], documentTypes = [], defaultFacilitySchemeId = '', defaultVendorId = null, returnTo = '' }) {
     const isEdit = !!purchaseOrder;
     const initialHeaderFacilitySchemeId = normalizeFacilityId(
         purchaseOrder?.facility_scheme_id,
@@ -53,6 +55,7 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
         facility_reference_date: toDateInputValue(purchaseOrder?.facility_reference_date || purchaseOrder?.items?.[0]?.facility_reference_date),
         return_to: returnTo || '',
         items: initialItems,
+        documents: [emptyDocument()],
     });
 
     const productUomMap = useMemo(() => Object.fromEntries(products.map((p) => [String(p.id), p.base_uom_id ? String(p.base_uom_id) : ''])), [products]);
@@ -123,6 +126,37 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
                 <button type='button' onClick={() => setData('items', [...data.items, emptyItem(String(data.facility_scheme_id || defaultFacilitySchemeId || ''))])} className='rounded border border-gray-300 px-3 py-1 text-sm'>+ Add Item</button>
             </div>
             <div className='mt-3 text-right text-sm font-medium'>Subtotal: {totals.subtotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Tax: {totals.tax.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Grand Total: {totals.grand.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className='mt-6 rounded border border-gray-200 p-3 dark:border-gray-800'>
+                <h3 className='text-sm font-semibold text-gray-700 dark:text-gray-200'>Upload Dokumen (Document Center)</h3>
+                <p className='mb-3 mt-1 text-xs text-gray-500'>Bisa upload multi dokumen: pilih tipe dokumen, isi judul, lalu upload file (PDF/JPG/PNG).</p>
+                <div className='space-y-3'>
+                    {data.documents.map((doc, idx) => (
+                        <div key={idx} className='grid grid-cols-1 gap-2 rounded border border-gray-200 p-2 md:grid-cols-4 dark:border-gray-800'>
+                            <select value={doc.document_type_id} onChange={(e) => {
+                                const docs = [...data.documents];
+                                docs[idx] = { ...docs[idx], document_type_id: e.target.value };
+                                setData('documents', docs);
+                            }} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900'>
+                                <option value=''>Pilih Tipe Dokumen</option>
+                                {documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name || type.code}</option>)}
+                            </select>
+                            <input value={doc.title || ''} onChange={(e) => {
+                                const docs = [...data.documents];
+                                docs[idx] = { ...docs[idx], title: e.target.value };
+                                setData('documents', docs);
+                            }} placeholder='Judul dokumen' className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
+                            <input type='file' accept='.pdf,.jpg,.jpeg,.png' onChange={(e) => {
+                                const docs = [...data.documents];
+                                docs[idx] = { ...docs[idx], file: e.target.files?.[0] || null };
+                                setData('documents', docs);
+                            }} className='rounded border border-gray-200 px-2 py-1 text-sm file:mr-2 file:rounded file:border-0 file:bg-gray-100 file:px-2 file:py-1 dark:border-gray-800 dark:bg-gray-900' />
+                            <button type='button' onClick={() => setData('documents', data.documents.filter((_, rowIndex) => rowIndex !== idx))} className='rounded border border-rose-400 px-2 py-1 text-xs text-rose-600'>Remove</button>
+                        </div>
+                    ))}
+                </div>
+                <button type='button' onClick={() => setData('documents', [...data.documents, emptyDocument()])} className='mt-3 rounded border border-gray-300 px-3 py-1 text-sm'>+ Add Dokumen</button>
+                {errors.documents && <small className='mt-2 block text-xs text-red-500'>{errors.documents}</small>}
+            </div>
         </Card>
     </>;
 }
