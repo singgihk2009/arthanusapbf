@@ -90,17 +90,13 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
             onError: () => setNotice({ type: 'error', text: 'Gagal menyimpan PO/dokumen. Cek field yang wajib diisi.' }),
         };
         if (isEdit) {
-            post(route('apps.procurement.purchase-orders.update', purchaseOrder.id), {
-                ...options,
-                data: { ...submitPayload, _method: 'put' },
-            });
+            transform(() => ({ ...submitPayload, _method: 'put' }));
+            post(route('apps.procurement.purchase-orders.update', purchaseOrder.id), options);
             return;
         }
 
-        post(route('apps.procurement.purchase-orders.store'), {
-            ...options,
-            data: submitPayload,
-        });
+        transform(() => submitPayload);
+        post(route('apps.procurement.purchase-orders.store'), options);
     };
     const handleBack = () => {
         const confirmLeave = window.confirm('Pastikan data sudah disimpan. Kembali sekarang dapat menyebabkan data yang belum disimpan hilang.');
