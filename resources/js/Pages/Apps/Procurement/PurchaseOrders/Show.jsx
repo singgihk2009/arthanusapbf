@@ -233,6 +233,21 @@ export default function Show({ purchaseOrder }) {
                     <Table.Tbody>{(purchaseOrder.goods_receipts || []).length ? (purchaseOrder.goods_receipts || []).map((gr) => <tr key={gr.id}><Table.Td>{gr.gr_number || gr.number || '-'}</Table.Td><Table.Td>{formatDisplayDate(gr.received_date || gr.document_date)}</Table.Td><Table.Td>{gr.warehouse_name || gr.warehouse?.name || gr.warehouse_code || gr.warehouse_id || '-'}</Table.Td><Table.Td>{gr.status}</Table.Td><Table.Td>{formatNumber(gr.total_qty ?? 0, 2)}</Table.Td><Table.Td>{Number(gr.total_value ?? 0).toLocaleString('id-ID')}</Table.Td></tr>) : <tr><Table.Td colSpan={6} className='text-center text-gray-500'>Belum ada receiving history.</Table.Td></tr>}</Table.Tbody>
                 </Table>
 
+                <h3 className='mt-6 mb-2 text-sm font-semibold'>Dokumen PO</h3>
+                <Table>
+                    <Table.Thead><tr><Table.Th>Tipe Dokumen</Table.Th><Table.Th>Judul</Table.Th><Table.Th>Status</Table.Th><Table.Th>Aksi</Table.Th></tr></Table.Thead>
+                    <Table.Tbody>
+                        {(purchaseOrder.documents || []).length ? (purchaseOrder.documents || []).map((doc) => (
+                            <tr key={doc.id}>
+                                <Table.Td>{doc.document_type?.name || doc.document_type?.code || '-'}</Table.Td>
+                                <Table.Td>{doc.title || '-'}</Table.Td>
+                                <Table.Td>{doc.status || '-'}</Table.Td>
+                                <Table.Td><a href={route('apps.document-center.documents.download', doc.id)} target='_blank' className='rounded border border-gray-300 px-2 py-1 text-xs'>View / Download</a></Table.Td>
+                            </tr>
+                        )) : <tr><Table.Td colSpan={4} className='text-center text-gray-500'>Belum ada dokumen PO.</Table.Td></tr>}
+                    </Table.Tbody>
+                </Table>
+
                 <Table>
                     <Table.Thead>
                         <tr>
