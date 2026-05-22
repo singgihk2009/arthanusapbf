@@ -1,12 +1,15 @@
 import AppLayout from '@/Layouts/AppLayout';
-import { Link, useForm } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { Link, useForm, usePage } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 const n = (v) => Number(v || 0);
 
 export default function Form({ vendor, outstandingInvoices = [], payment = null }) {
   const editing = !!payment;
   const existingLines = payment?.lines || [];
+
+  const { flash } = usePage().props;
+  const [notice, setNotice] = useState(null);
 
   const { data, setData, post, put, processing, errors } = useForm({
     payment_date: payment?.payment_date || '',
@@ -42,12 +45,26 @@ export default function Form({ vendor, outstandingInvoices = [], payment = null 
     setData('lines', data.lines.map((l) => String(l.vendor_invoice_id) === String(invoiceId) ? { ...l, [field]: value === '' ? '' : Number(value) } : l));
   };
 
+  useEffect(() => {
+    if (flash?.success) setNotice({ type: 'success', text: flash.success });
+    if (flash?.error) setNotice({ type: 'error', text: flash.error });
+  }, [flash]);
+
   const submit = () => {
+    setNotice({ type: 'info', text: 'Menyimpan draft payment...' });
     if (editing) {
-      put(`/apps/procurement/vendors/${vendor.id}/payments/${payment.id}`);
+      put(`/apps/procurement/vendors/${vendor.id}/payments/${payment.id}`, {
+        preserveScroll: true,
+        onSuccess: () => setNotice({ type: 'success', text: 'Payment draft berhasil diperbarui.' }),
+        onError: () => setNotice({ type: 'error', text: 'Gagal menyimpan payment. Silakan cek field yang masih invalid.' }),
+      });
       return;
     }
-    post(`/apps/procurement/vendors/${vendor.id}/payments`);
+    post(`/apps/procurement/vendors/${vendor.id}/payments`, {
+      preserveScroll: true,
+      onSuccess: () => setNotice({ type: 'success', text: 'Payment draft berhasil disimpan.' }),
+      onError: () => setNotice({ type: 'error', text: 'Gagal menyimpan payment. Silakan cek field yang masih invalid.' }),
+    });
   };
 
   return <AppLayout><div className='p-6 space-y-5'>
@@ -55,6 +72,8 @@ export default function Form({ vendor, outstandingInvoices = [], payment = null 
       <h1 className='text-xl font-semibold'>{editing ? 'Edit Vendor Payment' : 'Create Vendor Payment'}</h1>
       <Link className='rounded border px-3 py-2 text-sm' href={`/apps/procurement/vendors/${vendor.id}?tab=payments`}>Back</Link>
     </div>
+
+    {notice && <div className={`rounded border px-3 py-2 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : notice.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>{notice.text}</div>}
 
     <div className='grid grid-cols-1 md:grid-cols-2 gap-3 border rounded bg-white p-4'>
       <input type='date' value={data.payment_date} onChange={(e) => setData('payment_date', e.target.value)} className='rounded border p-2' />
