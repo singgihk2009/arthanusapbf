@@ -1,5 +1,5 @@
 import AppLayout from '@/Layouts/AppLayout';
-import { useForm } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 const numberOrZero = (value) => Number(value || 0);
@@ -75,7 +75,10 @@ export default function Page({ vendor, receivingLines, internalInvoiceNoPreview,
   };
 
   return <AppLayout><div className='p-6 space-y-6'>
-    <h1 className='text-xl font-semibold'>Create Vendor Invoice</h1>
+    <div className='flex items-center justify-between gap-3'>
+      <h1 className='text-xl font-semibold'>Create Vendor Invoice</h1>
+      <Link href={`/apps/procurement/vendors/${vendor.id}?tab=invoices`} className='rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50'>Back</Link>
+    </div>
     {notice && <div className={`rounded border px-3 py-2 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : notice.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>{notice.text}</div>}
 
     <div className='grid grid-cols-1 gap-3 bg-white p-4 border rounded md:grid-cols-2'>
