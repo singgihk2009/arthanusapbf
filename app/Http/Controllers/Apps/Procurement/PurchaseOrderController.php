@@ -78,7 +78,7 @@ class PurchaseOrderController extends Controller
             ? Carbon::parse($data['expected_delivery_date'])->toDateString()
             : null;
 
-        DB::transaction(function () use ($data, $request, $poDate, $expectedDeliveryDate) {
+        DB::transaction(function () use ($data, $request, $poDate, $expectedDeliveryDate, $documentVersioningService) {
             $poNumber = $this->generateNumber();
             $warehouseId = Warehouse::query()->value('id');
             $supplierId = $this->resolveSupplierId((int) $data['vendor_id']);
