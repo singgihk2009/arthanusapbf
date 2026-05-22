@@ -286,7 +286,29 @@ class VendorController extends Controller
         return $legacyWarehouseCode !== '' ? $legacyWarehouseCode : '-';
     }
     public function invoices(Vendor $vendor) { return response()->json(['invoices' => VendorInvoice::where('vendor_id', $vendor->id)->latest('invoice_date')->paginate(10)]); }
-    public function payments(Vendor $vendor) { $payments=VendorPayment::where('vendor_id',$vendor->id)->latest('payment_date')->paginate(10); $summary=['total_outstanding_invoice'=>(float)VendorInvoice::where('vendor_id',$vendor->id)->sum('outstanding_amount'),'total_paid'=>(float)VendorPayment::where('vendor_id',$vendor->id)->whereIn('status',['PAID','POSTED'])->sum('total_invoice_amount'),'total_payment_draft_submitted'=>(float)VendorPayment::where('vendor_id',$vendor->id)->whereIn('status',['DRAFT','SUBMITTED'])->sum('total_invoice_amount'),'last_payment_date'=>optional(VendorPayment::where('vendor_id',$vendor->id)->latest('payment_date')->first())->payment_date]; return response()->json(['payments'=>$payments,'summary'=>$summary]); }
+    public function payments(Vendor $vendor) {
+        $payments = VendorPayment::where('vendor_id', $vendor->id)
+            ->latest('payment_date')
+            ->paginate(10);
+
+        $approvedPaidPostedAmount = (float) VendorPayment::where('vendor_id', $vendor->id)
+            ->whereIn('status', ['APPROVED', 'PAID', 'POSTED'])
+            ->sum('total_invoice_amount');
+
+        $invoiceOutstandingAmount = (float) VendorInvoice::where('vendor_id', $vendor->id)
+            ->sum('outstanding_amount');
+
+        $summary = [
+            'total_outstanding_invoice' => max(0, $invoiceOutstandingAmount - $approvedPaidPostedAmount),
+            'total_paid' => $approvedPaidPostedAmount,
+            'total_payment_draft_submitted' => (float) VendorPayment::where('vendor_id', $vendor->id)
+                ->whereIn('status', ['DRAFT', 'SUBMITTED'])
+                ->sum('total_invoice_amount'),
+            'last_payment_date' => optional(VendorPayment::where('vendor_id', $vendor->id)->latest('payment_date')->first())->payment_date,
+        ];
+
+        return response()->json(['payments' => $payments, 'summary' => $summary]);
+    }
     public function ledger(Vendor $vendor) { return response()->json(['ledger' => VendorLedger::where('vendor_id', $vendor->id)->latest('transaction_date')->paginate(10)]); }
     public function auditLogs(Vendor $vendor) { return response()->json(['audit_logs' => [['action' => 'Vendor created/updated', 'at' => $vendor->updated_at, 'by' => $vendor->updated_by]]]); }
 
@@ -403,12 +425,19 @@ class VendorController extends Controller
 
     protected function summary(Vendor $vendor): array
     {
+        $invoiceOutstandingAmount = (float) VendorInvoice::where('vendor_id', $vendor->id)->sum('outstanding_amount');
+        $approvedPaidPostedAmount = (float) VendorPayment::where('vendor_id', $vendor->id)
+            ->whereIn('status', ['APPROVED', 'PAID', 'POSTED'])
+            ->sum('total_invoice_amount');
+
         return [
-            'outstanding_ap' => VendorInvoice::where('vendor_id', $vendor->id)->sum('outstanding_amount'),
+            'outstanding_ap' => max(0, $invoiceOutstandingAmount - $approvedPaidPostedAmount),
             'total_purchase_ytd' => PurchaseOrder::where('vendor_id', $vendor->id)->whereYear('document_date', now()->year)->sum('grand_total'),
             'last_purchase_date' => PurchaseOrder::where('vendor_id', $vendor->id)->max('document_date'),
             'open_po' => PurchaseOrder::where('vendor_id', $vendor->id)->whereIn('status', ['DRAFT','APPROVED','PARTIALLY_RECEIVED','SENT'])->count(),
-            'unpaid_invoice' => VendorInvoice::where('vendor_id', $vendor->id)->whereIn('status', ['POSTED','PARTIAL_PAID'])->count(),
+            'unpaid_invoice' => VendorInvoice::where('vendor_id', $vendor->id)
+                ->where('outstanding_amount', '>', 0)
+                ->count(),
             'expiring_documents' => $vendor->documents()->whereDate('expiry_date', '<=', now()->addDays(30))->count(),
         ];
     }

@@ -31,6 +31,17 @@ class VendorPaymentController extends Controller
         }); return back()->with('success','Payment marked as paid.'); }
     public function post(Vendor $vendor, VendorPayment $payment){ DB::transaction(function() use($payment){ if(strtoupper((string)$payment->status)!=='PAID') throw ValidationException::withMessages(['status'=>'Payment must be paid first']); $this->postToGeneralLedger($payment); $payment->update(['status'=>'POSTED','posted_by'=>auth()->id(),'posted_at'=>now()]); }); return back()->with('success','Payment posted.'); }
     public function cancel(Vendor $vendor, VendorPayment $payment){ DB::transaction(function() use($payment){ $status=strtoupper((string)$payment->status); if($status==='POSTED') throw ValidationException::withMessages(['status'=>'Posted payment requires reversal flow']); if($status==='PAID'){ foreach($payment->lines as $line){ $inv=VendorInvoice::lockForUpdate()->findOrFail($line->vendor_invoice_id); $inv->paid_amount=max(0,$inv->paid_amount-$line->payment_amount); $inv->wht_paid_amount=max(0,($inv->wht_paid_amount??0)-$line->wht_amount); $inv->outstanding_amount=max(0,(float)$inv->net_payable_amount-(float)$inv->paid_amount-(float)$inv->wht_paid_amount); $inv->payment_status=$inv->outstanding_amount<=0?'paid':((($inv->paid_amount+$inv->wht_paid_amount)>0)?'partial_paid':'unpaid'); $inv->status=$inv->outstanding_amount<=0?'PAID':((($inv->paid_amount+$inv->wht_paid_amount)>0)?'PARTIAL_PAID':'POSTED'); $inv->save(); }} $payment->update(['status'=>'CANCELLED']); }); return back()->with('success','Payment cancelled.'); }
+    public function destroy(VendorPayment $vendor_payment)
+    {
+        abort_unless($vendor_payment->can_edit, 422, 'Only draft can be deleted');
+
+        DB::transaction(function () use ($vendor_payment) {
+            $vendor_payment->lines()->delete();
+            $vendor_payment->delete();
+        });
+
+        return back()->with('success', 'Payment draft berhasil dihapus.');
+    }
 
     private function upsertPayment(VendorPayment $payment, Vendor $vendor, array $data): VendorPayment {
         $invoiceIds = collect($data['lines'])->pluck('vendor_invoice_id')->unique()->all();
