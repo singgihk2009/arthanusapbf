@@ -11,12 +11,13 @@ const emptyLine = {
     expired_date: '',
     notes: '',
 };
+const emptyDocument = { document_type_id: '', title: '', document_number: '', issue_date: '', expiry_date: '', notes: '', file: null };
 
 const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 const lineInputClassName = 'rounded border border-gray-300 bg-white px-2 py-1 text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 
 export default function Create() {
-    const { items, uoms, warehouses, transactionCodes, prefill } = usePage().props;
+    const { items, uoms, warehouses, transactionCodes, documentTypes, prefill } = usePage().props;
     const [form, setForm] = useState({
         warehouse_id: '',
         transaction_date: new Date().toISOString().slice(0, 10),
@@ -28,6 +29,7 @@ export default function Create() {
         source_id: prefill?.source_id || null,
         vendor_id: prefill?.vendor_id || null,
         lines: prefill?.lines?.length ? prefill.lines : [{ ...emptyLine }],
+        documents: [{ ...emptyDocument }],
     });
     const [errors, setErrors] = useState({});
     const [message, setMessage] = useState(null);
@@ -75,8 +77,41 @@ export default function Create() {
         setMessage(null);
 
         try {
-            await window.axios.post(route('apps.inbound.receiving.store'), form);
-            setMessage({ type: 'success', text: 'Receiving entry berhasil disimpan.' });
+            const normalizedDocuments = (form.documents || []).filter((doc) => doc?.file);
+            const payload = new FormData();
+            payload.append('warehouse_id', form.warehouse_id);
+            payload.append('transaction_date', form.transaction_date);
+            payload.append('transaction_code', form.transaction_code);
+            payload.append('reference', form.reference || '');
+            payload.append('vendor_name', form.vendor_name || '');
+            payload.append('notes', form.notes || '');
+            if (form.source_type) payload.append('source_type', form.source_type);
+            if (form.source_id) payload.append('source_id', form.source_id);
+            if (form.vendor_id) payload.append('vendor_id', form.vendor_id);
+            form.lines.forEach((line, index) => {
+                Object.entries(line).forEach(([key, value]) => payload.append(`lines[${index}][${key}]`, value ?? ''));
+            });
+            normalizedDocuments.forEach((doc, index) => {
+                payload.append(`documents[${index}][document_type_id]`, doc.document_type_id || '');
+                payload.append(`documents[${index}][title]`, doc.title || '');
+                payload.append(`documents[${index}][document_number]`, doc.document_number || '');
+                payload.append(`documents[${index}][issue_date]`, doc.issue_date || '');
+                payload.append(`documents[${index}][expiry_date]`, doc.expiry_date || '');
+                payload.append(`documents[${index}][notes]`, doc.notes || '');
+                payload.append(`documents[${index}][file]`, doc.file);
+            });
+            const response = await window.axios.post(route('apps.inbound.receiving.store'), payload, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            const isJsonResponse = String(response?.headers?.['content-type'] || '').includes('application/json');
+            if (!isJsonResponse) {
+                throw new Error('Server did not return JSON response');
+            }
+            setMessage({ type: 'success', text: response?.data?.message || 'Receiving entry berhasil disimpan.' });
             setForm((prev) => ({
                 ...prev,
                 warehouse_id: '',
@@ -84,6 +119,7 @@ export default function Create() {
                 vendor_name: '',
                 notes: '',
                 lines: [{ ...emptyLine }],
+                documents: [{ ...emptyDocument }],
             }));
         } catch (error) {
             if (error.response?.status === 422) {
@@ -197,6 +233,21 @@ export default function Create() {
                                     })}
                                 </tbody>
                             </table>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Dokumen Receiving</h3>
+                            {form.documents.map((doc, idx) => (
+                                <div key={idx} className="mt-3 grid gap-2 md:grid-cols-4">
+                                    <select value={doc.document_type_id} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_type_id: e.target.value } : d) }))} className={lineInputClassName}>
+                                        <option value="">Tipe Dokumen</option>
+                                        {documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+                                    </select>
+                                    <input value={doc.title} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, title: e.target.value } : d) }))} placeholder="Judul dokumen" className={lineInputClassName} />
+                                    <input value={doc.document_number} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_number: e.target.value } : d) }))} placeholder="No dokumen" className={lineInputClassName} />
+                                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d) }))} className={lineInputClassName} />
+                                </div>
+                            ))}
+                            <button type="button" onClick={() => setForm((prev) => ({ ...prev, documents: [...prev.documents, { ...emptyDocument }] }))} className="mt-3 rounded border px-3 py-1 text-sm">+ Add Dokumen</button>
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-2">
