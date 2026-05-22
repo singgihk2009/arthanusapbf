@@ -343,6 +343,7 @@ class VendorController extends Controller
 
         return response()->json(['payments' => $payments, 'summary' => $summary]);
     }
+
     public function ledger(Vendor $vendor) { return response()->json(['ledger' => VendorLedger::where('vendor_id', $vendor->id)->latest('transaction_date')->paginate(10)]); }
     public function auditLogs(Vendor $vendor) { return response()->json(['audit_logs' => [['action' => 'Vendor created/updated', 'at' => $vendor->updated_at, 'by' => $vendor->updated_by]]]); }
 
