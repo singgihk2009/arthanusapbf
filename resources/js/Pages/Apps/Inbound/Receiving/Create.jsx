@@ -234,12 +234,12 @@ export default function Create() {
                                 </tbody>
                             </table>
                         </div>
-                        <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
-                            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Dokumen Receiving</h3>
+                        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+                            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Upload Dokumen Receiving (Document Center)</h3>
                             {form.documents.map((doc, idx) => (
                                 <div key={idx} className="mt-3 grid gap-2 md:grid-cols-4">
                                     <select value={doc.document_type_id} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_type_id: e.target.value } : d) }))} className={lineInputClassName}>
-                                        <option value="">Tipe Dokumen</option>
+                                        <option value="">Pilih tipe dokumen</option>
                                         {documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
                                     </select>
                                     <input value={doc.title} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, title: e.target.value } : d) }))} placeholder="Judul dokumen" className={lineInputClassName} />
@@ -247,7 +247,41 @@ export default function Create() {
                                     <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d) }))} className={lineInputClassName} />
                                 </div>
                             ))}
-                            <button type="button" onClick={() => setForm((prev) => ({ ...prev, documents: [...prev.documents, { ...emptyDocument }] }))} className="mt-3 rounded border px-3 py-1 text-sm">+ Add Dokumen</button>
+                            <button type="button" onClick={() => setForm((prev) => ({ ...prev, documents: [...prev.documents, { ...emptyDocument }] }))} className="mt-3 rounded border border-gray-300 px-3 py-1 text-sm">+ Add Dokumen</button>
+
+                            <div className="mt-3 overflow-x-auto rounded-md border border-gray-200 dark:border-gray-800">
+                                <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
+                                    Daftar Dokumen Terupload ({form.documents.filter((doc) => doc.file).length})
+                                </div>
+                                <table className="min-w-full text-sm">
+                                    <thead>
+                                        <tr className="bg-gray-50 dark:bg-gray-900">
+                                            <th className="border px-3 py-2 text-left font-semibold">Document Type</th>
+                                            <th className="border px-3 py-2 text-left font-semibold">Judul</th>
+                                            <th className="border px-3 py-2 text-left font-semibold">No Dokumen</th>
+                                            <th className="border px-3 py-2 text-left font-semibold">Nama File</th>
+                                            <th className="border px-3 py-2 text-left font-semibold">Status Upload</th>
+                                            <th className="border px-3 py-2 text-left font-semibold">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {form.documents.filter((doc) => doc.file).length > 0 ? form.documents.filter((doc) => doc.file).map((doc, idx) => (
+                                            <tr key={`preview-${idx}`} className="odd:bg-white even:bg-gray-50 dark:odd:bg-gray-950 dark:even:bg-gray-900">
+                                                <td className="border px-3 py-2">{documentTypes.find((type) => String(type.id) === String(doc.document_type_id))?.name || '-'}</td>
+                                                <td className="border px-3 py-2">{doc.title || '-'}</td>
+                                                <td className="border px-3 py-2">{doc.document_number || '-'}</td>
+                                                <td className="border px-3 py-2">{doc.file?.name || '-'}</td>
+                                                <td className="border px-3 py-2"><span className="inline-flex rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">pending_review</span></td>
+                                                <td className="border px-3 py-2 text-gray-500">-</td>
+                                            </tr>
+                                        )) : (
+                                            <tr>
+                                                <td colSpan={6} className="border px-3 py-3 text-center text-gray-500">Belum ada dokumen yang dipilih.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-2">
