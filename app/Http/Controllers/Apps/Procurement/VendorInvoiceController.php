@@ -447,7 +447,7 @@ class VendorInvoiceController extends Controller
         }
 
         $receivingEntryLines = $receivingEntryLinesQuery
-            ->groupBy('rel.id', 'rel.item_id', 'rel.qty', 'rel.price', 're.number', 'po.po_no', 'i.name', 'i.sku')
+            ->groupBy('rel.id', 'rel.item_id', 'rel.qty', 'rel.price', 're.number', 're.reference', 'po.po_no', 'i.name', 'i.sku')
             ->selectRaw('rel.id as receiving_entry_line_id, rel.item_id, null as po_line_id, rel.qty as qty_received')
             ->selectRaw('COALESCE(SUM(CASE WHEN vi.deleted_at IS NULL THEN vil.qty_invoiced ELSE 0 END),0) as qty_already_invoiced')
             ->selectRaw('(rel.qty - COALESCE(SUM(CASE WHEN vi.deleted_at IS NULL THEN vil.qty_invoiced ELSE 0 END),0)) as qty_available_to_invoice')
