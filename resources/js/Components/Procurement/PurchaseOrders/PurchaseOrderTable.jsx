@@ -107,8 +107,8 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
                         const fulfillmentBadgeClass = FULFILLMENT_STATUS_STYLES[fulfillmentStatus] || FULFILLMENT_STATUS_STYLES.not_received;
                         const vendorName = po.vendor?.name ?? po.vendor_name ?? '-';
                         const isDraft = status === 'draft';
-                        const outstandingItemsCount = Number(po.outstanding_items_count ?? 0);
-                        const canCreateGoodsReceiving = status === 'approved' && fulfillmentStatus !== 'fully_received' && !['cancelled','closed'].includes(status) && outstandingItemsCount > 0;
+                        const canCreateGoodsReceiving = status === 'approved' && fulfillmentStatus !== 'fully_received' && !['cancelled', 'closed'].includes(status);
+                        const editReturnTo = po.vendor_id ? encodeURIComponent(`/apps/procurement/vendors/${po.vendor_id}?tab=purchase-orders`) : null;
 
                         return (
                             <tr key={po.id} className='hover:bg-gray-100 dark:hover:bg-gray-900'>
@@ -123,7 +123,7 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
                                 <Table.Td className={compact ? 'p-3 text-xs' : ''}>
                                     <div className='flex flex-wrap gap-2'>
                                         <Link className='rounded-lg border border-indigo-500 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50' href={route('apps.procurement.purchase-orders.show', po.id)}>Detail</Link>
-                                        {status === 'draft' && <Link className='rounded-lg border border-amber-500 px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50' href={route('apps.procurement.purchase-orders.edit', po.id)}>Edit</Link>}
+                                        {status === 'draft' && <Link className='rounded-lg border border-amber-500 px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50' href={`${route('apps.procurement.purchase-orders.edit', po.id)}${editReturnTo ? `?return_to=${editReturnTo}` : ''}`}>Edit</Link>}
                                         {(status === 'draft' || status === 'cancelled') && <button type='button' onClick={() => handleDeleteDraft(po.id)} className='rounded-lg border border-rose-500 px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50'>Delete</button>}
                                         {canCreateGoodsReceiving && <Link className='rounded-lg border border-emerald-500 px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50' href={`${route('apps.inbound.receiving.create')}?po_id=${po.id}`}>{fulfillmentStatus === 'partially_received' ? 'Continue Receiving' : 'Create Goods Receiving'}</Link>}
                                     </div>
