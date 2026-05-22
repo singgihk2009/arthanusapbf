@@ -101,8 +101,16 @@ export default function Create() {
                 payload.append(`documents[${index}][file]`, doc.file);
             });
             const response = await window.axios.post(route('apps.inbound.receiving.store'), payload, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
             });
+            const isJsonResponse = String(response?.headers?.['content-type'] || '').includes('application/json');
+            if (!isJsonResponse) {
+                throw new Error('Server did not return JSON response');
+            }
             setMessage({ type: 'success', text: response?.data?.message || 'Receiving entry berhasil disimpan.' });
             setForm((prev) => ({
                 ...prev,
