@@ -297,6 +297,16 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
         Route::get('/vendors/{vendor}/invoices/create', [VendorInvoiceController::class, 'create'])->name('vendors.invoices.create');
         Route::post('/vendors/{vendor}/invoices', [VendorInvoiceController::class, 'store'])->name('vendors.invoices.store');
         Route::get('/vendors/{vendor}/payments', [VendorController::class, 'payments'])->name('vendors.payments');
+        Route::get('/vendors/{vendor}/payments/create', [VendorPaymentController::class, 'create'])->name('vendors.payments.create');
+        Route::post('/vendors/{vendor}/payments', [VendorPaymentController::class, 'store'])->name('vendors.payments.store');
+        Route::get('/vendors/{vendor}/payments/{payment}', [VendorPaymentController::class, 'show'])->name('vendors.payments.show');
+        Route::get('/vendors/{vendor}/payments/{payment}/edit', [VendorPaymentController::class, 'edit'])->name('vendors.payments.edit');
+        Route::put('/vendors/{vendor}/payments/{payment}', [VendorPaymentController::class, 'update'])->name('vendors.payments.update');
+        Route::post('/vendors/{vendor}/payments/{payment}/submit', [VendorPaymentController::class, 'submit'])->name('vendors.payments.submit');
+        Route::post('/vendors/{vendor}/payments/{payment}/approve', [VendorPaymentController::class, 'approve'])->name('vendors.payments.approve');
+        Route::post('/vendors/{vendor}/payments/{payment}/mark-as-paid', [VendorPaymentController::class, 'markAsPaid'])->name('vendors.payments.mark-as-paid');
+        Route::post('/vendors/{vendor}/payments/{payment}/post', [VendorPaymentController::class, 'post'])->name('vendors.payments.post');
+        Route::post('/vendors/{vendor}/payments/{payment}/cancel', [VendorPaymentController::class, 'cancel'])->name('vendors.payments.cancel');
         Route::get('/vendors/{vendor}/ledger', [VendorController::class, 'ledger'])->name('vendors.ledger');
         Route::get('/vendors/{vendor}/audit-logs', [VendorController::class, 'auditLogs'])->name('vendors.audit-logs');
         Route::get('/vendors/{vendor}', [VendorController::class, 'show'])->whereNumber('vendor')->name('vendors.show');
