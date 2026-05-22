@@ -88,7 +88,7 @@ class VendorPaymentController extends Controller
         return $candidate;
     }
     private function outstandingInvoices(Vendor $vendor){
-        return VendorInvoice::query()
+        $invoices = VendorInvoice::query()
             ->where('vendor_id', $vendor->id)
             ->where('outstanding_amount', '>', 0)
             ->where(function ($query) {
@@ -98,6 +98,30 @@ class VendorPaymentController extends Controller
             ->whereIn(DB::raw('UPPER(status)'), ['POSTED', 'PARTIAL_PAID'])
             ->orderBy('invoice_date')
             ->get();
+
+        if ($invoices->isEmpty()) {
+            return $invoices;
+        }
+
+        $reservedTotals = DB::table('vendor_payment_lines as vpl')
+            ->join('vendor_payments as vp', 'vp.id', '=', 'vpl.vendor_payment_id')
+            ->whereIn('vpl.vendor_invoice_id', $invoices->pluck('id')->all())
+            ->where('vp.vendor_id', $vendor->id)
+            ->whereNull('vp.deleted_at')
+            ->whereNotIn(DB::raw('UPPER(vp.status)'), ['CANCELLED'])
+            ->groupBy('vpl.vendor_invoice_id')
+            ->selectRaw('vpl.vendor_invoice_id, SUM(COALESCE(vpl.payment_amount, 0) + COALESCE(vpl.wht_amount, 0)) as reserved_total')
+            ->pluck('reserved_total', 'vpl.vendor_invoice_id');
+
+        return $invoices
+            ->map(function (VendorInvoice $invoice) use ($reservedTotals) {
+                $reserved = (float) ($reservedTotals[$invoice->id] ?? 0);
+                $invoice->outstanding_amount = max(0, (float) $invoice->outstanding_amount - $reserved);
+
+                return $invoice;
+            })
+            ->filter(fn (VendorInvoice $invoice) => (float) $invoice->outstanding_amount > 0.0001)
+            ->values();
     }
     private function bankAccounts(Vendor $vendor)
     {
