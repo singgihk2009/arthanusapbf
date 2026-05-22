@@ -143,12 +143,41 @@ export default function Form({ vendor, outstandingInvoices = [], payment = null,
         <input type='file' accept='.pdf,.jpg,.jpeg,.png' onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d))} className='rounded border p-2' />
       </div>)}
       <button type='button' onClick={() => setData('documents', [...data.documents, { document_type_id: '', title: '', document_number: '', issue_date: '', expiry_date: '', notes: '', file: null }])} className='mt-3 rounded border px-3 py-1 text-sm'>+ Add Dokumen</button>
-      {!!uploadedDocuments.length && <div className='mt-4'>
-        <h4 className='text-sm font-semibold text-gray-700'>Dokumen Terupload ({uploadedDocuments.length})</h4>
-        <ul className='mt-2 list-disc pl-5 text-sm text-gray-700'>
-          {uploadedDocuments.map((doc) => <li key={doc.id}>{doc.document_type?.name || doc.title || doc.original_file_name} - {doc.status || 'uploaded'}</li>)}
-        </ul>
-      </div>}
+      <div className='mt-4 rounded border'>
+        <div className='border-b bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700'>
+          Daftar Dokumen Terupload ({uploadedDocuments.length})
+        </div>
+        <div className='overflow-auto'>
+          <table className='min-w-full text-sm'>
+            <thead>
+              <tr className='bg-white'>
+                <th className='border px-2 py-2 text-left'>Document Type</th>
+                <th className='border px-2 py-2 text-left'>Judul</th>
+                <th className='border px-2 py-2 text-left'>No Dokumen</th>
+                <th className='border px-2 py-2 text-left'>Nama File</th>
+                <th className='border px-2 py-2 text-left'>Status Upload</th>
+                <th className='border px-2 py-2 text-left'>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {uploadedDocuments.length ? uploadedDocuments.map((doc) => <tr key={doc.id}>
+                <td className='border px-2 py-2'>{doc.document_type?.name || doc.document_type?.code || '-'}</td>
+                <td className='border px-2 py-2'>{doc.title || '-'}</td>
+                <td className='border px-2 py-2'>{doc.document_number || '-'}</td>
+                <td className='border px-2 py-2'>{doc.original_file_name || '-'}</td>
+                <td className='border px-2 py-2'>
+                  <span className={`inline-flex rounded px-2 py-1 text-xs font-medium ${doc.status === 'pending_review' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                    {doc.status || 'uploaded'}
+                  </span>
+                </td>
+                <td className='border px-2 py-2'>
+                  <a href={route('apps.document-center.documents.download', doc.id)} target='_blank' className='text-blue-600 underline'>View</a>
+                </td>
+              </tr>) : <tr><td colSpan={6} className='border px-2 py-4 text-center text-gray-500'>Belum ada dokumen yang terupload untuk payment ini.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <div className='border rounded bg-white p-4 text-sm'>
