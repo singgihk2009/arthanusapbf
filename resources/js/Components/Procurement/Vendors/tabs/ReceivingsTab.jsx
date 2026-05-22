@@ -1,8 +1,40 @@
 import { Link } from '@inertiajs/react';
 
+const isDraft = (status) => String(status || '').toLowerCase() === 'draft';
+
 export default function ReceivingsTab({ data }) {
     const receivings = data?.receivings;
     const rows = receivings?.data || [];
+
+    const extractErrorMessage = (error, fallbackMessage) => {
+        return error?.response?.data?.message || fallbackMessage;
+    };
+
+    const handleDelete = async (id) => {
+        if (!window.confirm('Yakin hapus receiving entry ini?')) {
+            return;
+        }
+
+        try {
+            await window.axios.delete(route('apps.inbound.receiving.destroy', { receivingEntry: id }));
+            window.location.reload();
+        } catch (error) {
+            window.alert(extractErrorMessage(error, 'Gagal menghapus receiving entry.'));
+        }
+    };
+
+    const handlePost = async (id) => {
+        if (!window.confirm('Posting dokumen ini? Stok akan bertambah.')) {
+            return;
+        }
+
+        try {
+            await window.axios.post(route('apps.inventory.posting.receiving', id));
+            window.location.reload();
+        } catch (error) {
+            window.alert(extractErrorMessage(error, 'Gagal posting receiving entry.'));
+        }
+    };
 
     return (
         <div className="space-y-3">
@@ -38,7 +70,12 @@ export default function ReceivingsTab({ data }) {
                                 <td className="px-3 py-2"><span className="rounded border border-gray-300 px-2 py-1 text-xs">{entry.status || 'DRAFT'}</span></td>
                                 <td className="px-3 py-2 text-right">{Number(entry.total_value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 <td className="px-3 py-2 text-center">
-                                    <Link href={route('apps.inbound.receiving.edit', entry.id)} className="rounded border border-gray-300 px-2 py-1 text-xs">Detail</Link>
+                                    <div className="flex flex-wrap justify-center gap-2">
+                                        <Link href={route('apps.inbound.receiving.edit', entry.id)} className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700">Detail</Link>
+                                        {isDraft(entry.status) && <Link href={route('apps.inbound.receiving.edit', entry.id)} className="rounded border border-amber-300 px-2 py-1 text-xs text-amber-700">Edit</Link>}
+                                        {isDraft(entry.status) && <button type="button" onClick={() => handlePost(entry.id)} className="rounded border border-blue-300 px-2 py-1 text-xs text-blue-700">Post</button>}
+                                        {isDraft(entry.status) && <button type="button" onClick={() => handleDelete(entry.id)} className="rounded border border-red-300 px-2 py-1 text-xs text-red-600">Delete</button>}
+                                    </div>
                                 </td>
                             </tr>
                         ))}
