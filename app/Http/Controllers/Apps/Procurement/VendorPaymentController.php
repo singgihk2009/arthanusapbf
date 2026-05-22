@@ -58,7 +58,24 @@ class VendorPaymentController extends Controller
         $payment->fill(['vendor_id'=>$vendor->id,'payment_no'=>$payment->payment_no ?: $this->nextNo(),'payment_number'=>$payment->payment_number ?: $payment->payment_no,'payment_date'=>$data['payment_date'],'payment_method'=>strtoupper((string)($data['payment_method'] ?? 'BANK_TRANSFER')),'bank_account_id'=>$data['bank_account_id'] ?? null,'currency'=>'IDR','status'=>$payment->exists ? $payment->status : 'DRAFT','total_invoice_amount'=>$totalInvoice,'total_wht_amount'=>$totalWht,'stamp_duty_amount'=>$stamp,'freight_amount'=>$freight,'bank_charge_amount'=>$bank,'total_additional_cost'=>$additional,'net_vendor_payment_amount'=>$net,'total_cash_out_amount'=>$cashOut,'notes'=>$data['notes']??null,'created_by'=>$payment->created_by ?? auth()->id(),'updated_by'=>auth()->id()]);
         $payment->save(); $payment->lines()->delete(); $payment->lines()->createMany($lines); return $payment->fresh('lines');
     }
-    private function nextNo(): string { $prefix='VPY-'.now()->format('Ym').'-'; $last=VendorPayment::where('payment_no','like',$prefix.'%')->orderByDesc('id')->value('payment_no'); $seq=$last?((int)substr($last,-5)+1):1; return $prefix.str_pad((string)$seq,5,'0',STR_PAD_LEFT); }
+    private function nextNo(): string
+    {
+        $prefix = 'VPY-'.now()->format('Ym').'-';
+        $lastPaymentNo = VendorPayment::withTrashed()
+            ->where('payment_no', 'like', $prefix.'%')
+            ->orderByDesc('payment_no')
+            ->value('payment_no');
+
+        $nextSeq = $lastPaymentNo ? ((int) substr((string) $lastPaymentNo, -5) + 1) : 1;
+
+        do {
+            $candidate = $prefix.str_pad((string) $nextSeq, 5, '0', STR_PAD_LEFT);
+            $exists = VendorPayment::withTrashed()->where('payment_no', $candidate)->exists();
+            $nextSeq++;
+        } while ($exists);
+
+        return $candidate;
+    }
     private function outstandingInvoices(Vendor $vendor){ return VendorInvoice::where('vendor_id',$vendor->id)->where('outstanding_amount','>',0)->whereIn('status',['POSTED','PARTIAL_PAID'])->orderBy('invoice_date')->get(); }
     private function bankAccounts(Vendor $vendor)
     {

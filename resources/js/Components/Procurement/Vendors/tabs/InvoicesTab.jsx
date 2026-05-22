@@ -12,6 +12,20 @@ const formatCurrency = (value) => {
 
 const formatDate = (value) => value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
 
+const normalizeStatus = (value) => String(value ?? '').toLowerCase();
+
+const resolvePaymentStatus = (invoice) => {
+  const netPayable = Number(invoice?.net_payable_amount ?? invoice?.grand_total ?? 0);
+  const paidAmount = Number(invoice?.paid_amount ?? 0);
+  const outstandingAmount = Number(invoice?.outstanding_amount ?? Math.max(0, netPayable - paidAmount));
+
+  if (netPayable <= 0) return { key: 'unpaid', label: 'Belum Bayar', className: 'border-gray-300 bg-gray-100 text-gray-700' };
+  if (outstandingAmount <= 0) return { key: 'paid', label: 'Lunas', className: 'border-emerald-300 bg-emerald-100 text-emerald-700' };
+  if (paidAmount > 0 && outstandingAmount > 0) return { key: 'partial', label: 'Partial', className: 'border-amber-300 bg-amber-100 text-amber-700' };
+
+  return { key: 'unpaid', label: 'Belum Bayar', className: 'border-rose-300 bg-rose-100 text-rose-700' };
+};
+
 export default function Tab({ data, vendor, documentTypes = [] }) {
   const invoices = data?.invoices?.data ?? [];
   const docs = vendor?.documents ?? [];
@@ -88,8 +102,8 @@ export default function Tab({ data, vendor, documentTypes = [] }) {
       </div>
       <div className='overflow-auto border rounded'>
         <table className='min-w-full text-sm'>
-          <thead className='bg-gray-50'><tr>{['Internal Invoice No','Vendor Invoice No','Invoice Date','Due Date','Subtotal','Discount','PPN','WHT','Grand Total','Net Payable','Paid','Outstanding','Status','Action'].map(h=><th key={h} className='px-3 py-2 text-left'>{h}</th>)}</tr></thead>
-          <tbody>{invoices.map((x)=><tr key={x.id} className='border-t'><td className='px-3 py-2'>{x.invoice_no_internal}</td><td className='px-3 py-2'>{x.vendor_invoice_no}</td><td className='px-3 py-2'>{x.invoice_date}</td><td className='px-3 py-2'>{x.due_date}</td><td className='px-3 py-2'>{formatCurrency(x.subtotal)}</td><td className='px-3 py-2'>{formatCurrency(x.discount_amount)}</td><td className='px-3 py-2'>{formatCurrency(x.tax_amount)}</td><td className='px-3 py-2'>{formatCurrency(x.wht_tax_amount)}</td><td className='px-3 py-2'>{formatCurrency(x.grand_total)}</td><td className='px-3 py-2'>{formatCurrency(x.net_payable_amount)}</td><td className='px-3 py-2'>{formatCurrency(x.paid_amount)}</td><td className='px-3 py-2'>{formatCurrency(x.outstanding_amount)}</td><td className='px-3 py-2'>{x.status}</td><td className='px-3 py-2 space-x-1'><Link href={`/apps/procurement/vendor-invoices/${x.id}`} className='px-2 py-1 bg-gray-100 rounded'>View</Link><Link href={`/apps/procurement/vendor-invoices/${x.id}/edit`} className={`px-2 py-1 bg-gray-100 rounded ${x.status!=='draft' ? 'pointer-events-none opacity-50' : ''}`}>Edit</Link><button type='button' onClick={()=>approveInvoice(x.id)} disabled={x.status!=='draft'} className='px-2 py-1 bg-gray-100 rounded disabled:opacity-50'>Approve</button><button type='button' onClick={()=>deleteInvoice(x.id)} disabled={x.status!=='draft'} className='px-2 py-1 bg-red-50 text-red-700 rounded disabled:opacity-50'>Delete</button></td></tr>)}</tbody>
+          <thead className='bg-gray-50'><tr>{['Internal Invoice No','Vendor Invoice No','Invoice Date','Due Date','Subtotal','Discount','PPN','WHT','Grand Total','Net Payable','Paid','Outstanding','Status Invoice','Status Dokumen','Action'].map(h=><th key={h} className='px-3 py-2 text-left'>{h}</th>)}</tr></thead>
+          <tbody>{invoices.map((x)=>{ const paymentStatus = resolvePaymentStatus(x); const documentStatus = normalizeStatus(x.status); const isDraft = documentStatus === 'draft'; return <tr key={x.id} className='border-t'><td className='px-3 py-2'>{x.invoice_no_internal}</td><td className='px-3 py-2'>{x.vendor_invoice_no}</td><td className='px-3 py-2'>{formatDate(x.invoice_date)}</td><td className='px-3 py-2'>{formatDate(x.due_date)}</td><td className='px-3 py-2'>{formatCurrency(x.subtotal)}</td><td className='px-3 py-2'>{formatCurrency(x.discount_amount)}</td><td className='px-3 py-2'>{formatCurrency(x.tax_amount)}</td><td className='px-3 py-2'>{formatCurrency(x.wht_tax_amount)}</td><td className='px-3 py-2'>{formatCurrency(x.grand_total)}</td><td className='px-3 py-2'>{formatCurrency(x.net_payable_amount)}</td><td className='px-3 py-2'>{formatCurrency(x.paid_amount)}</td><td className='px-3 py-2'>{formatCurrency(x.outstanding_amount)}</td><td className='px-3 py-2'><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${paymentStatus.className}`}>{paymentStatus.label}</span></td><td className='px-3 py-2 uppercase'>{x.status}</td><td className='px-3 py-2 space-x-1'><Link href={`/apps/procurement/vendor-invoices/${x.id}`} className='px-2 py-1 bg-gray-100 rounded'>View</Link><Link href={`/apps/procurement/vendor-invoices/${x.id}/edit`} className={`px-2 py-1 bg-gray-100 rounded ${!isDraft ? 'pointer-events-none opacity-50' : ''}`}>Edit</Link><button type='button' onClick={()=>approveInvoice(x.id)} disabled={!isDraft} className='px-2 py-1 bg-gray-100 rounded disabled:opacity-50'>Approve</button><button type='button' onClick={()=>deleteInvoice(x.id)} disabled={!isDraft} className='px-2 py-1 bg-red-50 text-red-700 rounded disabled:opacity-50'>Delete</button></td></tr>;})}</tbody>
         </table>
       </div>
 
