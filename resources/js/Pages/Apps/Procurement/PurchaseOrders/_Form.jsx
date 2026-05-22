@@ -84,9 +84,14 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
             ...data,
             documents: filteredDocuments,
         };
+        const fallbackReturnTo = isEdit && data.vendor_id ? `/apps/procurement/vendors/${data.vendor_id}?tab=purchase-orders` : route('apps.procurement.purchase-orders.index');
+        const redirectTarget = returnTo || data.return_to || fallbackReturnTo;
         const options = {
             forceFormData: true,
-            onSuccess: () => setNotice({ type: 'success', text: 'PO dan dokumen berhasil disimpan.' }),
+            onSuccess: () => {
+                setNotice({ type: 'success', text: 'PO dan dokumen berhasil disimpan.' });
+                if (isEdit) router.get(redirectTarget);
+            },
             onError: () => setNotice({ type: 'error', text: 'Gagal menyimpan PO/dokumen. Cek field yang wajib diisi.' }),
         };
         if (isEdit) {
