@@ -140,35 +140,6 @@ export default function Edit() {
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Vendor</label><input value={form.vendor_name} onChange={(e) => updateHeader('vendor_name', e.target.value)} className={inputClassName} /></div>
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Keterangan</label><input value={form.notes} onChange={(e) => updateHeader('notes', e.target.value)} className={inputClassName} /></div>
                         </div>
-                        <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
-                            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Dokumen Receiving</h3>
-                            {form.documents.map((doc, idx) => (
-                                <div key={idx} className="mt-3 grid gap-2 md:grid-cols-4">
-                                    <select value={doc.document_type_id} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_type_id: e.target.value } : d) }))} className={lineInputClassName}>
-                                        <option value="">Tipe Dokumen</option>
-                                        {documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
-                                    </select>
-                                    <input value={doc.title} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, title: e.target.value } : d) }))} placeholder="Judul dokumen" className={lineInputClassName} />
-                                    <input value={doc.document_number} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_number: e.target.value } : d) }))} placeholder="No dokumen" className={lineInputClassName} />
-                                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d) }))} className={lineInputClassName} />
-                                </div>
-                            ))}
-                            <button type="button" onClick={() => setForm((prev) => ({ ...prev, documents: [...prev.documents, { ...emptyDocument }] }))} className="mt-3 rounded border px-3 py-1 text-sm">+ Add Dokumen</button>
-                            {(documents || []).length > 0 && (
-                                <div className="mt-4">
-                                    <p className="mb-2 text-xs font-semibold text-gray-600 dark:text-gray-300">Dokumen Existing</p>
-                                    <div className="space-y-1 text-xs">
-                                        {documents.map((doc) => (
-                                            <div key={doc.id} className="flex items-center justify-between">
-                                                <span>{doc.document_type?.name || doc.title || `Dokumen #${doc.id}`}</span>
-                                                <a href={route('apps.document-center.documents.download', doc.id)} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
                         <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
                             <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
                                 <thead className="bg-gray-50 dark:bg-gray-900"><tr><th className="px-2 py-2 text-left">Item</th><th className="px-2 py-2 text-left">Qty</th><th className="px-2 py-2 text-left">UOM</th><th className="px-2 py-2 text-left">Price</th><th className="px-2 py-2 text-left">Value</th><th className="px-2 py-2 text-left">Batch Number</th><th className="px-2 py-2 text-left">Expired Date</th><th className="px-2 py-2 text-left">Keterangan</th><th className="px-2 py-2 text-left">Aksi</th></tr></thead>
@@ -196,6 +167,34 @@ export default function Edit() {
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <button type="button" onClick={addLine} className="rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-800">+ Tambah Line</button>
                             <div className="text-sm font-semibold text-gray-900">Total Value: {totalValue.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        </div>
+
+                        <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Dokumen Receiving</h3>
+                            <div className="mt-3 overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
+                                <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+                                    <thead className="bg-gray-50 dark:bg-gray-900"><tr><th className="px-2 py-2 text-left">Tipe Dokumen</th><th className="px-2 py-2 text-left">Judul Dokumen</th><th className="px-2 py-2 text-left">No Dokumen</th><th className="px-2 py-2 text-left">File</th></tr></thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                        {form.documents.map((doc, idx) => (
+                                            <tr key={idx}>
+                                                <td className="p-2"><select value={doc.document_type_id} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_type_id: e.target.value } : d) }))} className={lineInputClassName}><option value="">Tipe Dokumen</option>{documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</select></td>
+                                                <td className="p-2"><input value={doc.title} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, title: e.target.value } : d) }))} placeholder="Judul dokumen" className={lineInputClassName} /></td>
+                                                <td className="p-2"><input value={doc.document_number} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_number: e.target.value } : d) }))} placeholder="No dokumen" className={lineInputClassName} /></td>
+                                                <td className="p-2"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d) }))} className={lineInputClassName} /></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button type="button" onClick={() => setForm((prev) => ({ ...prev, documents: [...prev.documents, { ...emptyDocument }] }))} className="mt-3 rounded border px-3 py-1 text-sm">+ Add Dokumen</button>
+                            {(documents || []).length > 0 && (
+                                <div className="mt-4 overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
+                                    <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+                                        <thead className="bg-gray-50 dark:bg-gray-900"><tr><th className="px-2 py-2 text-left">Dokumen Existing</th><th className="px-2 py-2 text-left">Aksi</th></tr></thead>
+                                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">{documents.map((doc) => (<tr key={doc.id}><td className="px-2 py-2">{doc.document_type?.name || doc.title || `Dokumen #${doc.id}`}</td><td className="px-2 py-2"><a href={route('apps.document-center.documents.download', doc.id)} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a></td></tr>))}</tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
 
                         <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{loading ? 'Menyimpan...' : 'Update Receiving Entry'}</button>
