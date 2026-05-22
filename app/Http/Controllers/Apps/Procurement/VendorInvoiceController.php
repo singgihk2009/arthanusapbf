@@ -196,6 +196,7 @@ class VendorInvoiceController extends Controller
 
         return Inertia::render('Apps/Procurement/VendorInvoices/Show', [
             'invoice' => $invoice,
+            'uploadedDocuments' => Document::query()->where('owner_type', 'vendor_invoice')->where('owner_id', $invoice->id)->with('documentType:id,name,code')->latest()->get(),
         ]);
     }
 

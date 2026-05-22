@@ -22,7 +22,7 @@ const escapeHtml = (text) => String(text ?? '-')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#039;');
 
-export default function Show({ invoice }) {
+export default function Show({ invoice, uploadedDocuments = [] }) {
   const lines = invoice.lines || [];
 
   const summaryRows = [
@@ -198,6 +198,43 @@ export default function Show({ invoice }) {
 
           <div className='mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-700'>
             <span className='font-semibold'>Notes:</span> {invoice.notes || '-'}
+          </div>
+
+
+          <div className='mt-4 rounded border'>
+            <div className='border-b bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700'>
+              Daftar Supporting Dokumen Terupload ({uploadedDocuments.length})
+            </div>
+            <div className='overflow-auto'>
+              <table className='min-w-full text-sm'>
+                <thead>
+                  <tr className='bg-white'>
+                    <th className='border px-2 py-2 text-left'>Document Type</th>
+                    <th className='border px-2 py-2 text-left'>Judul</th>
+                    <th className='border px-2 py-2 text-left'>No Dokumen</th>
+                    <th className='border px-2 py-2 text-left'>Nama File</th>
+                    <th className='border px-2 py-2 text-left'>Status Upload</th>
+                    <th className='border px-2 py-2 text-left'>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {uploadedDocuments.length ? uploadedDocuments.map((doc) => <tr key={doc.id}>
+                    <td className='border px-2 py-2'>{doc.document_type?.name || '-'}</td>
+                    <td className='border px-2 py-2'>{doc.title || '-'}</td>
+                    <td className='border px-2 py-2'>{doc.document_number || '-'}</td>
+                    <td className='border px-2 py-2'>{doc.original_file_name || '-'}</td>
+                    <td className='border px-2 py-2'>
+                      <span className={`inline-flex rounded px-2 py-1 text-xs font-medium ${doc.status === 'pending_review' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                        {doc.status || 'uploaded'}
+                      </span>
+                    </td>
+                    <td className='border px-2 py-2'>
+                      <a href={route('apps.document-center.documents.download', doc.id)} target='_blank' className='text-blue-600 underline' rel='noreferrer'>View</a>
+                    </td>
+                  </tr>) : <tr><td colSpan={6} className='border px-2 py-4 text-center text-gray-500'>Belum ada dokumen yang terupload untuk invoice ini.</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
