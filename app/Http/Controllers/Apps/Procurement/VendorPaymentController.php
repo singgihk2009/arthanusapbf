@@ -20,7 +20,7 @@ class VendorPaymentController extends Controller
     public function create(Vendor $vendor){ return Inertia::render('Apps/Procurement/VendorPayments/Form',['vendor'=>$vendor,'outstandingInvoices'=>$this->outstandingInvoices($vendor),'bankAccounts'=>$this->bankAccounts($vendor)]); }
     public function show(Vendor $vendor, VendorPayment $payment){ return Inertia::render('Apps/Procurement/VendorPayments/Show',['vendor'=>$vendor,'payment'=>$payment->load('lines')]); }
     public function edit(Vendor $vendor, VendorPayment $payment){ abort_unless($payment->can_edit, 422, 'Only draft can be edited'); return Inertia::render('Apps/Procurement/VendorPayments/Form',['vendor'=>$vendor,'payment'=>$payment->load('lines'),'outstandingInvoices'=>$this->outstandingInvoices($vendor),'bankAccounts'=>$this->bankAccounts($vendor)]); }
-    public function store(StoreVendorPaymentRequest $request, Vendor $vendor){ DB::transaction(fn()=> $this->upsertPayment(new VendorPayment(),$vendor,$request->validated())); return back()->with('success','Payment draft berhasil disimpan.'); }
+    public function store(StoreVendorPaymentRequest $request, Vendor $vendor){ $this->storeWithPaymentNoRetry($vendor, $request->validated()); return back()->with('success','Payment draft berhasil disimpan.'); }
     public function update(UpdateVendorPaymentRequest $request, Vendor $vendor, VendorPayment $payment){ abort_unless($payment->can_edit, 422); DB::transaction(fn()=> $this->upsertPayment($payment,$vendor,$request->validated())); return back()->with('success','Payment draft berhasil diperbarui.'); }
     public function submit(Vendor $vendor, VendorPayment $payment){ return $this->changeStatus($payment,'DRAFT','SUBMITTED','payment_submitted'); }
     public function approve(Vendor $vendor, VendorPayment $payment){ return $this->changeStatus($payment,'SUBMITTED','APPROVED','payment_approved', ['approved_by'=>auth()->id(),'approved_at'=>now()]); }
@@ -56,31 +56,32 @@ class VendorPaymentController extends Controller
                 'bank_charge_amount' => 'Total cash out tidak boleh melebihi total tagihan invoice yang dipilih.',
             ]);
         }
-        $maxSaveAttempts = 5;
-        for ($attempt = 1; $attempt <= $maxSaveAttempts; $attempt++) {
-            $paymentNo = $payment->payment_no ?: $this->nextNo();
-            $payment->fill(['vendor_id'=>$vendor->id,'payment_no'=>$paymentNo,'payment_number'=>$payment->payment_number ?: $paymentNo,'payment_date'=>$data['payment_date'],'payment_method'=>strtoupper((string)($data['payment_method'] ?? 'BANK_TRANSFER')),'bank_account_id'=>$data['bank_account_id'] ?? null,'currency'=>'IDR','status'=>$payment->exists ? $payment->status : 'DRAFT','total_invoice_amount'=>$totalInvoice,'total_wht_amount'=>$totalWht,'stamp_duty_amount'=>$stamp,'freight_amount'=>$freight,'bank_charge_amount'=>$bank,'total_additional_cost'=>$additional,'net_vendor_payment_amount'=>$net,'total_cash_out_amount'=>$cashOut,'notes'=>$data['notes']??null,'created_by'=>$payment->created_by ?? auth()->id(),'updated_by'=>auth()->id()]);
+        $paymentNo = $payment->payment_no ?: $this->nextNo();
+        $payment->fill(['vendor_id'=>$vendor->id,'payment_no'=>$paymentNo,'payment_number'=>$payment->payment_number ?: $paymentNo,'payment_date'=>$data['payment_date'],'payment_method'=>strtoupper((string)($data['payment_method'] ?? 'BANK_TRANSFER')),'bank_account_id'=>$data['bank_account_id'] ?? null,'currency'=>'IDR','status'=>$payment->exists ? $payment->status : 'DRAFT','total_invoice_amount'=>$totalInvoice,'total_wht_amount'=>$totalWht,'stamp_duty_amount'=>$stamp,'freight_amount'=>$freight,'bank_charge_amount'=>$bank,'total_additional_cost'=>$additional,'net_vendor_payment_amount'=>$net,'total_cash_out_amount'=>$cashOut,'notes'=>$data['notes']??null,'created_by'=>$payment->created_by ?? auth()->id(),'updated_by'=>auth()->id()]);
+        $payment->save();
+        $payment->lines()->delete();
+        $payment->lines()->createMany($lines);
+        return $payment->fresh('lines');
+    }
+    private function storeWithPaymentNoRetry(Vendor $vendor, array $data): void
+    {
+        $maxAttempts = 5;
 
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             try {
-                $payment->save();
-                $payment->lines()->delete();
-                $payment->lines()->createMany($lines);
-                return $payment->fresh('lines');
+                DB::transaction(fn () => $this->upsertPayment(new VendorPayment(), $vendor, $data));
+                return;
             } catch (QueryException $e) {
                 $isDuplicatePaymentNo = (string) $e->getCode() === '23000'
                     && str_contains(strtolower((string) $e->getMessage()), 'vendor_payments_payment_no_unique');
 
-                if (! $isDuplicatePaymentNo || $payment->exists || $attempt === $maxSaveAttempts) {
+                if (! $isDuplicatePaymentNo || $attempt === $maxAttempts) {
                     throw $e;
                 }
-
-                $payment->payment_no = null;
-                $payment->payment_number = null;
             }
         }
-
-        throw ValidationException::withMessages(['payment_no' => 'Gagal membuat nomor payment unik. Silakan coba lagi.']);
     }
+
     private function nextNo(): string { $prefix='VPY-'.now()->format('Ym').'-'; $last=VendorPayment::where('payment_no','like',$prefix.'%')->lockForUpdate()->orderByDesc('payment_no')->value('payment_no'); $seq=$last?((int)substr($last,-5)+1):1; $candidate=$prefix.str_pad((string)$seq,5,'0',STR_PAD_LEFT); while (VendorPayment::where('payment_no', $candidate)->exists()) { $seq++; $candidate = $prefix.str_pad((string)$seq,5,'0',STR_PAD_LEFT); } return $candidate; }
     private function outstandingInvoices(Vendor $vendor){ return VendorInvoice::where('vendor_id',$vendor->id)->where('outstanding_amount','>',0)->whereIn('status',['POSTED','PARTIAL_PAID'])->orderBy('invoice_date')->get(); }
     private function bankAccounts(Vendor $vendor)
