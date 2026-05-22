@@ -347,10 +347,12 @@ class VendorInvoiceController extends Controller
             return back()->with('error', 'Hanya invoice draft yang bisa di-approve.');
         }
 
-        $invoice->status = 'APPROVED';
+        $invoice->status = 'POSTED';
+        $invoice->posted_at = now();
+        $invoice->posted_by = auth()->id();
         $invoice->save();
 
-        return back()->with('success', 'Vendor invoice berhasil di-approve.');
+        return back()->with('success', 'Vendor invoice berhasil di-posting.');
     }
 
     public function destroy(VendorInvoice $vendorInvoice): RedirectResponse
