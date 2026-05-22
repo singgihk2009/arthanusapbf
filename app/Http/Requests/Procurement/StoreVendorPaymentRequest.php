@@ -22,6 +22,14 @@ class StoreVendorPaymentRequest extends FormRequest
             'lines.*.payment_amount' => ['required','numeric','min:0.01'],
             'lines.*.wht_amount' => ['nullable','numeric','min:0'],
             'lines.*.notes' => ['nullable','string'],
+            'documents' => ['nullable', 'array'],
+            'documents.*.document_type_id' => ['required_with:documents', 'integer', 'exists:document_types,id'],
+            'documents.*.title' => ['nullable', 'string', 'max:255'],
+            'documents.*.document_number' => ['nullable', 'string', 'max:120'],
+            'documents.*.issue_date' => ['nullable', 'date'],
+            'documents.*.expiry_date' => ['nullable', 'date'],
+            'documents.*.notes' => ['nullable', 'string'],
+            'documents.*.file' => ['required_with:documents', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
         ];
     }
 
@@ -47,4 +55,3 @@ class StoreVendorPaymentRequest extends FormRequest
         ];
     }
 }
-
