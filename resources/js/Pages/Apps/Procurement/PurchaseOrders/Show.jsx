@@ -60,6 +60,61 @@ export default function Show({ purchaseOrder }) {
         .filter(Boolean)
         .filter((value, index, arr) => arr.indexOf(value) === index)
         .join(', ') || '-';
+    const poDocuments = purchaseOrder.documents || [];
+    const receivingDocuments = (purchaseOrder.goods_receipts || [])
+        .flatMap((gr) => (gr.documents || []).map((doc) => ({
+            ...doc,
+            receiving_number: gr.gr_number || gr.number || '-',
+            receiving_date: gr.received_date || gr.document_date || null,
+        })));
+
+    const renderUploadedDocumentsTable = (documents, emptyMessage, showReceivingInfo = false) => (
+        <div className='rounded-lg border border-gray-200'>
+            <div className='border-b border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700'>
+                Daftar Dokumen Terupload ({documents.length})
+            </div>
+            <Table>
+                <Table.Thead>
+                    <tr>
+                        {showReceivingInfo && <Table.Th>No Receiving</Table.Th>}
+                        {showReceivingInfo && <Table.Th>Tanggal Receiving</Table.Th>}
+                        <Table.Th>Document Type</Table.Th>
+                        <Table.Th>Judul</Table.Th>
+                        <Table.Th>No Dokumen</Table.Th>
+                        <Table.Th>Nama File</Table.Th>
+                        <Table.Th>Status Upload</Table.Th>
+                        <Table.Th>Aksi</Table.Th>
+                    </tr>
+                </Table.Thead>
+                <Table.Tbody>
+                    {documents.length ? documents.map((doc) => (
+                        <tr key={`${showReceivingInfo ? `gr-${doc.receiving_number}-` : 'po-'}${doc.id}`}>
+                            {showReceivingInfo && <Table.Td>{doc.receiving_number || '-'}</Table.Td>}
+                            {showReceivingInfo && <Table.Td>{formatDisplayDate(doc.receiving_date)}</Table.Td>}
+                            <Table.Td>{doc.document_type?.name || doc.document_type?.code || doc.type || '-'}</Table.Td>
+                            <Table.Td>{doc.title || '-'}</Table.Td>
+                            <Table.Td>{doc.document_number || doc.number || '-'}</Table.Td>
+                            <Table.Td>{doc.original_file_name || doc.file_name || '-'}</Table.Td>
+                            <Table.Td>{doc.status || doc.upload_status || '-'}</Table.Td>
+                            <Table.Td>
+                                {doc.id ? (
+                                    <a href={route('apps.document-center.documents.download', doc.id)} target='_blank' rel='noopener noreferrer' className='inline-flex rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50'>
+                                        Download
+                                    </a>
+                                ) : '-'}
+                            </Table.Td>
+                        </tr>
+                    )) : (
+                        <tr>
+                            <Table.Td colSpan={showReceivingInfo ? 8 : 6} className='text-center text-gray-500'>
+                                {emptyMessage}
+                            </Table.Td>
+                        </tr>
+                    )}
+                </Table.Tbody>
+            </Table>
+        </div>
+    );
 
     const handlePrintPo = () => {
         const linesHtml = (purchaseOrder.items || []).map((item, index) => {
@@ -226,38 +281,7 @@ export default function Show({ purchaseOrder }) {
                     <div><span className='font-semibold'>Warehouse:</span> {warehouseInfo}</div>
                 </div>
 
-
-                <h3 className='mt-6 mb-2 text-sm font-semibold'>Receiving History</h3>
-                <Table>
-                    <Table.Thead><tr><Table.Th>Reference No</Table.Th><Table.Th>Tanggal Penerimaan</Table.Th><Table.Th>Warehouse</Table.Th><Table.Th>Status</Table.Th><Table.Th>Received Qty</Table.Th><Table.Th>Total Value</Table.Th></tr></Table.Thead>
-                    <Table.Tbody>{(purchaseOrder.goods_receipts || []).length ? (purchaseOrder.goods_receipts || []).map((gr) => <tr key={gr.id}><Table.Td>{gr.gr_number || gr.number || '-'}</Table.Td><Table.Td>{formatDisplayDate(gr.received_date || gr.document_date)}</Table.Td><Table.Td>{gr.warehouse_name || gr.warehouse?.name || gr.warehouse_code || gr.warehouse_id || '-'}</Table.Td><Table.Td>{gr.status}</Table.Td><Table.Td>{formatNumber(gr.total_qty ?? 0, 2)}</Table.Td><Table.Td>{Number(gr.total_value ?? 0).toLocaleString('id-ID')}</Table.Td></tr>) : <tr><Table.Td colSpan={6} className='text-center text-gray-500'>Belum ada receiving history.</Table.Td></tr>}</Table.Tbody>
-                </Table>
-
-                <h3 className='mt-6 mb-2 text-sm font-semibold'>Dokumen PO</h3>
-                <Table>
-                    <Table.Thead><tr><Table.Th></Table.Th><Table.Th>Tipe Dokumen</Table.Th><Table.Th>Nama File</Table.Th><Table.Th>Status</Table.Th></tr></Table.Thead>
-                    <Table.Tbody>
-                        {(purchaseOrder.documents || []).length ? (purchaseOrder.documents || []).map((doc) => (
-                            <tr key={doc.id}>
-                                <Table.Td>
-                                    <a
-                                        href={route('apps.document-center.documents.download', doc.id)}
-                                        target='_blank'
-                                        rel='noopener noreferrer'
-                                        className='inline-flex rounded border border-gray-300 px-2 py-1 text-sm'
-                                        title='Download dokumen'
-                                    >
-                                        📄
-                                    </a>
-                                </Table.Td>
-                                <Table.Td>{doc.document_type?.name || doc.document_type?.code || '-'}</Table.Td>
-                                <Table.Td>{doc.original_file_name || doc.title || '-'}</Table.Td>
-                                <Table.Td>{doc.status || '-'}</Table.Td>
-                            </tr>
-                        )) : <tr><Table.Td colSpan={4} className='text-center text-gray-500'>Belum ada dokumen PO.</Table.Td></tr>}
-                    </Table.Tbody>
-                </Table>
-
+                <h3 className='mt-6 mb-2 text-sm font-semibold'>Detail PO</h3>
                 <Table>
                     <Table.Thead>
                         <tr>
@@ -288,6 +312,18 @@ export default function Show({ purchaseOrder }) {
                         ))}
                     </Table.Tbody>
                 </Table>
+
+                <h3 className='mt-6 mb-2 text-sm font-semibold'>Dokumen PO</h3>
+                {renderUploadedDocumentsTable(poDocuments, 'Belum ada dokumen PO.')}
+
+                <h3 className='mt-6 mb-2 text-sm font-semibold'>Receiving</h3>
+                <Table>
+                    <Table.Thead><tr><Table.Th>Reference No</Table.Th><Table.Th>Tanggal Penerimaan</Table.Th><Table.Th>Warehouse</Table.Th><Table.Th>Status</Table.Th><Table.Th>Received Qty</Table.Th><Table.Th>Total Value</Table.Th></tr></Table.Thead>
+                    <Table.Tbody>{(purchaseOrder.goods_receipts || []).length ? (purchaseOrder.goods_receipts || []).map((gr) => <tr key={gr.id}><Table.Td>{gr.gr_number || gr.number || '-'}</Table.Td><Table.Td>{formatDisplayDate(gr.received_date || gr.document_date)}</Table.Td><Table.Td>{gr.warehouse_name || gr.warehouse?.name || gr.warehouse_code || gr.warehouse_id || '-'}</Table.Td><Table.Td>{gr.status}</Table.Td><Table.Td>{formatNumber(gr.total_qty ?? 0, 2)}</Table.Td><Table.Td>{Number(gr.total_value ?? 0).toLocaleString('id-ID')}</Table.Td></tr>) : <tr><Table.Td colSpan={6} className='text-center text-gray-500'>Belum ada receiving history.</Table.Td></tr>}</Table.Tbody>
+                </Table>
+
+                <h3 className='mt-6 mb-2 text-sm font-semibold'>Dokumen Receiving</h3>
+                {renderUploadedDocumentsTable(receivingDocuments, 'Belum ada dokumen receiving.', true)}
             </Card>
         </>
     );
