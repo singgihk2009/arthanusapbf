@@ -34,7 +34,7 @@ const toDateInputValue = (value) => {
     return str.length >= 10 ? str.slice(0, 10) : str;
 };
 
-const emptyDocument = () => ({ document_type_id: '', title: '', file: null });
+const emptyDocument = () => ({ document_type_id: '', title: '', document_number: '', file: null });
 
 export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], facilitySchemes = [], documentTypes = [], uploadedDocuments = [], defaultFacilitySchemeId = '', defaultVendorId = null, returnTo = '' }) {
     const [notice, setNotice] = useState(null);
@@ -154,10 +154,10 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
             <div className='mt-3 text-right text-sm font-medium'>Subtotal: {totals.subtotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Tax: {totals.tax.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Grand Total: {totals.grand.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <div className='mt-6 rounded border border-gray-200 p-3 dark:border-gray-800'>
                 <h3 className='text-sm font-semibold text-gray-700 dark:text-gray-200'>Upload Dokumen (Document Center)</h3>
-                <p className='mb-3 mt-1 text-xs text-gray-500'>Bisa upload multi dokumen: pilih tipe dokumen, isi judul, lalu upload file (PDF/JPG/PNG).</p>
+                <p className='mb-3 mt-1 text-xs text-gray-500'>Bisa upload multi dokumen: pilih tipe dokumen, isi judul, isi no dokumen, lalu upload file (PDF/JPG/PNG).</p>
                 <div className='space-y-3'>
                     {data.documents.map((doc, idx) => (
-                        <div key={idx} className='grid grid-cols-1 gap-2 rounded border border-gray-200 p-2 md:grid-cols-4 dark:border-gray-800'>
+                        <div key={idx} className='grid grid-cols-1 gap-2 rounded border border-gray-200 p-2 md:grid-cols-5 dark:border-gray-800'>
                             <select value={doc.document_type_id} onChange={(e) => {
                                 const docs = [...data.documents];
                                 docs[idx] = { ...docs[idx], document_type_id: e.target.value };
@@ -171,6 +171,11 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
                                 docs[idx] = { ...docs[idx], title: e.target.value };
                                 setData('documents', docs);
                             }} placeholder='Judul dokumen' className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
+                            <input value={doc.document_number || ''} onChange={(e) => {
+                                const docs = [...data.documents];
+                                docs[idx] = { ...docs[idx], document_number: e.target.value };
+                                setData('documents', docs);
+                            }} placeholder='No dokumen' className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                             <input type='file' accept='.pdf,.jpg,.jpeg,.png' onChange={(e) => {
                                 const docs = [...data.documents];
                                 docs[idx] = { ...docs[idx], file: e.target.files?.[0] || null };
@@ -186,27 +191,33 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
                 <button type='button' onClick={() => setData('documents', [...data.documents, emptyDocument()])} className='mt-3 rounded border border-gray-300 px-3 py-1 text-sm'>+ Add Dokumen</button>
                 <div className='mt-2 text-xs text-gray-500'>Dokumen akan di-upload saat klik tombol <span className='font-semibold'>Save Draft</span>.</div>
                 {errors.documents && <small className='mt-2 block text-xs text-red-500'>{errors.documents}</small>}
-                {!!uploadedDocuments.length && <div className='mt-5 rounded border border-gray-200 p-3 dark:border-gray-800'>
-                    <h4 className='mb-3 text-sm font-semibold text-gray-700 dark:text-gray-200'>Dokumen tersimpan di server</h4>
+                <div className='mt-5 rounded border border-gray-200 p-3 dark:border-gray-800'>
+                    <h4 className='mb-3 text-sm font-semibold text-gray-700 dark:text-gray-200'>Daftar Dokumen Terupload ({uploadedDocuments.length})</h4>
                     <div className='overflow-x-auto'>
                         <table className='min-w-full border border-gray-200 text-sm dark:border-gray-800'>
-                            <thead><tr className='bg-gray-50 dark:bg-gray-900'><th className='border px-3 py-2 text-left font-semibold'>Tipe</th><th className='border px-3 py-2 text-left font-semibold'>Judul</th><th className='border px-3 py-2 text-left font-semibold'>Status</th><th className='border px-3 py-2 text-left font-semibold'>Aksi</th></tr></thead>
+                            <thead><tr className='bg-gray-50 dark:bg-gray-900'><th className='border px-3 py-2 text-left font-semibold'>Document Type</th><th className='border px-3 py-2 text-left font-semibold'>Judul</th><th className='border px-3 py-2 text-left font-semibold'>No Dokumen</th><th className='border px-3 py-2 text-left font-semibold'>Nama File</th><th className='border px-3 py-2 text-left font-semibold'>Status Upload</th><th className='border px-3 py-2 text-left font-semibold'>Aksi</th></tr></thead>
                             <tbody>
-                                {uploadedDocuments.map((doc) => <tr key={doc.id}>
+                                {uploadedDocuments.length > 0 ? uploadedDocuments.map((doc) => <tr key={doc.id}>
                                     <td className='border px-3 py-2'>{doc.document_type?.name || doc.document_type?.code || '-'}</td>
                                     <td className='border px-3 py-2'>{doc.title || '-'}</td>
-                                    <td className='border px-3 py-2'>{doc.status || '-'}</td>
+                                    <td className='border px-3 py-2'>{doc.document_number || '-'}</td>
+                                    <td className='border px-3 py-2'>{doc.original_file_name || '-'}</td>
+                                    <td className='border px-3 py-2'>
+                                        <span className={`inline-flex rounded px-2 py-1 text-xs font-medium ${doc.status === 'pending_review' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                                            {doc.status || 'uploaded'}
+                                        </span>
+                                    </td>
                                     <td className='border px-3 py-2'>
                                         <div className='flex items-center gap-2'>
                                             <button type='button' onClick={() => router.delete(route('apps.procurement.purchase-orders.documents.delete', [purchaseOrder.id, doc.id]))} className='rounded border border-rose-400 px-2 py-1 text-xs text-rose-600'>Remove</button>
                                             <button type='button' onClick={() => window.open(route('apps.document-center.documents.download', doc.id), '_blank', 'noopener,noreferrer')} className='rounded border border-blue-300 px-2 py-1 text-xs text-blue-600'>View</button>
                                         </div>
                                     </td>
-                                </tr>)}
+                                </tr>) : <tr><td colSpan={6} className='border px-3 py-4 text-center text-gray-500'>Belum ada dokumen yang terupload untuk PO ini.</td></tr>}
                             </tbody>
                         </table>
                     </div>
-                </div>}
+                </div>
             </div>
         </Card>
     </>;
