@@ -14,6 +14,7 @@ use App\Services\VendorComplianceService;
 use App\Models\Procurement\VendorInvoice;
 use App\Models\Procurement\VendorLedger;
 use App\Models\Procurement\VendorPayment;
+use App\Models\Procurement\VendorPaymentLine;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
@@ -285,7 +286,40 @@ class VendorController extends Controller
 
         return $legacyWarehouseCode !== '' ? $legacyWarehouseCode : '-';
     }
-    public function invoices(Vendor $vendor) { return response()->json(['invoices' => VendorInvoice::where('vendor_id', $vendor->id)->latest('invoice_date')->paginate(10)]); }
+    public function invoices(Vendor $vendor)
+    {
+        $invoices = VendorInvoice::where('vendor_id', $vendor->id)
+            ->latest('invoice_date')
+            ->paginate(10);
+
+        $invoiceIds = collect($invoices->items())
+            ->pluck('id')
+            ->filter()
+            ->values();
+
+        if ($invoiceIds->isNotEmpty()) {
+            $paidByInvoice = VendorPaymentLine::query()
+                ->select('vendor_invoice_id', DB::raw('SUM(payment_amount + COALESCE(wht_amount, 0)) as paid_total'))
+                ->whereIn('vendor_invoice_id', $invoiceIds)
+                ->whereHas('payment', function ($query) {
+                    $query->whereIn('status', ['APPROVED', 'PAID', 'POSTED']);
+                })
+                ->groupBy('vendor_invoice_id')
+                ->pluck('paid_total', 'vendor_invoice_id');
+
+            $invoices->getCollection()->transform(function (VendorInvoice $invoice) use ($paidByInvoice) {
+                $calculatedPaid = (float) ($paidByInvoice[$invoice->id] ?? 0);
+                $netPayable = (float) ($invoice->net_payable_amount ?? $invoice->grand_total ?? 0);
+
+                $invoice->paid_amount = $calculatedPaid;
+                $invoice->outstanding_amount = max(0, $netPayable - $calculatedPaid);
+
+                return $invoice;
+            });
+        }
+
+        return response()->json(['invoices' => $invoices]);
+    }
     public function payments(Vendor $vendor) {
         $payments = VendorPayment::where('vendor_id', $vendor->id)
             ->latest('payment_date')
