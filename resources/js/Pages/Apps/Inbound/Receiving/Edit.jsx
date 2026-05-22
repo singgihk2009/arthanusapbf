@@ -170,31 +170,57 @@ export default function Edit() {
                         </div>
 
                         <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
-                            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Dokumen Receiving</h3>
-                            <div className="mt-3 overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
-                                <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-                                    <thead className="bg-gray-50 dark:bg-gray-900"><tr><th className="px-2 py-2 text-left">Tipe Dokumen</th><th className="px-2 py-2 text-left">Judul Dokumen</th><th className="px-2 py-2 text-left">No Dokumen</th><th className="px-2 py-2 text-left">File</th></tr></thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                        {form.documents.map((doc, idx) => (
-                                            <tr key={idx}>
-                                                <td className="p-2"><select value={doc.document_type_id} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_type_id: e.target.value } : d) }))} className={lineInputClassName}><option value="">Tipe Dokumen</option>{documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</select></td>
-                                                <td className="p-2"><input value={doc.title} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, title: e.target.value } : d) }))} placeholder="Judul dokumen" className={lineInputClassName} /></td>
-                                                <td className="p-2"><input value={doc.document_number} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_number: e.target.value } : d) }))} placeholder="No dokumen" className={lineInputClassName} /></td>
-                                                <td className="p-2"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d) }))} className={lineInputClassName} /></td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Upload Dokumen Receiving (Document Center)</h3>
+                            {form.documents.map((doc, idx) => (
+                                <div key={idx} className="mt-3 grid gap-2 md:grid-cols-4">
+                                    <select value={doc.document_type_id} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_type_id: e.target.value } : d) }))} className={inputClassName}>
+                                        <option value="">Pilih tipe dokumen</option>
+                                        {documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+                                    </select>
+                                    <input value={doc.title} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, title: e.target.value } : d) }))} placeholder="Judul dokumen" className={inputClassName} />
+                                    <input value={doc.document_number} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_number: e.target.value } : d) }))} placeholder="No dokumen" className={inputClassName} />
+                                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d) }))} className={inputClassName} />
+                                </div>
+                            ))}
                             <button type="button" onClick={() => setForm((prev) => ({ ...prev, documents: [...prev.documents, { ...emptyDocument }] }))} className="mt-3 rounded border px-3 py-1 text-sm">+ Add Dokumen</button>
-                            {(documents || []).length > 0 && (
-                                <div className="mt-4 overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
-                                    <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-                                        <thead className="bg-gray-50 dark:bg-gray-900"><tr><th className="px-2 py-2 text-left">Dokumen Existing</th><th className="px-2 py-2 text-left">Aksi</th></tr></thead>
-                                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">{documents.map((doc) => (<tr key={doc.id}><td className="px-2 py-2">{doc.document_type?.name || doc.title || `Dokumen #${doc.id}`}</td><td className="px-2 py-2"><a href={route('apps.document-center.documents.download', doc.id)} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a></td></tr>))}</tbody>
+
+                            <div className="mt-4 rounded border border-gray-200 dark:border-gray-800">
+                                <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
+                                    Daftar Dokumen Terupload ({(documents || []).length})
+                                </div>
+                                <div className="overflow-auto">
+                                    <table className="min-w-full text-sm">
+                                        <thead>
+                                            <tr className="bg-white dark:bg-gray-950">
+                                                <th className="border px-2 py-2 text-left">Document Type</th>
+                                                <th className="border px-2 py-2 text-left">Judul</th>
+                                                <th className="border px-2 py-2 text-left">No Dokumen</th>
+                                                <th className="border px-2 py-2 text-left">Nama File</th>
+                                                <th className="border px-2 py-2 text-left">Status Upload</th>
+                                                <th className="border px-2 py-2 text-left">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(documents || []).length > 0 ? (documents || []).map((doc) => (
+                                                <tr key={doc.id}>
+                                                    <td className="border px-2 py-2">{doc.document_type?.name || '-'}</td>
+                                                    <td className="border px-2 py-2">{doc.title || '-'}</td>
+                                                    <td className="border px-2 py-2">{doc.document_number || '-'}</td>
+                                                    <td className="border px-2 py-2">{doc.original_file_name || '-'}</td>
+                                                    <td className="border px-2 py-2">
+                                                        <span className={`inline-flex rounded px-2 py-1 text-xs font-medium ${doc.status === 'pending_review' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                                                            {doc.status || 'uploaded'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="border px-2 py-2"><a href={route('apps.document-center.documents.download', doc.id)} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a></td>
+                                                </tr>
+                                            )) : (
+                                                <tr><td colSpan={6} className="border px-2 py-4 text-center text-gray-500">Belum ada dokumen yang terupload untuk receiving ini.</td></tr>
+                                            )}
+                                        </tbody>
                                     </table>
                                 </div>
-                            )}
+                            </div>
                         </div>
 
                         <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{loading ? 'Menyimpan...' : 'Update Receiving Entry'}</button>
