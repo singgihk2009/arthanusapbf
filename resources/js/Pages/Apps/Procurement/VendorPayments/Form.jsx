@@ -4,14 +4,14 @@ import { useEffect, useMemo, useState } from 'react';
 
 const n = (v) => Number(v || 0);
 
-export default function Form({ vendor, outstandingInvoices = [], payment = null, bankAccounts = [] }) {
+export default function Form({ vendor, outstandingInvoices = [], payment = null, bankAccounts = [], documentTypes = [], uploadedDocuments = [] }) {
   const editing = !!payment;
   const existingLines = payment?.lines || [];
 
   const { flash } = usePage().props;
   const [notice, setNotice] = useState(null);
 
-  const { data, setData, post, put, processing, errors } = useForm({
+  const { data, setData, post, put, transform, processing, errors } = useForm({
     payment_date: payment?.payment_date || '',
     payment_method: payment?.payment_method || 'BANK_TRANSFER',
     bank_account_id: payment?.bank_account_id || '',
@@ -19,6 +19,7 @@ export default function Form({ vendor, outstandingInvoices = [], payment = null,
     stamp_duty_amount: payment?.stamp_duty_amount || 0,
     freight_amount: payment?.freight_amount || 0,
     bank_charge_amount: payment?.bank_charge_amount || 0,
+    documents: [{ document_type_id: '', title: '', document_number: '', issue_date: '', expiry_date: '', notes: '', file: null }],
     lines: existingLines.length > 0
       ? existingLines.map((l) => ({ vendor_invoice_id: l.vendor_invoice_id, payment_amount: n(l.payment_amount), wht_amount: n(l.wht_amount), notes: l.notes || '' }))
       : [],
@@ -52,8 +53,11 @@ export default function Form({ vendor, outstandingInvoices = [], payment = null,
 
   const submit = () => {
     setNotice({ type: 'info', text: 'Menyimpan draft payment...' });
+    const normalizedDocuments = (data.documents || []).filter((doc) => doc?.file && doc?.document_type_id);
+    transform(() => ({ ...data, documents: normalizedDocuments }));
     if (editing) {
       put(`/apps/procurement/vendors/${vendor.id}/payments/${payment.id}`, {
+        forceFormData: true,
         preserveScroll: true,
         onSuccess: () => setNotice({ type: 'success', text: 'Payment draft berhasil diperbarui.' }),
         onError: () => setNotice({ type: 'error', text: 'Gagal menyimpan payment. Silakan cek field yang masih invalid.' }),
@@ -61,6 +65,7 @@ export default function Form({ vendor, outstandingInvoices = [], payment = null,
       return;
     }
     post(`/apps/procurement/vendors/${vendor.id}/payments`, {
+      forceFormData: true,
       preserveScroll: true,
       onSuccess: () => setNotice({ type: 'success', text: 'Payment draft berhasil disimpan.' }),
       onError: () => setNotice({ type: 'error', text: 'Gagal menyimpan payment. Silakan cek field yang masih invalid.' }),
@@ -125,6 +130,25 @@ export default function Form({ vendor, outstandingInvoices = [], payment = null,
       <input type='number' min='0' step='0.01' value={data.stamp_duty_amount} onChange={(e) => setData('stamp_duty_amount', e.target.value)} placeholder='Stamp Duty' className='rounded border p-2' />
       <input type='number' min='0' step='0.01' value={data.freight_amount} onChange={(e) => setData('freight_amount', e.target.value)} placeholder='Freight' className='rounded border p-2' />
       <input type='number' min='0' step='0.01' value={data.bank_charge_amount} onChange={(e) => setData('bank_charge_amount', e.target.value)} placeholder='Bank Charge' className='rounded border p-2' />
+    </div>
+    <div className='border rounded bg-white p-4'>
+      <h3 className='text-sm font-semibold text-gray-700'>Upload Dokumen Payment (Document Center)</h3>
+      {data.documents.map((doc, idx) => <div key={idx} className='mt-3 grid gap-2 md:grid-cols-4'>
+        <select value={doc.document_type_id} onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, document_type_id: e.target.value } : d))} className='rounded border p-2'>
+          <option value=''>Pilih tipe dokumen</option>
+          {documentTypes.map((t) => <option key={t.id} value={t.id}>{t.name || t.code}</option>)}
+        </select>
+        <input value={doc.title} onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, title: e.target.value } : d))} placeholder='Judul dokumen' className='rounded border p-2' />
+        <input value={doc.document_number} onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, document_number: e.target.value } : d))} placeholder='No dokumen' className='rounded border p-2' />
+        <input type='file' accept='.pdf,.jpg,.jpeg,.png' onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d))} className='rounded border p-2' />
+      </div>)}
+      <button type='button' onClick={() => setData('documents', [...data.documents, { document_type_id: '', title: '', document_number: '', issue_date: '', expiry_date: '', notes: '', file: null }])} className='mt-3 rounded border px-3 py-1 text-sm'>+ Add Dokumen</button>
+      {!!uploadedDocuments.length && <div className='mt-4'>
+        <h4 className='text-sm font-semibold text-gray-700'>Dokumen Terupload ({uploadedDocuments.length})</h4>
+        <ul className='mt-2 list-disc pl-5 text-sm text-gray-700'>
+          {uploadedDocuments.map((doc) => <li key={doc.id}>{doc.document_type?.name || doc.title || doc.original_file_name} - {doc.status || 'uploaded'}</li>)}
+        </ul>
+      </div>}
     </div>
 
     <div className='border rounded bg-white p-4 text-sm'>

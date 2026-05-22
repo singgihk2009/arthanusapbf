@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Apps\Procurement;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Procurement\StoreVendorPaymentRequest;
 use App\Http\Requests\Procurement\UpdateVendorPaymentRequest;
+use App\Models\Document;
+use App\Models\DocumentType;
 use App\Models\Procurement\Vendor;
 use App\Models\Procurement\VendorInvoice;
 use App\Models\Procurement\VendorPayment;
@@ -16,11 +18,11 @@ use Inertia\Inertia;
 class VendorPaymentController extends Controller
 {
     public function index(Vendor $vendor){ return Inertia::render('Apps/Procurement/VendorPayments/Index',['vendor'=>$vendor]); }
-    public function create(Vendor $vendor){ return Inertia::render('Apps/Procurement/VendorPayments/Form',['vendor'=>$vendor,'outstandingInvoices'=>$this->outstandingInvoices($vendor),'bankAccounts'=>$this->bankAccounts($vendor)]); }
+    public function create(Vendor $vendor){ return Inertia::render('Apps/Procurement/VendorPayments/Form',['vendor'=>$vendor,'outstandingInvoices'=>$this->outstandingInvoices($vendor),'bankAccounts'=>$this->bankAccounts($vendor), 'documentTypes' => $this->documentTypes(), 'uploadedDocuments' => collect()]); }
     public function show(Vendor $vendor, VendorPayment $payment){ return Inertia::render('Apps/Procurement/VendorPayments/Show',['vendor'=>$vendor,'payment'=>$payment->load('lines')]); }
-    public function edit(Vendor $vendor, VendorPayment $payment){ abort_unless($payment->can_edit, 422, 'Only draft can be edited'); return Inertia::render('Apps/Procurement/VendorPayments/Form',['vendor'=>$vendor,'payment'=>$payment->load('lines'),'outstandingInvoices'=>$this->outstandingInvoices($vendor),'bankAccounts'=>$this->bankAccounts($vendor)]); }
-    public function store(StoreVendorPaymentRequest $request, Vendor $vendor){ DB::transaction(fn()=> $this->upsertPayment(new VendorPayment(),$vendor,$request->validated())); return back()->with('success','Payment draft berhasil disimpan.'); }
-    public function update(UpdateVendorPaymentRequest $request, Vendor $vendor, VendorPayment $payment){ abort_unless($payment->can_edit, 422); DB::transaction(fn()=> $this->upsertPayment($payment,$vendor,$request->validated())); return back()->with('success','Payment draft berhasil diperbarui.'); }
+    public function edit(Vendor $vendor, VendorPayment $payment){ abort_unless($payment->can_edit, 422, 'Only draft can be edited'); return Inertia::render('Apps/Procurement/VendorPayments/Form',['vendor'=>$vendor,'payment'=>$payment->load('lines'),'outstandingInvoices'=>$this->outstandingInvoices($vendor),'bankAccounts'=>$this->bankAccounts($vendor), 'documentTypes' => $this->documentTypes(), 'uploadedDocuments' => $this->uploadedDocuments($payment)]); }
+    public function store(StoreVendorPaymentRequest $request, Vendor $vendor){ $data = $request->validated(); $uploadedDocumentCount = 0; DB::transaction(function() use($data, $vendor, $request, &$uploadedDocumentCount){ $payment = $this->upsertPayment(new VendorPayment(),$vendor,$data); $uploadedDocumentCount = $this->attachDocumentsToPayment($payment, (array) ($data['documents'] ?? []), $request); }); $message = 'Payment draft berhasil disimpan.'; if ($uploadedDocumentCount > 0) { $message .= " {$uploadedDocumentCount} dokumen berhasil diupload."; } return back()->with('success',$message); }
+    public function update(UpdateVendorPaymentRequest $request, Vendor $vendor, VendorPayment $payment){ abort_unless($payment->can_edit, 422); $data = $request->validated(); $uploadedDocumentCount = 0; DB::transaction(function() use($data, $vendor, $payment, $request, &$uploadedDocumentCount){ $savedPayment = $this->upsertPayment($payment,$vendor,$data); $uploadedDocumentCount = $this->attachDocumentsToPayment($savedPayment, (array) ($data['documents'] ?? []), $request); }); $message = 'Payment draft berhasil diperbarui.'; if ($uploadedDocumentCount > 0) { $message .= " {$uploadedDocumentCount} dokumen berhasil diupload."; } return back()->with('success',$message); }
     public function submit(Vendor $vendor, VendorPayment $payment){ return $this->changeStatus($payment,'DRAFT','SUBMITTED','payment_submitted'); }
     public function approve(Vendor $vendor, VendorPayment $payment){ return $this->changeStatus($payment,'SUBMITTED','APPROVED','payment_approved', ['approved_by'=>auth()->id(),'approved_at'=>now()]); }
     public function markAsPaid(Vendor $vendor, VendorPayment $payment){
@@ -143,4 +145,42 @@ class VendorPaymentController extends Controller
 
     private function changeStatus(VendorPayment $payment,string $from,string $to,string $event,array $extra=[]){ if(strtoupper((string)$payment->status)!==$from) throw ValidationException::withMessages(['status'=>'Invalid status transition']); $payment->update(array_merge(['status'=>$to],$extra)); return back()->with('success',str_replace('_',' ',$event)); }
     private function postToGeneralLedger(VendorPayment $vendorPayment): array { return ['document_type'=>'vendor_payment','document_id'=>$vendorPayment->id,'status'=>'prepared']; }
+    private function documentTypes()
+    {
+        return DocumentType::query()->select(['id', 'name', 'code'])->orderBy('name')->get();
+    }
+    private function uploadedDocuments(VendorPayment $payment)
+    {
+        return Document::query()->where('owner_type', 'vendor_payment')->where('owner_id', $payment->id)->with('documentType:id,name,code')->latest()->get();
+    }
+    private function attachDocumentsToPayment(VendorPayment $payment, array $documents, StoreVendorPaymentRequest $request): int
+    {
+        $uploadedCount = 0;
+        foreach ($documents as $index => $document) {
+            $file = $request->file("documents.$index.file");
+            $documentTypeId = $document['document_type_id'] ?? null;
+            if (! $file || ! $documentTypeId) continue;
+            $path = $file->store('documents/vendor-payments', 'public');
+            Document::create([
+                'business_id' => auth()->user()?->company_id ?? 1,
+                'owner_type' => 'vendor_payment',
+                'owner_id' => $payment->id,
+                'document_type_id' => $documentTypeId,
+                'title' => $document['title'] ?: ('Payment Document #'.$payment->payment_no),
+                'document_number' => $document['document_number'] ?? null,
+                'issue_date' => $document['issue_date'] ?? null,
+                'expiry_date' => $document['expiry_date'] ?? null,
+                'notes' => $document['notes'] ?? null,
+                'file_path' => $path,
+                'storage_disk' => 'public',
+                'original_file_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getClientMimeType(),
+                'file_size' => $file->getSize(),
+                'uploaded_by' => auth()->id(),
+                'status' => 'pending_review',
+            ]);
+            $uploadedCount++;
+        }
+        return $uploadedCount;
+    }
 }
