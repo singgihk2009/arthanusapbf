@@ -286,7 +286,7 @@ class VendorController extends Controller
         return $legacyWarehouseCode !== '' ? $legacyWarehouseCode : '-';
     }
     public function invoices(Vendor $vendor) { return response()->json(['invoices' => VendorInvoice::where('vendor_id', $vendor->id)->latest('invoice_date')->paginate(10)]); }
-    public function payments(Vendor $vendor) { return response()->json(['payments' => VendorPayment::where('vendor_id', $vendor->id)->latest('payment_date')->paginate(10)]); }
+    public function payments(Vendor $vendor) { $payments=VendorPayment::where('vendor_id',$vendor->id)->latest('payment_date')->paginate(10); $summary=['total_outstanding_invoice'=>(float)VendorInvoice::where('vendor_id',$vendor->id)->sum('outstanding_amount'),'total_paid'=>(float)VendorPayment::where('vendor_id',$vendor->id)->whereIn('status',['PAID','POSTED'])->sum('total_invoice_amount'),'total_payment_draft_submitted'=>(float)VendorPayment::where('vendor_id',$vendor->id)->whereIn('status',['DRAFT','SUBMITTED'])->sum('total_invoice_amount'),'last_payment_date'=>optional(VendorPayment::where('vendor_id',$vendor->id)->latest('payment_date')->first())->payment_date]; return response()->json(['payments'=>$payments,'summary'=>$summary]); }
     public function ledger(Vendor $vendor) { return response()->json(['ledger' => VendorLedger::where('vendor_id', $vendor->id)->latest('transaction_date')->paginate(10)]); }
     public function auditLogs(Vendor $vendor) { return response()->json(['audit_logs' => [['action' => 'Vendor created/updated', 'at' => $vendor->updated_at, 'by' => $vendor->updated_by]]]); }
 
