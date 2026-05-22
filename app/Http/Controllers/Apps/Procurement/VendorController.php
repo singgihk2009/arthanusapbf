@@ -298,14 +298,7 @@ class VendorController extends Controller
             ->values();
 
         if ($invoiceIds->isNotEmpty()) {
-            $paidByInvoice = VendorPaymentLine::query()
-                ->select('vendor_invoice_id', DB::raw('SUM(payment_amount + COALESCE(wht_amount, 0)) as paid_total'))
-                ->whereIn('vendor_invoice_id', $invoiceIds)
-                ->whereHas('payment', function ($query) {
-                    $query->whereIn('status', ['APPROVED', 'PAID', 'POSTED']);
-                })
-                ->groupBy('vendor_invoice_id')
-                ->pluck('paid_total', 'vendor_invoice_id');
+            $paidByInvoice = $this->paidByInvoiceIds($invoiceIds->all());
 
             $invoices->getCollection()->transform(function (VendorInvoice $invoice) use ($paidByInvoice) {
                 $calculatedPaid = (float) ($paidByInvoice[$invoice->id] ?? 0);
@@ -325,15 +318,15 @@ class VendorController extends Controller
             ->latest('payment_date')
             ->paginate(10);
 
-        $approvedPaidPostedAmount = (float) VendorPayment::where('vendor_id', $vendor->id)
-            ->whereIn('status', ['APPROVED', 'PAID', 'POSTED'])
-            ->sum('total_invoice_amount');
+        $vendorInvoiceIds = VendorInvoice::where('vendor_id', $vendor->id)->pluck('id')->all();
+        $paidByInvoice = $this->paidByInvoiceIds($vendorInvoiceIds);
+        $approvedPaidPostedAmount = array_sum(array_map(static fn ($v) => (float) $v, $paidByInvoice));
 
-        $invoiceOutstandingAmount = (float) VendorInvoice::where('vendor_id', $vendor->id)
-            ->sum('outstanding_amount');
+        $invoiceNetPayableAmount = (float) VendorInvoice::where('vendor_id', $vendor->id)
+            ->sum('net_payable_amount');
 
         $summary = [
-            'total_outstanding_invoice' => max(0, $invoiceOutstandingAmount - $approvedPaidPostedAmount),
+            'total_outstanding_invoice' => max(0, $invoiceNetPayableAmount - $approvedPaidPostedAmount),
             'total_paid' => $approvedPaidPostedAmount,
             'total_payment_draft_submitted' => (float) VendorPayment::where('vendor_id', $vendor->id)
                 ->whereIn('status', ['DRAFT', 'SUBMITTED'])
