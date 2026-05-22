@@ -115,17 +115,17 @@ export default function Edit({ vendor, invoice, receivingLines, selectedLines, d
       </div>
     </div>
     <div className='bg-white p-4 border rounded'>
-      <h3 className='text-sm font-semibold text-gray-700'>Upload Dokumen Tambahan Invoice</h3>
+      <h3 className='text-sm font-semibold text-gray-700'>Upload Dokumen Invoice (Document Center)</h3>
       {data.documents.map((doc, idx) => <div key={idx} className='mt-3 grid gap-2 md:grid-cols-4'>
-        <select value={doc.document_type_id} onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, document_type_id: e.target.value } : d))} className='rounded border p-2'>
-          <option value=''>Pilih Tipe Dokumen</option>
+        <select value={doc.document_type_id} onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, document_type_id: e.target.value } : d))} className='w-full rounded border p-2'>
+          <option value=''>Pilih tipe dokumen</option>
           {documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name || type.code}</option>)}
         </select>
-        <input value={doc.title} onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, title: e.target.value } : d))} placeholder='Judul dokumen' className='rounded border p-2' />
-        <input value={doc.document_number} onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, document_number: e.target.value } : d))} placeholder='No dokumen' className='rounded border p-2' />
-        <input type='file' accept='.pdf,.jpg,.jpeg,.png' onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d))} className='rounded border p-2' />
+        <input value={doc.title} onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, title: e.target.value } : d))} placeholder='Judul dokumen' className='w-full rounded border p-2' />
+        <input value={doc.document_number} onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, document_number: e.target.value } : d))} placeholder='No dokumen' className='w-full rounded border p-2' />
+        <input type='file' accept='.pdf,.jpg,.jpeg,.png' onChange={(e) => setData('documents', data.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d))} className='w-full rounded border p-2' />
       </div>)}
-      <button type='button' onClick={() => setData('documents', [...data.documents, { document_type_id: '', title: '', document_number: '', issue_date: '', expiry_date: '', notes: '', file: null }])} className='mt-3 rounded border px-3 py-1 text-sm'>+ Add Dokumen</button>
+      <button type='button' onClick={() => setData('documents', [...data.documents, { document_type_id: '', title: '', document_number: '', issue_date: '', expiry_date: '', notes: '', file: null }])} className='mt-3 rounded border border-gray-300 px-3 py-1 text-sm'>+ Add Dokumen</button>
       <div className='mt-4 rounded border'>
         <div className='border-b bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700'>
           Daftar Dokumen Berhasil Terupload ({uploadedDocuments.length})
@@ -136,6 +136,7 @@ export default function Edit({ vendor, invoice, receivingLines, selectedLines, d
               <tr className='bg-white'>
                 <th className='border px-2 py-2 text-left'>Document Type</th>
                 <th className='border px-2 py-2 text-left'>Judul</th>
+                <th className='border px-2 py-2 text-left'>No Dokumen</th>
                 <th className='border px-2 py-2 text-left'>Nama File</th>
                 <th className='border px-2 py-2 text-left'>Status Upload</th>
                 <th className='border px-2 py-2 text-left'>Aksi</th>
@@ -145,6 +146,7 @@ export default function Edit({ vendor, invoice, receivingLines, selectedLines, d
               {uploadedDocuments.length ? uploadedDocuments.map((doc) => <tr key={doc.id}>
                 <td className='border px-2 py-2'>{doc.document_type?.name || '-'}</td>
                 <td className='border px-2 py-2'>{doc.title || '-'}</td>
+                <td className='border px-2 py-2'>{doc.document_number || '-'}</td>
                 <td className='border px-2 py-2'>{doc.original_file_name || '-'}</td>
                 <td className='border px-2 py-2'>
                   <span className={`inline-flex rounded px-2 py-1 text-xs font-medium ${doc.status === 'pending_review' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
@@ -154,7 +156,7 @@ export default function Edit({ vendor, invoice, receivingLines, selectedLines, d
                 <td className='border px-2 py-2'>
                   <a href={route('apps.document-center.documents.download', doc.id)} target='_blank' className='text-blue-600 underline'>View</a>
                 </td>
-              </tr>) : <tr><td colSpan={5} className='border px-2 py-4 text-center text-gray-500'>Belum ada dokumen yang terupload untuk invoice ini.</td></tr>}
+              </tr>) : <tr><td colSpan={6} className='border px-2 py-4 text-center text-gray-500'>Belum ada dokumen yang terupload untuk invoice ini.</td></tr>}
             </tbody>
           </table>
         </div>
