@@ -12,6 +12,7 @@ const emptyLine = {
     expired_date: '',
     notes: '',
 };
+const emptyDocument = { document_type_id: '', title: '', document_number: '', issue_date: '', expiry_date: '', notes: '', file: null };
 
 const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 const lineInputClassName = 'rounded border border-gray-300 bg-white px-2 py-1 text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
@@ -23,7 +24,7 @@ const extractErrorMessage = (error, fallbackMessage) => {
 };
 
 export default function Edit() {
-    const { entry, lines, items, uoms, warehouses, transactionCodes } = usePage().props;
+    const { entry, lines, items, uoms, warehouses, transactionCodes, documentTypes, documents } = usePage().props;
     const [form, setForm] = useState({
         warehouse_id: entry.warehouse_id ? String(entry.warehouse_id) : '',
         transaction_date: entry.transaction_date,
@@ -32,6 +33,7 @@ export default function Edit() {
         vendor_name: entry.vendor_name,
         notes: entry.notes,
         lines: lines.length > 0 ? lines : [{ ...emptyLine }],
+        documents: [{ ...emptyDocument }],
     });
     const [errors, setErrors] = useState({});
     const [message, setMessage] = useState(null);
@@ -71,7 +73,30 @@ export default function Edit() {
         setMessage(null);
 
         try {
-            await window.axios.put(route('apps.inbound.receiving.update', entry.id), form);
+            const normalizedDocuments = (form.documents || []).filter((doc) => doc?.file);
+            const payload = new FormData();
+            payload.append('_method', 'PUT');
+            payload.append('warehouse_id', form.warehouse_id);
+            payload.append('transaction_date', form.transaction_date);
+            payload.append('transaction_code', form.transaction_code);
+            payload.append('reference', form.reference || '');
+            payload.append('vendor_name', form.vendor_name || '');
+            payload.append('notes', form.notes || '');
+            form.lines.forEach((line, index) => {
+                Object.entries(line).forEach(([key, value]) => payload.append(`lines[${index}][${key}]`, value ?? ''));
+            });
+            normalizedDocuments.forEach((doc, index) => {
+                payload.append(`documents[${index}][document_type_id]`, doc.document_type_id || '');
+                payload.append(`documents[${index}][title]`, doc.title || '');
+                payload.append(`documents[${index}][document_number]`, doc.document_number || '');
+                payload.append(`documents[${index}][issue_date]`, doc.issue_date || '');
+                payload.append(`documents[${index}][expiry_date]`, doc.expiry_date || '');
+                payload.append(`documents[${index}][notes]`, doc.notes || '');
+                payload.append(`documents[${index}][file]`, doc.file);
+            });
+            await window.axios.post(route('apps.inbound.receiving.update', entry.id), payload, {
+                headers: { 'Content-Type': 'multipart/form-data', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
             window.location.href = route('apps.inbound.receiving.index');
         } catch (error) {
             if (error.response?.status === 422) {
@@ -114,6 +139,34 @@ export default function Edit() {
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Referensi</label><input value={form.reference} onChange={(e) => updateHeader('reference', e.target.value)} className={inputClassName} /></div>
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Vendor</label><input value={form.vendor_name} onChange={(e) => updateHeader('vendor_name', e.target.value)} className={inputClassName} /></div>
                             <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Keterangan</label><input value={form.notes} onChange={(e) => updateHeader('notes', e.target.value)} className={inputClassName} /></div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Dokumen Receiving</h3>
+                            {form.documents.map((doc, idx) => (
+                                <div key={idx} className="mt-3 grid gap-2 md:grid-cols-4">
+                                    <select value={doc.document_type_id} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_type_id: e.target.value } : d) }))} className={lineInputClassName}>
+                                        <option value="">Tipe Dokumen</option>
+                                        {documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+                                    </select>
+                                    <input value={doc.title} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, title: e.target.value } : d) }))} placeholder="Judul dokumen" className={lineInputClassName} />
+                                    <input value={doc.document_number} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_number: e.target.value } : d) }))} placeholder="No dokumen" className={lineInputClassName} />
+                                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d) }))} className={lineInputClassName} />
+                                </div>
+                            ))}
+                            <button type="button" onClick={() => setForm((prev) => ({ ...prev, documents: [...prev.documents, { ...emptyDocument }] }))} className="mt-3 rounded border px-3 py-1 text-sm">+ Add Dokumen</button>
+                            {(documents || []).length > 0 && (
+                                <div className="mt-4">
+                                    <p className="mb-2 text-xs font-semibold text-gray-600 dark:text-gray-300">Dokumen Existing</p>
+                                    <div className="space-y-1 text-xs">
+                                        {documents.map((doc) => (
+                                            <div key={doc.id} className="flex items-center justify-between">
+                                                <span>{doc.document_type?.name || doc.title || `Dokumen #${doc.id}`}</span>
+                                                <a href={route('apps.document-center.documents.download', doc.id)} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
