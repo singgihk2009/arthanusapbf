@@ -9,6 +9,7 @@ use App\Models\DocumentType;
 use App\Models\Procurement\Vendor;
 use App\Models\Procurement\VendorInvoice;
 use App\Models\Procurement\VendorInvoiceLine;
+use App\Models\Procurement\VendorPaymentLine;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\RedirectResponse;
@@ -25,8 +26,28 @@ class VendorInvoiceController extends Controller
             ->where('vendor_id', $vendor->id)
             ->where('company_id', $companyId)
             ->latest('invoice_date')
-            ->paginate(10)
-            ->through(fn ($inv) => [
+            ->paginate(10);
+
+        $invoiceIds = collect($invoices->items())->pluck('id')->filter()->values();
+        $paidByInvoice = collect();
+
+        if ($invoiceIds->isNotEmpty()) {
+            $paidByInvoice = VendorPaymentLine::query()
+                ->select('vendor_invoice_id', DB::raw('SUM(payment_amount + COALESCE(wht_amount, 0)) as paid_total'))
+                ->whereIn('vendor_invoice_id', $invoiceIds)
+                ->whereHas('payment', function ($query) {
+                    $query->whereIn('status', ['APPROVED', 'PAID', 'POSTED']);
+                })
+                ->groupBy('vendor_invoice_id')
+                ->pluck('paid_total', 'vendor_invoice_id');
+        }
+
+        $invoices->setCollection($invoices->getCollection()->map(function (VendorInvoice $inv) use ($paidByInvoice) {
+            $netPayable = (float) ($inv->net_payable_amount ?? $inv->grand_total ?? 0);
+            $calculatedPaid = (float) ($paidByInvoice[$inv->id] ?? 0);
+            $outstanding = max(0, $netPayable - $calculatedPaid);
+
+            return [
                 'id' => $inv->id,
                 'invoice_no_internal' => $inv->invoice_no_internal,
                 'vendor_invoice_no' => $inv->vendor_invoice_no,
@@ -37,11 +58,13 @@ class VendorInvoiceController extends Controller
                 'tax_amount' => $inv->tax_amount,
                 'wht_tax_amount' => $inv->wht_tax_amount ?? 0,
                 'grand_total' => $inv->grand_total,
-                'net_payable_amount' => $inv->net_payable_amount ?? $inv->grand_total,
-                'paid_amount' => $inv->paid_amount,
-                'outstanding_amount' => $inv->outstanding_amount,
+                'net_payable_amount' => $netPayable,
+                'paid_amount' => $calculatedPaid,
+                'outstanding_amount' => $outstanding,
                 'status' => strtolower((string) $inv->status),
-            ]);
+                'payment_status' => $outstanding <= 0 ? 'paid' : ($calculatedPaid > 0 ? 'partial_paid' : 'unpaid'),
+            ];
+        }));
 
         return response()->json(['invoices' => $invoices]);
     }
