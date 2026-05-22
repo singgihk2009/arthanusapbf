@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Apps\Inbound;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\ReceivingEntryRequest;
+use App\Models\Document;
+use App\Models\DocumentType;
 use App\Models\Procurement\PurchaseOrder;
+use App\Services\Documents\DocumentVersioningService;
 use App\Services\Inventory\FacilityReferenceValidationService;
 use App\Services\WarehouseAccessService;
 use Illuminate\Http\JsonResponse;
@@ -20,7 +23,8 @@ class ReceivingEntryController extends Controller
 {
     public function __construct(
         private readonly FacilityReferenceValidationService $facilityValidationService,
-        private readonly WarehouseAccessService $warehouseAccessService
+        private readonly WarehouseAccessService $warehouseAccessService,
+        private readonly DocumentVersioningService $documentVersioningService
     ) {}
     public function index(): Response
     {
@@ -104,6 +108,7 @@ class ReceivingEntryController extends Controller
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
             'transactionCodes' => ['PEMBELIAN', 'RETUR', 'ADJUSTMENT'],
+            'documentTypes' => DocumentType::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
             'prefill' => $prefill,
         ]);
     }
@@ -114,13 +119,36 @@ class ReceivingEntryController extends Controller
         $this->warehouseAccessService->assertWarehouseAccess($request->user(), $validated['warehouse_id']);
         $userId = $request->user()?->id;
 
-        DB::transaction(function () use ($validated, $userId): void {
+        $uploadedDocumentCount = 0;
+        DB::transaction(function () use ($validated, $userId, $request, &$uploadedDocumentCount): void {
             $entryId = $this->insertEntryHeader($validated, $userId);
             $this->replaceEntryLines($entryId, $validated['lines'], $validated);
+            foreach ((array) ($validated['documents'] ?? []) as $index => $document) {
+                $file = $request->file("documents.$index.file");
+                if (! $file || empty($document['document_type_id'])) {
+                    continue;
+                }
+                $this->documentVersioningService->createOriginalDocument([
+                    'business_id' => 1,
+                    'owner_type' => 'receiving_entry',
+                    'owner_id' => (int) $entryId,
+                    'document_type_id' => (int) $document['document_type_id'],
+                    'title' => $document['title'] ?? null,
+                    'document_number' => $document['document_number'] ?? null,
+                    'issue_date' => $document['issue_date'] ?? null,
+                    'expiry_date' => $document['expiry_date'] ?? null,
+                    'notes' => $document['notes'] ?? null,
+                ], $file);
+                $uploadedDocumentCount++;
+            }
         });
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => 'Receiving entry berhasil disimpan.']);
+            $message = 'Receiving entry berhasil disimpan.';
+            if ($uploadedDocumentCount > 0) {
+                $message .= " {$uploadedDocumentCount} dokumen berhasil diupload.";
+            }
+            return response()->json(['message' => $message]);
         }
 
         return to_route('apps.inbound.receiving.index')->with('success', 'Receiving entry berhasil disimpan.');
@@ -172,6 +200,8 @@ class ReceivingEntryController extends Controller
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
             'transactionCodes' => ['PEMBELIAN', 'RETUR', 'ADJUSTMENT'],
+            'documentTypes' => DocumentType::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
+            'documents' => Document::query()->with('documentType:id,name,code')->where('owner_type', 'receiving_entry')->where('owner_id', $receivingEntry)->latest('id')->get(),
         ]);
     }
 
@@ -180,7 +210,8 @@ class ReceivingEntryController extends Controller
         $validated = $request->validated();
         $this->warehouseAccessService->assertWarehouseAccess($request->user(), $validated['warehouse_id']);
 
-        DB::transaction(function () use ($request, $validated, $receivingEntry): void {
+        $uploadedDocumentCount = 0;
+        DB::transaction(function () use ($request, $validated, $receivingEntry, &$uploadedDocumentCount): void {
             $entry = DB::table('receiving_entries')->where('id', $receivingEntry)->first();
             abort_if(! $entry, 404);
             $this->warehouseAccessService->assertWarehouseAccess($request->user(), $this->resolveEntryWarehouseId($entry));
@@ -215,10 +246,33 @@ class ReceivingEntryController extends Controller
             $lineHeader['source_id'] = $headerPayload['source_id'] ?? null;
 
             $this->replaceEntryLines($receivingEntry, $validated['lines'], $lineHeader);
+
+            foreach ((array) ($validated['documents'] ?? []) as $index => $document) {
+                $file = $request->file("documents.$index.file");
+                if (! $file || empty($document['document_type_id'])) {
+                    continue;
+                }
+                $this->documentVersioningService->createOriginalDocument([
+                    'business_id' => 1,
+                    'owner_type' => 'receiving_entry',
+                    'owner_id' => (int) $receivingEntry,
+                    'document_type_id' => (int) $document['document_type_id'],
+                    'title' => $document['title'] ?? null,
+                    'document_number' => $document['document_number'] ?? null,
+                    'issue_date' => $document['issue_date'] ?? null,
+                    'expiry_date' => $document['expiry_date'] ?? null,
+                    'notes' => $document['notes'] ?? null,
+                ], $file);
+                $uploadedDocumentCount++;
+            }
         });
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => 'Receiving entry berhasil diperbarui.']);
+            $message = 'Receiving entry berhasil diperbarui.';
+            if ($uploadedDocumentCount > 0) {
+                $message .= " {$uploadedDocumentCount} dokumen berhasil diupload.";
+            }
+            return response()->json(['message' => $message]);
         }
 
         return to_route('apps.inbound.receiving.index')->with('success', 'Receiving entry berhasil diperbarui.');
