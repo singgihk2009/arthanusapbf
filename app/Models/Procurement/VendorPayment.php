@@ -31,6 +31,8 @@ class VendorPayment extends Model
     public function paidBy(): BelongsTo { return $this->belongsTo(User::class, 'paid_by'); }
     public function postedBy(): BelongsTo { return $this->belongsTo(User::class, 'posted_by'); }
 
+    public function bankAccount(): BelongsTo { return $this->belongsTo(VendorBankAccount::class, 'bank_account_id'); }
+
     public function getCanEditAttribute(): bool { return strtoupper((string) $this->status) === 'DRAFT'; }
     public function getCanSubmitAttribute(): bool { return strtoupper((string) $this->status) === 'DRAFT'; }
     public function getCanApproveAttribute(): bool { return strtoupper((string) $this->status) === 'SUBMITTED'; }
