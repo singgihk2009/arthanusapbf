@@ -101,7 +101,18 @@ class DocumentCenterDocumentController extends Controller
 
     public function destroy(Document $document, DocumentAuditLogger $auditLogger): JsonResponse
     {
-        $this->authorizeDocumentAction($document, 'document.delete');
+        $user = auth()->user();
+        abort_unless($user, 403);
+
+        $canDelete = $user->can('document.delete')
+            || $user->hasAnyRole(['super-admin', 'admin'])
+            || ($document->owner_type === 'receiving_entry' && $user->can('inventory.receiving.update'));
+        abort_unless($canDelete, 403, 'You are not allowed to remove this document.');
+
+        if ($document->business_id !== null && (int) $document->business_id !== (int) ($user->business_id ?? $document->business_id)) {
+            abort(403, 'Document business does not match.');
+        }
+
         $old = $document->only(['id', 'status', 'file_path', 'storage_disk', 'owner_type', 'owner_id']);
 
         if ($document->file_path && Storage::disk($document->storage_disk)->exists($document->file_path)) {
