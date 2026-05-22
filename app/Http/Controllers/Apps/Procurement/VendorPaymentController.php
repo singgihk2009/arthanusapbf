@@ -39,6 +39,11 @@ class VendorPaymentController extends Controller
         foreach($data['lines'] as $line){ $inv=$invoices[$line['vendor_invoice_id']]??null; if(!$inv || (int)$inv->vendor_id !== (int)$vendor->id) throw ValidationException::withMessages(['lines'=>'Invoice vendor mismatch']); $outstanding=(float)$inv->outstanding_amount; $pay=(float)$line['payment_amount']; $wht=(float)($line['wht_amount']??0); if(($pay+$wht) > $outstanding + 0.0001) throw ValidationException::withMessages(['lines'=>'Overpayment detected']); $totalInvoice+=$pay; $totalWht+=$wht; $lines[]=[ 'vendor_invoice_id'=>$inv->id,'invoice_number'=>$inv->vendor_invoice_no ?? $inv->invoice_no_internal,'invoice_date'=>$inv->invoice_date,'invoice_total_amount'=>$inv->net_payable_amount ?? $inv->grand_total,'invoice_outstanding_amount'=>$outstanding,'payment_amount'=>$pay,'wht_amount'=>$wht,'net_payment_amount'=>$pay-$wht,'notes'=>$line['notes']??null ]; }
         $stamp=(float)($data['stamp_duty_amount']??0); $freight=(float)($data['freight_amount']??0); $bank=(float)($data['bank_charge_amount']??0);
         $additional=$stamp+$freight+$bank; $net=$totalInvoice-$totalWht+$stamp+$freight; $cashOut=$net+$bank;
+        if ($cashOut > ($totalInvoice + 0.0001)) {
+            throw ValidationException::withMessages([
+                'bank_charge_amount' => 'Total cash out tidak boleh melebihi total tagihan invoice yang dipilih.',
+            ]);
+        }
         $payment->fill(['vendor_id'=>$vendor->id,'payment_no'=>$payment->payment_no ?: $this->nextNo(),'payment_number'=>$payment->payment_number ?: $payment->payment_no,'payment_date'=>$data['payment_date'],'payment_method'=>strtoupper((string)($data['payment_method'] ?? 'BANK_TRANSFER')),'bank_account_id'=>$data['bank_account_id'] ?? null,'currency'=>'IDR','status'=>$payment->exists ? $payment->status : 'DRAFT','total_invoice_amount'=>$totalInvoice,'total_wht_amount'=>$totalWht,'stamp_duty_amount'=>$stamp,'freight_amount'=>$freight,'bank_charge_amount'=>$bank,'total_additional_cost'=>$additional,'net_vendor_payment_amount'=>$net,'total_cash_out_amount'=>$cashOut,'notes'=>$data['notes']??null,'created_by'=>$payment->created_by ?? auth()->id(),'updated_by'=>auth()->id()]);
         $payment->save(); $payment->lines()->delete(); $payment->lines()->createMany($lines); return $payment->fresh('lines');
     }

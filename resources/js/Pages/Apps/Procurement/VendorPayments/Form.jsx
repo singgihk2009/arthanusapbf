@@ -111,7 +111,7 @@ export default function Form({ vendor, outstandingInvoices = [], payment = null,
             <td>{inv.invoice_date}</td>
             <td>{inv.net_payable_amount || inv.grand_total}</td>
             <td>{inv.outstanding_amount}</td>
-            <td><input disabled={!line} type='number' className='border rounded p-1 w-32' value={line?.payment_amount ?? ''} onChange={(e) => updateLine(inv.id, 'payment_amount', e.target.value)} /></td>
+            <td><input disabled={!line} type='number' min='0.01' max={n(inv.outstanding_amount)} step='0.01' className='border rounded p-1 w-32' value={line?.payment_amount ?? ''} onChange={(e) => updateLine(inv.id, 'payment_amount', e.target.value)} /></td>
             <td><input disabled={!line} type='number' className='border rounded p-1 w-24' value={line?.wht_amount ?? ''} onChange={(e) => updateLine(inv.id, 'wht_amount', e.target.value)} /></td>
             <td>{line ? (n(line.payment_amount) - n(line.wht_amount)).toFixed(2) : '-'}</td>
           </tr>;
