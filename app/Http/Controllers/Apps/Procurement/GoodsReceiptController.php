@@ -32,9 +32,36 @@ class GoodsReceiptController extends Controller
             ->when($request->date_from, fn ($q, $v) => $q->whereDate('transaction_date', '>=', $v))
             ->when($request->date_to, fn ($q, $v) => $q->whereDate('transaction_date', '<=', $v))
             ->orderByDesc('id')
-            ->paginate(15)
-            ->through(function (object $entry) use ($warehouseCodes): object {
+            ->paginate(15);
+
+        $receivingEntryIds = $goodsReceipts->getCollection()->pluck('id')->all();
+        $invoiceStatsByEntry = [];
+
+        if (count($receivingEntryIds) > 0) {
+            $invoiceStatsByEntry = DB::table('receiving_entry_lines as rel')
+                ->leftJoin('vendor_invoice_lines as vil', 'vil.receiving_entry_line_id', '=', 'rel.id')
+                ->leftJoin('vendor_invoices as vi', 'vi.id', '=', 'vil.vendor_invoice_id')
+                ->whereIn('rel.receiving_entry_id', $receivingEntryIds)
+                ->groupBy('rel.receiving_entry_id')
+                ->selectRaw('rel.receiving_entry_id')
+                ->selectRaw('COALESCE(SUM(rel.qty), 0) as qty_received')
+                ->selectRaw('COALESCE(SUM(CASE WHEN vi.deleted_at IS NULL THEN vil.qty_invoiced ELSE 0 END), 0) as qty_already_invoiced')
+                ->get()
+                ->keyBy('receiving_entry_id')
+                ->all();
+        }
+
+        $goodsReceipts = $goodsReceipts->through(function (object $entry) use ($warehouseCodes, $invoiceStatsByEntry): object {
                 $entry->warehouse_label = $this->resolveEntryWarehouseLabel($entry, $warehouseCodes);
+                $stats = $invoiceStatsByEntry[$entry->id] ?? null;
+                $qtyReceived = (float) ($stats->qty_received ?? 0);
+                $qtyAlreadyInvoiced = (float) ($stats->qty_already_invoiced ?? 0);
+                $qtyAvailableToInvoice = max(0, $qtyReceived - $qtyAlreadyInvoiced);
+
+                $entry->qty_received = $qtyReceived;
+                $entry->qty_already_invoiced = $qtyAlreadyInvoiced;
+                $entry->qty_available_to_invoice = $qtyAvailableToInvoice;
+                $entry->invoice_status = $this->resolveInvoiceStatus($qtyReceived, $qtyAlreadyInvoiced, $qtyAvailableToInvoice);
 
                 return $entry;
             });
@@ -166,7 +193,38 @@ class GoodsReceiptController extends Controller
     public function show(GoodsReceipt $goodsReceipt): Response
     {
         $goodsReceipt->load(['purchaseOrder:id,po_number', 'vendor:id,name', 'items.product:id,name']);
+        $lineIds = $goodsReceipt->items->pluck('id')->all();
+        $qtyReceived = (float) $goodsReceipt->items->sum(fn ($item) => (float) ($item->received_qty ?? 0));
+        $qtyAlreadyInvoiced = 0.0;
+
+        if (count($lineIds) > 0) {
+            $qtyAlreadyInvoiced = (float) DB::table('vendor_invoice_lines as vil')
+                ->leftJoin('vendor_invoices as vi', 'vi.id', '=', 'vil.vendor_invoice_id')
+                ->whereIn('vil.receipt_line_id', $lineIds)
+                ->whereNull('vi.deleted_at')
+                ->sum('vil.qty_invoiced');
+        }
+
+        $qtyAvailableToInvoice = max(0, $qtyReceived - $qtyAlreadyInvoiced);
+        $goodsReceipt->setAttribute('qty_received', $qtyReceived);
+        $goodsReceipt->setAttribute('qty_already_invoiced', $qtyAlreadyInvoiced);
+        $goodsReceipt->setAttribute('qty_available_to_invoice', $qtyAvailableToInvoice);
+        $goodsReceipt->setAttribute('invoice_status', $this->resolveInvoiceStatus($qtyReceived, $qtyAlreadyInvoiced, $qtyAvailableToInvoice));
+
         return Inertia::render('Apps/Procurement/GoodsReceipts/Show', ['goodsReceipt' => $goodsReceipt]);
+    }
+
+    private function resolveInvoiceStatus(float $qtyReceived, float $qtyAlreadyInvoiced, float $qtyAvailableToInvoice): string
+    {
+        if ($qtyReceived <= 0 || $qtyAlreadyInvoiced <= 0) {
+            return 'Belum Ditagih';
+        }
+
+        if ($qtyAvailableToInvoice <= 0) {
+            return 'Sudah Ditagih';
+        }
+
+        return 'Sebagian Ditagih';
     }
 
     public function post(GoodsReceipt $goodsReceipt): RedirectResponse
