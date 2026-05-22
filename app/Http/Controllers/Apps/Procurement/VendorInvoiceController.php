@@ -169,7 +169,7 @@ class VendorInvoiceController extends Controller
     {
         $invoice = $this->authorizedInvoice($vendorInvoice);
 
-        $invoice->loadMissing(['vendor:id,name,code', 'lines.item:id,name,sku']);
+        $invoice->loadMissing(['vendor:id,name,vendor_code', 'lines.item:id,name,sku']);
 
         return Inertia::render('Apps/Procurement/VendorInvoices/Show', [
             'invoice' => $invoice,
