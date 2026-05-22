@@ -343,7 +343,97 @@ class VendorController extends Controller
 
         return response()->json(['payments' => $payments, 'summary' => $summary]);
     }
-    public function ledger(Vendor $vendor) { return response()->json(['ledger' => VendorLedger::where('vendor_id', $vendor->id)->latest('transaction_date')->paginate(10)]); }
+    public function ledger(Vendor $vendor)
+    {
+        $perPage = max(1, min((int) request('per_page', 10), 100));
+        $page = max(1, (int) request('page', 1));
+
+        $persistedLedger = VendorLedger::query()
+            ->where('vendor_id', $vendor->id)
+            ->orderBy('transaction_date')
+            ->orderBy('id')
+            ->paginate($perPage, ['*'], 'page', $page);
+
+        if ($persistedLedger->total() > 0) {
+            return response()->json(['ledger' => $persistedLedger]);
+        }
+
+        $rows = collect();
+
+        $invoiceRows = VendorInvoice::query()
+            ->where('vendor_id', $vendor->id)
+            ->whereNotIn('status', ['DRAFT', 'VOID'])
+            ->orderBy('invoice_date')
+            ->orderBy('id')
+            ->get()
+            ->map(function (VendorInvoice $invoice) {
+                $amount = (float) ($invoice->net_payable_amount ?? $invoice->grand_total ?? 0);
+
+                return [
+                    'id' => 'invoice-'.$invoice->id,
+                    'transaction_date' => $invoice->invoice_date,
+                    'reference_type' => 'vendor_invoice',
+                    'reference_id' => $invoice->id,
+                    'description' => $invoice->invoice_no_internal ?: $invoice->vendor_invoice_no,
+                    'status' => (string) ($invoice->status ?? 'POSTED'),
+                    'debit' => $amount,
+                    'credit' => 0,
+                ];
+            });
+
+        $paymentRows = VendorPayment::query()
+            ->where('vendor_id', $vendor->id)
+            ->whereIn('status', ['APPROVED', 'PAID', 'POSTED'])
+            ->orderBy('payment_date')
+            ->orderBy('id')
+            ->get()
+            ->map(function (VendorPayment $payment) {
+                $amount = (float) ($payment->total_invoice_amount ?? $payment->allocated_amount ?? $payment->total_amount ?? 0);
+
+                return [
+                    'id' => 'payment-'.$payment->id,
+                    'transaction_date' => $payment->payment_date,
+                    'reference_type' => 'vendor_payment',
+                    'reference_id' => $payment->id,
+                    'description' => $payment->payment_number ?: $payment->payment_no,
+                    'status' => (string) ($payment->status ?? 'POSTED'),
+                    'debit' => 0,
+                    'credit' => $amount,
+                ];
+            });
+
+        $rows = $invoiceRows
+            ->concat($paymentRows)
+            ->sortBy([
+                ['transaction_date', 'asc'],
+                ['reference_type', 'asc'],
+                ['reference_id', 'asc'],
+            ])
+            ->values();
+
+        $runningBalance = 0.0;
+        $rows = $rows->map(function (array $row) use (&$runningBalance) {
+            $runningBalance += (float) $row['debit'] - (float) $row['credit'];
+            $row['balance'] = $runningBalance;
+
+            return $row;
+        });
+
+        $total = $rows->count();
+        $pageRows = $rows->forPage($page, $perPage)->values();
+
+        return response()->json([
+            'ledger' => [
+                'data' => $pageRows,
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+                'from' => $total === 0 ? null : (($page - 1) * $perPage) + 1,
+                'to' => $total === 0 ? null : min($page * $perPage, $total),
+            ],
+        ]);
+    }
     public function auditLogs(Vendor $vendor) { return response()->json(['audit_logs' => [['action' => 'Vendor created/updated', 'at' => $vendor->updated_at, 'by' => $vendor->updated_by]]]); }
 
     public function create(){ return Inertia::render('Apps/Procurement/Vendors/Form'); }
