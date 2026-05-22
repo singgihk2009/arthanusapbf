@@ -46,8 +46,19 @@ class VendorPaymentController extends Controller
     private function upsertPayment(VendorPayment $payment, Vendor $vendor, array $data): VendorPayment {
         $invoiceIds = collect($data['lines'])->pluck('vendor_invoice_id')->unique()->all();
         $invoices = VendorInvoice::whereIn('id',$invoiceIds)->lockForUpdate()->get()->keyBy('id');
+        $reservedByOtherPayments = DB::table('vendor_payment_lines as vpl')
+            ->join('vendor_payments as vp', 'vp.id', '=', 'vpl.vendor_payment_id')
+            ->whereIn('vpl.vendor_invoice_id', $invoiceIds)
+            ->where('vp.vendor_id', $vendor->id)
+            ->whereNull('vp.deleted_at')
+            ->whereNotIn(DB::raw('UPPER(vp.status)'), ['CANCELLED'])
+            ->when($payment->exists, fn ($query) => $query->where('vp.id', '!=', $payment->id))
+            ->groupBy('vpl.vendor_invoice_id')
+            ->selectRaw('vpl.vendor_invoice_id, SUM(COALESCE(vpl.payment_amount,0) + COALESCE(vpl.wht_amount,0)) as reserved_total')
+            ->pluck('reserved_total', 'vpl.vendor_invoice_id');
+
         $totalInvoice=0; $totalWht=0; $lines=[];
-        foreach($data['lines'] as $line){ $inv=$invoices[$line['vendor_invoice_id']]??null; if(!$inv || (int)$inv->vendor_id !== (int)$vendor->id) throw ValidationException::withMessages(['lines'=>'Invoice vendor mismatch']); $outstanding=(float)$inv->outstanding_amount; $pay=(float)$line['payment_amount']; $wht=(float)($line['wht_amount']??0); if(($pay+$wht) > $outstanding + 0.0001) throw ValidationException::withMessages(['lines'=>'Overpayment detected']); $totalInvoice+=$pay; $totalWht+=$wht; $lines[]=[ 'vendor_invoice_id'=>$inv->id,'invoice_number'=>$inv->vendor_invoice_no ?? $inv->invoice_no_internal,'invoice_date'=>$inv->invoice_date,'invoice_total_amount'=>$inv->net_payable_amount ?? $inv->grand_total,'invoice_outstanding_amount'=>$outstanding,'payment_amount'=>$pay,'wht_amount'=>$wht,'net_payment_amount'=>$pay-$wht,'notes'=>$line['notes']??null ]; }
+        foreach($data['lines'] as $line){ $inv=$invoices[$line['vendor_invoice_id']]??null; if(!$inv || (int)$inv->vendor_id !== (int)$vendor->id) throw ValidationException::withMessages(['lines'=>'Invoice vendor mismatch']); $baseOutstanding=(float)($inv->outstanding_amount ?? 0); $reserved=(float)($reservedByOtherPayments[$inv->id] ?? 0); $outstanding=max(0, $baseOutstanding - $reserved); $pay=(float)$line['payment_amount']; $wht=(float)($line['wht_amount']??0); if($outstanding <= 0.0001) throw ValidationException::withMessages(['lines'=>"Invoice {$inv->invoice_no_internal} sudah lunas / sudah dialokasikan di payment lain."]); if(($pay+$wht) > $outstanding + 0.0001) throw ValidationException::withMessages(['lines'=>'Overpayment detected']); $totalInvoice+=$pay; $totalWht+=$wht; $lines[]=[ 'vendor_invoice_id'=>$inv->id,'invoice_number'=>$inv->vendor_invoice_no ?? $inv->invoice_no_internal,'invoice_date'=>$inv->invoice_date,'invoice_total_amount'=>$inv->net_payable_amount ?? $inv->grand_total,'invoice_outstanding_amount'=>$outstanding,'payment_amount'=>$pay,'wht_amount'=>$wht,'net_payment_amount'=>$pay-$wht,'notes'=>$line['notes']??null ]; }
         $stamp=(float)($data['stamp_duty_amount']??0); $freight=(float)($data['freight_amount']??0); $bank=(float)($data['bank_charge_amount']??0);
         $additional=$stamp+$freight+$bank; $net=$totalInvoice-$totalWht+$stamp+$freight; $cashOut=$net+$bank;
         if ($cashOut > ($totalInvoice + 0.0001)) {
@@ -76,7 +87,18 @@ class VendorPaymentController extends Controller
 
         return $candidate;
     }
-    private function outstandingInvoices(Vendor $vendor){ return VendorInvoice::where('vendor_id',$vendor->id)->where('outstanding_amount','>',0)->whereIn('status',['POSTED','PARTIAL_PAID'])->orderBy('invoice_date')->get(); }
+    private function outstandingInvoices(Vendor $vendor){
+        return VendorInvoice::query()
+            ->where('vendor_id', $vendor->id)
+            ->where('outstanding_amount', '>', 0)
+            ->where(function ($query) {
+                $query->whereNull('payment_status')
+                    ->orWhere(DB::raw('LOWER(payment_status)'), '!=', 'paid');
+            })
+            ->whereIn(DB::raw('UPPER(status)'), ['POSTED', 'PARTIAL_PAID'])
+            ->orderBy('invoice_date')
+            ->get();
+    }
     private function bankAccounts(Vendor $vendor)
     {
         if (! Schema::hasTable('vendor_bank_accounts')) {
