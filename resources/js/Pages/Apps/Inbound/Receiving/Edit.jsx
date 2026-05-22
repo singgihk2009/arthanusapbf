@@ -38,6 +38,7 @@ export default function Edit() {
     const [errors, setErrors] = useState({});
     const [message, setMessage] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [removingDocumentId, setRemovingDocumentId] = useState(null);
 
     const defaultUomByItemId = useMemo(() => new Map(items.map((item) => [String(item.id), String(item.base_uom_id ?? '')])), [items]);
 
@@ -112,6 +113,25 @@ export default function Edit() {
                 setMessage({ type: 'error', text: extractErrorMessage(error, 'Gagal memperbarui receiving entry.') });
             }
             setLoading(false);
+        }
+    };
+
+    const removeUploadedDocument = async (documentId) => {
+        if (!window.confirm('Hapus dokumen ini?')) {
+            return;
+        }
+
+        setRemovingDocumentId(documentId);
+        setMessage(null);
+
+        try {
+            await window.axios.delete(route('apps.document-center.documents.destroy', documentId), {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            window.location.reload();
+        } catch (error) {
+            setMessage({ type: 'error', text: extractErrorMessage(error, 'Gagal menghapus dokumen.') });
+            setRemovingDocumentId(null);
         }
     };
 
@@ -212,7 +232,19 @@ export default function Edit() {
                                                             {doc.status || 'uploaded'}
                                                         </span>
                                                     </td>
-                                                    <td className="border px-2 py-2"><a href={route('apps.document-center.documents.download', doc.id)} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a></td>
+                                                    <td className="border px-2 py-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <a href={route('apps.document-center.documents.download', doc.id)} target="_blank" rel="noreferrer" className="rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">View</a>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeUploadedDocument(doc.id)}
+                                                                disabled={removingDocumentId === doc.id}
+                                                                className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            >
+                                                                {removingDocumentId === doc.id ? 'Removing...' : 'Remove'}
+                                                            </button>
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                             )) : (
                                                 <tr><td colSpan={6} className="border px-2 py-4 text-center text-gray-500">Belum ada dokumen yang terupload untuk receiving ini.</td></tr>

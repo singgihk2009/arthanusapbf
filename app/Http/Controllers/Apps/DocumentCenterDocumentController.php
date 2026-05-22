@@ -99,6 +99,32 @@ class DocumentCenterDocumentController extends Controller
         return response()->json($document->auditLogs()->latest('performed_at')->get());
     }
 
+    public function destroy(Document $document, DocumentAuditLogger $auditLogger): JsonResponse
+    {
+        $user = auth()->user();
+        abort_unless($user, 403);
+
+        $canDelete = $user->can('document.delete')
+            || $user->hasAnyRole(['super-admin', 'admin'])
+            || ($document->owner_type === 'receiving_entry' && $user->can('inventory.receiving.update'));
+        abort_unless($canDelete, 403, 'You are not allowed to remove this document.');
+
+        if ($document->business_id !== null && (int) $document->business_id !== (int) ($user->business_id ?? $document->business_id)) {
+            abort(403, 'Document business does not match.');
+        }
+
+        $old = $document->only(['id', 'status', 'file_path', 'storage_disk', 'owner_type', 'owner_id']);
+
+        if ($document->file_path && Storage::disk($document->storage_disk)->exists($document->file_path)) {
+            Storage::disk($document->storage_disk)->delete($document->file_path);
+        }
+
+        $document->delete();
+        $auditLogger->log($document, 'document_deleted', $old, []);
+
+        return response()->json(['success' => true, 'message' => 'Document removed successfully.']);
+    }
+
     public function pendingReviewPage()
     {
         return Inertia::render('Apps/DocumentCenter/PendingReview');

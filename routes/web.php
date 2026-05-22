@@ -244,6 +244,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::get('/document-center/documents/{document}/audit-logs', [DocumentCenterDocumentController::class, 'auditLogs'])->name('document-center.documents.audit-logs');
     Route::post('/document-center/documents/{document}/verify', [DocumentCenterDocumentController::class, 'verify'])->name('document-center.documents.verify');
     Route::post('/document-center/documents/{document}/reject', [DocumentCenterDocumentController::class, 'reject'])->name('document-center.documents.reject');
+    Route::delete('/document-center/documents/{document}', [DocumentCenterDocumentController::class, 'destroy'])->name('document-center.documents.destroy');
 
     // Backward-compatible aliases under /apps prefix (old/typo procurement URLs)
     Route::redirect('/procureme', '/apps/procurement/vendors', 301);
