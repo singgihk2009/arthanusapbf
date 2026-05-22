@@ -307,6 +307,20 @@ class VendorController extends Controller
                 ->groupBy('vendor_invoice_id')
                 ->pluck('paid_total', 'vendor_invoice_id');
 
+            if (Schema::hasTable('vendor_payment_allocations')) {
+                $legacyPaidByInvoice = DB::table('vendor_payment_allocations as vpa')
+                    ->join('vendor_payments as vp', 'vp.id', '=', 'vpa.vendor_payment_id')
+                    ->select('vpa.vendor_invoice_id', DB::raw('SUM(vpa.amount) as paid_total'))
+                    ->whereIn('vpa.vendor_invoice_id', $invoiceIds)
+                    ->whereIn('vp.status', ['APPROVED', 'PAID', 'POSTED'])
+                    ->groupBy('vpa.vendor_invoice_id')
+                    ->pluck('paid_total', 'vendor_invoice_id');
+
+                foreach ($legacyPaidByInvoice as $invoiceId => $legacyPaid) {
+                    $paidByInvoice[$invoiceId] = (float) ($paidByInvoice[$invoiceId] ?? 0) + (float) $legacyPaid;
+                }
+            }
+
             $invoices->getCollection()->transform(function (VendorInvoice $invoice) use ($paidByInvoice) {
                 $calculatedPaid = (float) ($paidByInvoice[$invoice->id] ?? 0);
                 $netPayable = (float) ($invoice->net_payable_amount ?? $invoice->grand_total ?? 0);
