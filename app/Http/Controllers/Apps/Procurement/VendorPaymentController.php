@@ -9,15 +9,16 @@ use App\Models\Procurement\Vendor;
 use App\Models\Procurement\VendorInvoice;
 use App\Models\Procurement\VendorPayment;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class VendorPaymentController extends Controller
 {
     public function index(Vendor $vendor){ return Inertia::render('Apps/Procurement/VendorPayments/Index',['vendor'=>$vendor]); }
-    public function create(Vendor $vendor){ return Inertia::render('Apps/Procurement/VendorPayments/Form',['vendor'=>$vendor,'outstandingInvoices'=>$this->outstandingInvoices($vendor)]); }
+    public function create(Vendor $vendor){ return Inertia::render('Apps/Procurement/VendorPayments/Form',['vendor'=>$vendor,'outstandingInvoices'=>$this->outstandingInvoices($vendor),'bankAccounts'=>$this->bankAccounts($vendor)]); }
     public function show(Vendor $vendor, VendorPayment $payment){ return Inertia::render('Apps/Procurement/VendorPayments/Show',['vendor'=>$vendor,'payment'=>$payment->load('lines')]); }
-    public function edit(Vendor $vendor, VendorPayment $payment){ abort_unless($payment->can_edit, 422, 'Only draft can be edited'); return Inertia::render('Apps/Procurement/VendorPayments/Form',['vendor'=>$vendor,'payment'=>$payment->load('lines'),'outstandingInvoices'=>$this->outstandingInvoices($vendor)]); }
+    public function edit(Vendor $vendor, VendorPayment $payment){ abort_unless($payment->can_edit, 422, 'Only draft can be edited'); return Inertia::render('Apps/Procurement/VendorPayments/Form',['vendor'=>$vendor,'payment'=>$payment->load('lines'),'outstandingInvoices'=>$this->outstandingInvoices($vendor),'bankAccounts'=>$this->bankAccounts($vendor)]); }
     public function store(StoreVendorPaymentRequest $request, Vendor $vendor){ DB::transaction(fn()=> $this->upsertPayment(new VendorPayment(),$vendor,$request->validated())); return back()->with('success','Payment draft berhasil disimpan.'); }
     public function update(UpdateVendorPaymentRequest $request, Vendor $vendor, VendorPayment $payment){ abort_unless($payment->can_edit, 422); DB::transaction(fn()=> $this->upsertPayment($payment,$vendor,$request->validated())); return back()->with('success','Payment draft berhasil diperbarui.'); }
     public function submit(Vendor $vendor, VendorPayment $payment){ return $this->changeStatus($payment,'DRAFT','SUBMITTED','payment_submitted'); }
@@ -43,6 +44,24 @@ class VendorPaymentController extends Controller
     }
     private function nextNo(): string { $prefix='VPY-'.now()->format('Ym').'-'; $last=VendorPayment::where('payment_no','like',$prefix.'%')->orderByDesc('id')->value('payment_no'); $seq=$last?((int)substr($last,-5)+1):1; return $prefix.str_pad((string)$seq,5,'0',STR_PAD_LEFT); }
     private function outstandingInvoices(Vendor $vendor){ return VendorInvoice::where('vendor_id',$vendor->id)->where('outstanding_amount','>',0)->whereIn('status',['POSTED','PARTIAL_PAID'])->orderBy('invoice_date')->get(); }
+    private function bankAccounts(Vendor $vendor)
+    {
+        if (! Schema::hasTable('vendor_bank_accounts')) {
+            return [];
+        }
+
+        return DB::table('vendor_bank_accounts')
+            ->where('vendor_id', $vendor->id)
+            ->orderByDesc('is_default')
+            ->orderBy('bank_name')
+            ->get(['id', 'bank_name', 'account_number', 'account_name', 'is_default'])
+            ->map(fn ($row) => [
+                'id' => $row->id,
+                'label' => trim(sprintf('%s - %s a/n %s%s', $row->bank_name, $row->account_number, $row->account_name, $row->is_default ? ' (Default)' : '')),
+            ])
+            ->values();
+    }
+
     private function changeStatus(VendorPayment $payment,string $from,string $to,string $event,array $extra=[]){ if(strtoupper((string)$payment->status)!==$from) throw ValidationException::withMessages(['status'=>'Invalid status transition']); $payment->update(array_merge(['status'=>$to],$extra)); return back()->with('success',str_replace('_',' ',$event)); }
     private function postToGeneralLedger(VendorPayment $vendorPayment): array { return ['document_type'=>'vendor_payment','document_id'=>$vendorPayment->id,'status'=>'prepared']; }
 }

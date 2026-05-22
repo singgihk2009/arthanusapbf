@@ -12,7 +12,7 @@ class StoreVendorPaymentRequest extends FormRequest
         return [
             'payment_date' => ['required','date'],
             'payment_method' => ['nullable','string','max:50'],
-            'bank_account_id' => ['nullable','integer'],
+            'bank_account_id' => ['nullable','integer','exists:vendor_bank_accounts,id'],
             'stamp_duty_amount' => ['nullable','numeric','min:0'],
             'freight_amount' => ['nullable','numeric','min:0'],
             'bank_charge_amount' => ['nullable','numeric','min:0'],
@@ -24,4 +24,27 @@ class StoreVendorPaymentRequest extends FormRequest
             'lines.*.notes' => ['nullable','string'],
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'payment_date.required' => 'Payment date wajib diisi.',
+            'bank_account_id.integer' => 'Bank account harus dipilih dari daftar.',
+            'bank_account_id.exists' => 'Bank account tidak valid.',
+            'lines.required' => 'Pilih minimal 1 invoice.',
+            'lines.min' => 'Pilih minimal 1 invoice.',
+            'lines.*.payment_amount.min' => 'Payment amount minimal 0.01.',
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'payment_date' => 'payment date',
+            'payment_method' => 'payment method',
+            'bank_account_id' => 'bank account',
+            'lines' => 'invoice lines',
+        ];
+    }
 }
+

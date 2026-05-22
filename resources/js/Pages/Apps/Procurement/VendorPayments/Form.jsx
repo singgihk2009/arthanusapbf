@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 const n = (v) => Number(v || 0);
 
-export default function Form({ vendor, outstandingInvoices = [], payment = null }) {
+export default function Form({ vendor, outstandingInvoices = [], payment = null, bankAccounts = [] }) {
   const editing = !!payment;
   const existingLines = payment?.lines || [];
 
@@ -76,12 +76,27 @@ export default function Form({ vendor, outstandingInvoices = [], payment = null 
     {notice && <div className={`rounded border px-3 py-2 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : notice.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>{notice.text}</div>}
 
     <div className='grid grid-cols-1 md:grid-cols-2 gap-3 border rounded bg-white p-4'>
-      <input type='date' value={data.payment_date} onChange={(e) => setData('payment_date', e.target.value)} className='rounded border p-2' />
+      <div>
+        <input type='date' value={data.payment_date} onChange={(e) => setData('payment_date', e.target.value)} className='rounded border p-2 w-full' />
+        {errors.payment_date && <div className='text-xs text-red-600 mt-1'>{errors.payment_date}</div>}
+      </div>
+      <div>
       <select value={data.payment_method} onChange={(e) => setData('payment_method', e.target.value)} className='rounded border p-2'>
         <option value='BANK_TRANSFER'>Bank Transfer</option><option value='CASH'>Cash</option><option value='GIRO'>Giro</option>
       </select>
-      <input value={data.bank_account_id} onChange={(e) => setData('bank_account_id', e.target.value)} placeholder='Bank Account ID (optional)' className='rounded border p-2' />
-      <input value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder='Notes' className='rounded border p-2' />
+        {errors.payment_method && <div className='text-xs text-red-600 mt-1'>{errors.payment_method}</div>}
+      </div>
+      <div>
+      <select value={data.bank_account_id} onChange={(e) => setData('bank_account_id', e.target.value)} className='rounded border p-2 w-full'>
+        <option value=''>Pilih Bank Account (opsional)</option>
+        {bankAccounts.map((acc) => <option key={acc.id} value={acc.id}>{acc.label}</option>)}
+      </select>
+        {errors.bank_account_id && <div className='text-xs text-red-600 mt-1'>{errors.bank_account_id}</div>}
+      </div>
+      <div>
+      <input value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder='Notes' className='rounded border p-2 w-full' />
+      {errors.notes && <div className='text-xs text-red-600 mt-1'>{errors.notes}</div>}
+      </div>
     </div>
 
     <div className='border rounded bg-white p-4 overflow-auto'>
@@ -103,6 +118,7 @@ export default function Form({ vendor, outstandingInvoices = [], payment = null 
         })}</tbody>
       </table>
       {errors.lines && <div className='text-red-600 text-sm mt-2'>{errors.lines}</div>}
+      {Object.entries(errors).filter(([k]) => k.startsWith('lines.')).map(([k,v]) => <div key={k} className='text-red-600 text-xs mt-1'>{k}: {v}</div>)}
     </div>
 
     <div className='grid grid-cols-1 md:grid-cols-3 gap-3 border rounded bg-white p-4'>
