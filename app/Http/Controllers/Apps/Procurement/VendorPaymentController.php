@@ -82,7 +82,7 @@ class VendorPaymentController extends Controller
         }
     }
 
-    private function nextNo(): string { $prefix='VPY-'.now()->format('Ym').'-'; $last=VendorPayment::where('payment_no','like',$prefix.'%')->lockForUpdate()->orderByDesc('payment_no')->value('payment_no'); $seq=$last?((int)substr($last,-5)+1):1; $candidate=$prefix.str_pad((string)$seq,5,'0',STR_PAD_LEFT); while (VendorPayment::where('payment_no', $candidate)->exists()) { $seq++; $candidate = $prefix.str_pad((string)$seq,5,'0',STR_PAD_LEFT); } return $candidate; }
+    private function nextNo(): string { $prefix='VPY-'.now()->format('Ym').'-'; $last=VendorPayment::withTrashed()->where('payment_no','like',$prefix.'%')->lockForUpdate()->orderByDesc('payment_no')->value('payment_no'); $seq=$last?((int)substr($last,-5)+1):1; $candidate=$prefix.str_pad((string)$seq,5,'0',STR_PAD_LEFT); while (VendorPayment::withTrashed()->where('payment_no', $candidate)->exists()) { $seq++; $candidate = $prefix.str_pad((string)$seq,5,'0',STR_PAD_LEFT); } return $candidate; }
     private function outstandingInvoices(Vendor $vendor){ return VendorInvoice::where('vendor_id',$vendor->id)->where('outstanding_amount','>',0)->whereIn('status',['POSTED','PARTIAL_PAID'])->orderBy('invoice_date')->get(); }
     private function bankAccounts(Vendor $vendor)
     {
