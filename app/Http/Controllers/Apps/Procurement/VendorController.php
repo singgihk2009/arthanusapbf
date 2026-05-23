@@ -330,7 +330,7 @@ class VendorController extends Controller
             ->unique()
             ->values();
 
-        $receivingTotalQuery = DB::table('receiving_entries')
+        $receivingBaseQuery = DB::table('receiving_entries')
             ->leftJoin('purchase_orders', function ($join) {
                 $join->on('purchase_orders.id', '=', 'receiving_entries.source_id')
                     ->where('receiving_entries.source_type', '=', 'purchase_order');
@@ -344,9 +344,17 @@ class VendorController extends Controller
                 }
             });
 
-        $this->warehouseAccessService->scopeInventoryQuery($receivingTotalQuery, $user);
+        $this->warehouseAccessService->scopeInventoryQuery($receivingBaseQuery, $user);
 
-        $totalReceived = (float) $receivingTotalQuery->sum(DB::raw('COALESCE(receiving_entries.total_value, receiving_entries.grand_total, receiving_entries.total, 0)'));
+        $receivingRows = (clone $receivingBaseQuery)
+            ->select('receiving_entries.total_value', 'receiving_entries.grand_total', 'receiving_entries.total')
+            ->orderByDesc('receiving_entries.id')
+            ->limit(10)
+            ->get();
+
+        $totalReceived = (float) $receivingRows->sum(function (object $entry): float {
+            return (float) ($entry->total_value ?? $entry->grand_total ?? $entry->total ?? 0);
+        });
 
         $totalInvoiced = (float) (clone $invoiceBaseQuery)
             ->get(['net_payable_amount', 'grand_total'])
