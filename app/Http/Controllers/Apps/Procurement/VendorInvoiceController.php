@@ -23,10 +23,22 @@ class VendorInvoiceController extends Controller
     {
         $companyId = (int) (auth()->user()?->company_id ?? 1);
 
+
+        $paidTotalsSubquery = VendorPaymentLine::query()
+            ->select('vendor_invoice_id', DB::raw('SUM(payment_amount + COALESCE(wht_amount, 0)) as paid_total'))
+            ->whereHas('payment', function ($query) {
+                $query->whereIn('status', ['APPROVED', 'PAID', 'POSTED']);
+            })
+            ->groupBy('vendor_invoice_id');
+
         $query = VendorInvoice::query()
             ->with('vendor:id,name,vendor_name')
-            ->where('company_id', $companyId)
-            ->latest('invoice_date');
+            ->leftJoinSub($paidTotalsSubquery, 'invoice_paid_totals', function ($join) {
+                $join->on('invoice_paid_totals.vendor_invoice_id', '=', 'vendor_invoices.id');
+            })
+            ->select('vendor_invoices.*', DB::raw('COALESCE(invoice_paid_totals.paid_total, 0) as paid_amount_calc'))
+            ->where('vendor_invoices.company_id', $companyId)
+            ->latest('vendor_invoices.invoice_date');
 
         if ($vendor) {
             $query->where('vendor_id', $vendor->id);
@@ -37,13 +49,13 @@ class VendorInvoiceController extends Controller
 
             if ($paymentStatus !== '') {
                 if (in_array($paymentStatus, ['lunas', 'paid'], true)) {
-                    $query->whereRaw('COALESCE(outstanding_amount, 0) <= 0');
+                    $query->whereRaw('(COALESCE(vendor_invoices.net_payable_amount, vendor_invoices.grand_total, 0) - COALESCE(invoice_paid_totals.paid_total, 0)) <= 0');
                 } elseif (in_array($paymentStatus, ['belum_lunas'], true)) {
-                    $query->whereRaw('COALESCE(outstanding_amount, 0) > 0');
+                    $query->whereRaw('(COALESCE(vendor_invoices.net_payable_amount, vendor_invoices.grand_total, 0) - COALESCE(invoice_paid_totals.paid_total, 0)) > 0');
                 } elseif (in_array($paymentStatus, ['partial'], true)) {
-                    $query->whereRaw('COALESCE(paid_amount, 0) > 0 AND COALESCE(outstanding_amount, 0) > 0');
+                    $query->whereRaw('COALESCE(invoice_paid_totals.paid_total, 0) > 0 AND (COALESCE(vendor_invoices.net_payable_amount, vendor_invoices.grand_total, 0) - COALESCE(invoice_paid_totals.paid_total, 0)) > 0');
                 } elseif (in_array($paymentStatus, ['unpaid'], true)) {
-                    $query->whereRaw('COALESCE(paid_amount, 0) <= 0 AND COALESCE(outstanding_amount, 0) > 0');
+                    $query->whereRaw('COALESCE(invoice_paid_totals.paid_total, 0) <= 0 AND (COALESCE(vendor_invoices.net_payable_amount, vendor_invoices.grand_total, 0) - COALESCE(invoice_paid_totals.paid_total, 0)) > 0');
                 }
             }
 
@@ -82,7 +94,7 @@ class VendorInvoiceController extends Controller
 
         $invoices->setCollection($invoices->getCollection()->map(function (VendorInvoice $inv) use ($paidByInvoice) {
             $netPayable = (float) ($inv->net_payable_amount ?? $inv->grand_total ?? 0);
-            $calculatedPaid = (float) ($paidByInvoice[$inv->id] ?? 0);
+            $calculatedPaid = (float) ($inv->paid_amount_calc ?? ($paidByInvoice[$inv->id] ?? 0));
             $outstanding = max(0, $netPayable - $calculatedPaid);
 
             return [
