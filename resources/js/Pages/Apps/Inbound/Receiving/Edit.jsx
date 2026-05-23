@@ -25,6 +25,7 @@ const extractErrorMessage = (error, fallbackMessage) => {
 
 export default function Edit() {
     const { entry, lines, items, uoms, warehouses, transactionCodes, documentTypes, documents } = usePage().props;
+    const isPosted = String(entry?.status || '').toLowerCase() === 'posted';
     const [form, setForm] = useState({
         warehouse_id: entry.warehouse_id ? String(entry.warehouse_id) : '',
         transaction_date: entry.transaction_date,
@@ -156,16 +157,16 @@ export default function Edit() {
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                             <div>
                                 <label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Warehouse</label>
-                                <select value={form.warehouse_id} onChange={(e) => updateHeader('warehouse_id', e.target.value)} className={inputClassName}>
+                                <select value={form.warehouse_id} onChange={(e) => updateHeader('warehouse_id', e.target.value)} className={inputClassName} disabled={isPosted}>
                                     <option value="">Pilih Warehouse</option>
                                     {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} - {warehouse.name}</option>)}
                                 </select>
                             </div>
-                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Tanggal</label><input type="date" value={form.transaction_date} onChange={(e) => updateHeader('transaction_date', e.target.value)} className={inputClassName} /></div>
-                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Kode Transaksi</label><select value={form.transaction_code} onChange={(e) => updateHeader('transaction_code', e.target.value)} className={inputClassName}>{transactionCodes.map((code) => <option key={code} value={code}>{code}</option>)}</select></div>
-                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Referensi</label><input value={form.reference} onChange={(e) => updateHeader('reference', e.target.value)} className={inputClassName} /></div>
-                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Vendor</label><input value={form.vendor_name} onChange={(e) => updateHeader('vendor_name', e.target.value)} className={inputClassName} /></div>
-                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Keterangan</label><input value={form.notes} onChange={(e) => updateHeader('notes', e.target.value)} className={inputClassName} /></div>
+                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Tanggal</label><input type="date" value={form.transaction_date} onChange={(e) => updateHeader('transaction_date', e.target.value)} className={inputClassName} disabled={isPosted} /></div>
+                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Kode Transaksi</label><select value={form.transaction_code} onChange={(e) => updateHeader('transaction_code', e.target.value)} className={inputClassName} disabled={isPosted}>{transactionCodes.map((code) => <option key={code} value={code}>{code}</option>)}</select></div>
+                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Referensi</label><input value={form.reference} onChange={(e) => updateHeader('reference', e.target.value)} className={inputClassName} disabled={isPosted} /></div>
+                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Vendor</label><input value={form.vendor_name} onChange={(e) => updateHeader('vendor_name', e.target.value)} className={inputClassName} disabled={isPosted} /></div>
+                            <div><label className="mb-1 block text-sm text-gray-700 dark:text-gray-300">Keterangan</label><input value={form.notes} onChange={(e) => updateHeader('notes', e.target.value)} className={inputClassName} disabled={isPosted} /></div>
                         </div>
                         <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
                             <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
@@ -175,15 +176,15 @@ export default function Edit() {
                                         const value = (Number(line.qty) || 0) * (Number(line.price) || 0);
                                         return (
                                             <tr key={index}>
-                                                <td className="p-2"><select value={line.item_id} onChange={(e) => updateLine(index, 'item_id', e.target.value)} className={`w-56 ${lineInputClassName}`}><option value="">Pilih Item</option>{items.map((item) => <option key={item.id} value={item.id}>{item.sku} - {item.name}</option>)}</select>{errors[`lines.${index}.item_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.item_id`][0]}</p>}</td>
-                                                <td className="p-2"><input type="number" min="0" step="0.000001" value={line.qty} onChange={(e) => updateLine(index, 'qty', e.target.value)} className={`w-28 ${lineInputClassName}`} /></td>
-                                                <td className="p-2"><select value={line.uom_id} onChange={(e) => updateLine(index, 'uom_id', e.target.value)} className={`w-36 ${lineInputClassName}`}><option value="">UOM</option>{uoms.map((uom) => <option key={uom.id} value={uom.id}>{uom.code}</option>)}</select></td>
-                                                <td className="p-2"><input type="number" min="0" step="0.000001" value={line.price} onChange={(e) => updateLine(index, 'price', e.target.value)} className={`w-36 ${lineInputClassName}`} /></td>
+                                                <td className="p-2"><select value={line.item_id} onChange={(e) => updateLine(index, 'item_id', e.target.value)} className={`w-56 ${lineInputClassName}`} disabled={isPosted}><option value="">Pilih Item</option>{items.map((item) => <option key={item.id} value={item.id}>{item.sku} - {item.name}</option>)}</select>{errors[`lines.${index}.item_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.item_id`][0]}</p>}</td>
+                                                <td className="p-2"><input type="number" min="0" step="0.000001" value={line.qty} onChange={(e) => updateLine(index, 'qty', e.target.value)} className={`w-28 ${lineInputClassName}`} disabled={isPosted} /></td>
+                                                <td className="p-2"><select value={line.uom_id} onChange={(e) => updateLine(index, 'uom_id', e.target.value)} className={`w-36 ${lineInputClassName}`} disabled={isPosted}><option value="">UOM</option>{uoms.map((uom) => <option key={uom.id} value={uom.id}>{uom.code}</option>)}</select></td>
+                                                <td className="p-2"><input type="number" min="0" step="0.000001" value={line.price} onChange={(e) => updateLine(index, 'price', e.target.value)} className={`w-36 ${lineInputClassName}`} disabled={isPosted} /></td>
                                                 <td className="p-2">{value.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                                <td className="p-2"><input value={line.batch_number} onChange={(e) => updateLine(index, 'batch_number', e.target.value)} className={`w-36 ${lineInputClassName}`} /></td>
-                                                <td className="p-2"><input type="date" value={line.expired_date} onChange={(e) => updateLine(index, 'expired_date', e.target.value)} className={`w-44 ${lineInputClassName}`} /></td>
-                                                <td className="p-2"><input value={line.notes} onChange={(e) => updateLine(index, 'notes', e.target.value)} className={`w-44 ${lineInputClassName}`} /></td>
-                                                <td className="p-2"><button type="button" onClick={() => removeLine(index)} className="rounded border border-red-300 px-2 py-1 text-red-600">Hapus</button></td>
+                                                <td className="p-2"><input value={line.batch_number} onChange={(e) => updateLine(index, 'batch_number', e.target.value)} className={`w-36 ${lineInputClassName}`} disabled={isPosted} /></td>
+                                                <td className="p-2"><input type="date" value={line.expired_date} onChange={(e) => updateLine(index, 'expired_date', e.target.value)} className={`w-44 ${lineInputClassName}`} disabled={isPosted} /></td>
+                                                <td className="p-2"><input value={line.notes} onChange={(e) => updateLine(index, 'notes', e.target.value)} className={`w-44 ${lineInputClassName}`} disabled={isPosted} /></td>
+                                                <td className="p-2">{!isPosted && <button type="button" onClick={() => removeLine(index)} className="rounded border border-red-300 px-2 py-1 text-red-600">Hapus</button>}</td>
                                             </tr>
                                         );
                                     })}
@@ -192,13 +193,13 @@ export default function Edit() {
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                            <button type="button" onClick={addLine} className="rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-800">+ Tambah Line</button>
+                            {!isPosted && <button type="button" onClick={addLine} className="rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-800">+ Tambah Line</button>}
                             <div className="text-sm font-semibold text-gray-900">Total Value: {totalValue.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </div>
 
                         <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
                             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Upload Dokumen Receiving (Document Center)</h3>
-                            {form.documents.map((doc, idx) => (
+                            {!isPosted && form.documents.map((doc, idx) => (
                                 <div key={idx} className="mt-3 grid gap-2 md:grid-cols-4">
                                     <select value={doc.document_type_id} onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, document_type_id: e.target.value } : d) }))} className={inputClassName}>
                                         <option value="">Pilih tipe dokumen</option>
@@ -209,7 +210,7 @@ export default function Edit() {
                                     <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setForm((prev) => ({ ...prev, documents: prev.documents.map((d, i) => i === idx ? { ...d, file: e.target.files?.[0] ?? null } : d) }))} className={inputClassName} />
                                 </div>
                             ))}
-                            <button type="button" onClick={() => setForm((prev) => ({ ...prev, documents: [...prev.documents, { ...emptyDocument }] }))} className="mt-3 rounded border px-3 py-1 text-sm">+ Add Dokumen</button>
+                            {!isPosted && <button type="button" onClick={() => setForm((prev) => ({ ...prev, documents: [...prev.documents, { ...emptyDocument }] }))} className="mt-3 rounded border px-3 py-1 text-sm">+ Add Dokumen</button>}
 
                             <div className="mt-4 rounded border border-gray-200 dark:border-gray-800">
                                 <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
@@ -242,14 +243,14 @@ export default function Edit() {
                                                     <td className="border px-2 py-2">
                                                         <div className="flex items-center gap-2">
                                                             <a href={route('apps.document-center.documents.download', doc.id)} target="_blank" rel="noreferrer" className="rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">View</a>
-                                                            <button
+                                                            {!isPosted && <button
                                                                 type="button"
                                                                 onClick={() => removeUploadedDocument(doc.id)}
                                                                 disabled={removingDocumentId === doc.id}
                                                                 className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                                                             >
                                                                 {removingDocumentId === doc.id ? 'Removing...' : 'Remove'}
-                                                            </button>
+                                                            </button>}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -263,10 +264,10 @@ export default function Edit() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
-                            <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{loading ? 'Menyimpan...' : 'Update Receiving Entry'}</button>
-                            <button type="button" onClick={(event) => submit(event, 'post')} disabled={loading} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+                            {!isPosted && <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{loading ? 'Menyimpan...' : 'Update Receiving Entry'}</button>}
+                            {!isPosted && <button type="button" onClick={(event) => submit(event, 'post')} disabled={loading} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
                                 {loading ? 'Menyimpan...' : 'Posting'}
-                            </button>
+                            </button>}
                             <button type="button" onClick={() => { window.location.href = route('apps.inbound.receiving.index'); }} disabled={loading} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200">
                                 Close
                             </button>

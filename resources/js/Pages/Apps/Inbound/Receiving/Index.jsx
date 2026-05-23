@@ -53,22 +53,6 @@ export default function Index() {
     };
 
 
-    const handleUnpost = async (id) => {
-        if (!window.confirm('Batalkan posting dokumen ini? Stok akan dikurangi kembali.')) {
-            return;
-        }
-
-        setProcessingId(id);
-        try {
-            await window.axios.post(route('apps.inventory.unposting.receiving', id));
-            window.location.reload();
-        } catch (error) {
-            window.alert(extractErrorMessage(error, 'Gagal unpost receiving entry.'));
-        } finally {
-            setProcessingId(null);
-        }
-    };
-
     return (
         <>
             <Head title="Receiving Entry" />
@@ -122,8 +106,8 @@ export default function Index() {
                                         <td className="px-3 py-2">
                                             <div className="flex justify-center gap-2">
                                                 {!isPosted(entry.status) && <Link href={route('apps.inbound.receiving.edit', entry.id)} className="rounded border border-gray-300 px-2 py-1 text-xs">Edit</Link>}
+                                                {isPosted(entry.status) && <Link href={route('apps.inbound.receiving.edit', entry.id)} className="rounded border border-gray-300 px-2 py-1 text-xs">View</Link>}
                                                 {!isPosted(entry.status) && <button type="button" onClick={() => handlePost(entry.id)} disabled={processingId === entry.id} className="rounded border border-blue-300 px-2 py-1 text-xs text-blue-700 disabled:opacity-50">Post</button>}
-                                                {isPosted(entry.status) && <button type="button" onClick={() => handleUnpost(entry.id)} disabled={processingId === entry.id} className="rounded border border-amber-300 px-2 py-1 text-xs text-amber-700 disabled:opacity-50">Unpost</button>}
                                                 {!isPosted(entry.status) && <button type="button" onClick={() => handleDelete(entry.id)} disabled={processingId === entry.id} className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 disabled:opacity-50">Hapus</button>}
                                             </div>
                                         </td>
