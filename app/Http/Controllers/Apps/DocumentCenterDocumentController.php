@@ -159,8 +159,13 @@ class DocumentCenterDocumentController extends Controller
     {
         $user = auth()->user();
         abort_unless($user, 403);
+        $isReportRoleDocumentAccess = $user->hasRole('inventory-reports-access')
+            && in_array($permission, ['document.view', 'document.download'], true)
+            && in_array((string) $document->owner_type, ['purchase_order', 'receiving_entry', 'goods_receipt'], true);
+
         $allowedRole = $user->hasAnyRole(['super-admin', 'admin'])
-            || ($user->hasAnyRole(['compliance', 'manager']) && in_array($permission, ['document.verify', 'document.reject'], true));
+            || ($user->hasAnyRole(['compliance', 'manager']) && in_array($permission, ['document.verify', 'document.reject'], true))
+            || $isReportRoleDocumentAccess;
 
         abort_unless($user->can($permission) || $allowedRole, 403);
         if ($document->business_id !== null && (int) $document->business_id !== (int) ($user->business_id ?? $document->business_id)) {
