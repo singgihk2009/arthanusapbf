@@ -28,6 +28,7 @@ const resolvePaymentStatus = (invoice) => {
 
 export default function Tab({ data, vendor, documentTypes = [] }) {
   const invoices = data?.invoices?.data ?? [];
+  const tableGrandTotal = invoices.reduce((total, invoice) => total + Number(invoice?.grand_total ?? 0), 0);
   const docs = vendor?.documents ?? [];
   const [notice, setNotice] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -100,6 +101,11 @@ export default function Tab({ data, vendor, documentTypes = [] }) {
       <div className='flex justify-end'>
         <Link href={`/apps/procurement/vendors/${vendor.id}/invoices/create`} className='px-3 py-2 bg-indigo-600 text-white rounded'>+ Create Vendor Invoice</Link>
       </div>
+      <div className='grid grid-cols-1 gap-3 text-sm md:grid-cols-3'>
+        <Card label='Received Not Invoiced' value={formatCurrency(data?.monitoring?.received_not_invoiced || 0)} />
+        <Card label='Total Received' value={formatCurrency(data?.monitoring?.total_received || 0)} />
+        <Card label='Total Invoiced' value={formatCurrency(tableGrandTotal)} />
+      </div>
       <div className='overflow-auto border rounded'>
         <table className='min-w-full text-sm'>
           <thead className='bg-gray-50'><tr>{['Internal Invoice No','Vendor Invoice No','Invoice Date','Due Date','Subtotal','Discount','PPN','WHT','Grand Total','Net Payable','Paid','Outstanding','Status Invoice','Status Dokumen','Action'].map(h=><th key={h} className='px-3 py-2 text-left'>{h}</th>)}</tr></thead>
@@ -110,3 +116,10 @@ export default function Tab({ data, vendor, documentTypes = [] }) {
     </div>
   );
 }
+
+const Card = ({ label, value }) => (
+  <div className='rounded border bg-white p-3'>
+    <div className='text-gray-500'>{label}</div>
+    <div className='font-semibold'>{value}</div>
+  </div>
+);
