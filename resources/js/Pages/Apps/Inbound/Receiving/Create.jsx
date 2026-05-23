@@ -70,7 +70,7 @@ export default function Create() {
         }));
     };
 
-    const submit = async (event) => {
+    const submit = async (event, action = 'save') => {
         event.preventDefault();
         setLoading(true);
         setErrors({});
@@ -111,6 +111,16 @@ export default function Create() {
             if (!isJsonResponse) {
                 throw new Error('Server did not return JSON response');
             }
+            if (action === 'post') {
+                const createdId = response?.data?.id;
+                if (!createdId) throw new Error('ID receiving entry tidak ditemukan.');
+                await window.axios.post(route('apps.inventory.posting.receiving', createdId), null, {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                window.location.href = route('apps.inbound.receiving.index');
+                return;
+            }
+
             setMessage({ type: 'success', text: response?.data?.message || 'Receiving entry berhasil disimpan.' });
             setForm((prev) => ({
                 ...prev,
@@ -289,9 +299,17 @@ export default function Create() {
                             <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">Total Value: {totalValue.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </div>
 
-                        <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">
-                            {loading ? 'Menyimpan...' : 'Simpan Receiving Entry'}
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">
+                                {loading ? 'Menyimpan...' : 'Simpan Receiving Entry'}
+                            </button>
+                            <button type="button" onClick={(event) => submit(event, 'post')} disabled={loading} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+                                {loading ? 'Menyimpan...' : 'Posting'}
+                            </button>
+                            <button type="button" onClick={() => { window.location.href = route('apps.inbound.receiving.index'); }} disabled={loading} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200">
+                                Close
+                            </button>
+                        </div>
                     </form>
                 </div>
 

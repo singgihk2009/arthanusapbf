@@ -120,7 +120,8 @@ class ReceivingEntryController extends Controller
         $userId = $request->user()?->id;
 
         $uploadedDocumentCount = 0;
-        DB::transaction(function () use ($validated, $userId, $request, &$uploadedDocumentCount): void {
+        $entryId = 0;
+        DB::transaction(function () use ($validated, $userId, $request, &$uploadedDocumentCount, &$entryId): void {
             $entryId = $this->insertEntryHeader($validated, $userId);
             $this->replaceEntryLines($entryId, $validated['lines'], $validated);
             foreach ((array) ($validated['documents'] ?? []) as $index => $document) {
@@ -148,7 +149,7 @@ class ReceivingEntryController extends Controller
             if ($uploadedDocumentCount > 0) {
                 $message .= " {$uploadedDocumentCount} dokumen berhasil diupload.";
             }
-            return response()->json(['message' => $message]);
+            return response()->json(['message' => $message, 'id' => $entryId]);
         }
 
         return to_route('apps.inbound.receiving.index')->with('success', 'Receiving entry berhasil disimpan.');

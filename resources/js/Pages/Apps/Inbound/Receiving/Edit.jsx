@@ -68,7 +68,7 @@ export default function Edit() {
     const addLine = () => setForm((prev) => ({ ...prev, lines: [...prev.lines, { ...emptyLine }] }));
     const removeLine = (index) => setForm((prev) => ({ ...prev, lines: prev.lines.length === 1 ? [{ ...emptyLine }] : prev.lines.filter((_, idx) => idx !== index) }));
 
-    const submit = async (event) => {
+    const submit = async (event, action = 'save') => {
         event.preventDefault();
         setLoading(true);
         setErrors({});
@@ -100,6 +100,11 @@ export default function Edit() {
             await window.axios.post(route('apps.inbound.receiving.update', entry.id), payload, {
                 headers: { 'Content-Type': 'multipart/form-data', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             });
+            if (action === 'post') {
+                await window.axios.post(route('apps.inventory.posting.receiving', entry.id), null, {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+            }
             window.location.href = route('apps.inbound.receiving.index');
         } catch (error) {
             if (error.response?.status === 422) {
@@ -257,7 +262,15 @@ export default function Edit() {
                             </div>
                         </div>
 
-                        <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{loading ? 'Menyimpan...' : 'Update Receiving Entry'}</button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button type="submit" disabled={loading} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{loading ? 'Menyimpan...' : 'Update Receiving Entry'}</button>
+                            <button type="button" onClick={(event) => submit(event, 'post')} disabled={loading} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+                                {loading ? 'Menyimpan...' : 'Posting'}
+                            </button>
+                            <button type="button" onClick={() => { window.location.href = route('apps.inbound.receiving.index'); }} disabled={loading} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200">
+                                Close
+                            </button>
+                        </div>
                     </form>
                 </div>
 
