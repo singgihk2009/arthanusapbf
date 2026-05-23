@@ -13,12 +13,13 @@ use App\Models\Procurement\VendorPaymentLine;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class VendorInvoiceController extends Controller
 {
-    public function index(?Vendor $vendor = null)
+    public function index(Request $request, ?Vendor $vendor = null)
     {
         $companyId = (int) (auth()->user()?->company_id ?? 1);
 
@@ -29,9 +30,33 @@ class VendorInvoiceController extends Controller
 
         if ($vendor) {
             $query->where('vendor_id', $vendor->id);
+        } else {
+            $search = trim((string) $request->input('search', ''));
+            $paymentStatus = strtolower(trim((string) $request->input('status_invoice', '')));
+            $documentStatus = strtoupper(trim((string) $request->input('status_dokumen', '')));
+
+            if ($paymentStatus !== '') {
+                $query->whereRaw('LOWER(COALESCE(payment_status, "")) = ?', [$paymentStatus]);
+            }
+
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $like = '%'.$search.'%';
+                    $q->where('invoice_no_internal', 'like', $like)
+                        ->orWhere('vendor_invoice_no', 'like', $like)
+                        ->orWhereHas('vendor', function ($vendorQuery) use ($like) {
+                            $vendorQuery->where('vendor_name', 'like', $like)
+                                ->orWhere('name', 'like', $like);
+                        });
+                });
+            }
+
+            if ($documentStatus !== '') {
+                $query->whereRaw('UPPER(COALESCE(status, "")) = ?', [$documentStatus]);
+            }
         }
 
-        $invoices = $query->paginate(10);
+        $invoices = $query->paginate(10)->withQueryString();
 
         $invoiceIds = collect($invoices->items())->pluck('id')->filter()->values();
         $paidByInvoice = collect();
@@ -72,12 +97,20 @@ class VendorInvoiceController extends Controller
             ];
         }));
 
+
         if ($vendor) {
             return response()->json(['invoices' => $invoices]);
         }
 
         return Inertia::render('Apps/Procurement/VendorInvoices/Index', [
             'invoices' => $invoices,
+            'filters' => [
+                'search' => (string) $request->input('search', ''),
+                'status_invoice' => strtolower((string) $request->input('status_invoice', '')),
+                'status_dokumen' => strtoupper((string) $request->input('status_dokumen', '')),
+            ],
+            'statusInvoiceOptions' => ['paid', 'partial_paid', 'unpaid'],
+            'statusDokumenOptions' => ['DRAFT', 'SUBMITTED', 'APPROVED', 'POSTED', 'PAID', 'CANCELLED'],
         ]);
     }
 
