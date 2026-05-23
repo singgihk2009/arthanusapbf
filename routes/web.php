@@ -215,7 +215,17 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     // phase 1 sales otc
     Route::get('/customers/search', [CustomerController::class, 'search'])->name('customers.search');
     Route::resource('/customers', CustomerController::class);
-    Route::resource('/price-lists', PriceListController::class);
+    Route::get('/price-lists/resolve-price', [PriceListController::class, 'resolvePrice'])->name('price-lists.resolve-price')->middleware('can:price-list.view');
+    Route::get('/items/search', [PriceListController::class, 'searchItems'])->name('items.search')->middleware('can:price-list.view');
+    
+    Route::get('/price-lists', [PriceListController::class, 'index'])->name('price-lists.index')->middleware('can:price-list.view');
+    Route::get('/price-lists/create', [PriceListController::class, 'create'])->name('price-lists.create')->middleware('can:price-list.create');
+    Route::post('/price-lists', [PriceListController::class, 'store'])->name('price-lists.store')->middleware('can:price-list.create');
+    Route::get('/price-lists/{price_list}', [PriceListController::class, 'show'])->name('price-lists.show')->middleware('can:price-list.view');
+    Route::get('/price-lists/{price_list}/edit', [PriceListController::class, 'edit'])->name('price-lists.edit')->middleware('can:price-list.update');
+    Route::put('/price-lists/{price_list}', [PriceListController::class, 'update'])->name('price-lists.update')->middleware('can:price-list.update');
+    Route::delete('/price-lists/{price_list}', [PriceListController::class, 'destroy'])->name('price-lists.destroy')->middleware('can:price-list.delete');
+
     Route::resource('/sales-orders', SalesOrderController::class);
     Route::post('/sales-orders/{id}/submit', [SalesOrderController::class, 'submit'])->name('sales-orders.submit');
     Route::post('/sales-orders/{id}/approve', [SalesOrderController::class, 'approve'])->name('sales-orders.approve');
