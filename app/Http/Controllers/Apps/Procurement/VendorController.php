@@ -288,7 +288,10 @@ class VendorController extends Controller
     }
     public function invoices(Vendor $vendor)
     {
-        $invoices = VendorInvoice::where('vendor_id', $vendor->id)
+        $invoiceBaseQuery = VendorInvoice::query()
+            ->where('vendor_id', $vendor->id);
+
+        $invoices = (clone $invoiceBaseQuery)
             ->latest('invoice_date')
             ->paginate(10);
 
@@ -318,22 +321,36 @@ class VendorController extends Controller
             });
         }
 
-        $legacyReceivingTotal = (float) DB::table('receiving_entries')
-            ->where('vendor_id', $vendor->id)
-            ->sum('total_value');
+        $user = auth()->user();
+        abort_if(! $user, 401);
 
-        $goodsReceiptTotal = (float) DB::table('goods_receipts as gr')
-            ->join('purchase_orders as po', 'po.id', '=', 'gr.purchase_order_id')
-            ->where('po.vendor_id', $vendor->id)
-            ->whereIn('gr.status', ['APPROVED', 'POSTED'])
-            ->sum(DB::raw('COALESCE(gr.grand_total, 0)'));
+        $vendorNames = collect([$vendor->vendor_name, $vendor->name])
+            ->filter(fn ($name) => is_string($name) && trim($name) !== '')
+            ->map(fn ($name) => mb_strtolower(trim((string) $name)))
+            ->unique()
+            ->values();
 
-        $totalReceived = max($legacyReceivingTotal, $goodsReceiptTotal);
+        $receivingTotalQuery = DB::table('receiving_entries')
+            ->leftJoin('purchase_orders', function ($join) {
+                $join->on('purchase_orders.id', '=', 'receiving_entries.source_id')
+                    ->where('receiving_entries.source_type', '=', 'purchase_order');
+            })
+            ->where(function ($scopedQuery) use ($vendor, $vendorNames) {
+                $scopedQuery->where('receiving_entries.vendor_id', $vendor->id)
+                    ->orWhere('purchase_orders.vendor_id', $vendor->id);
 
-        $totalInvoiced = (float) VendorInvoice::query()
-            ->where('vendor_id', $vendor->id)
-            ->selectRaw('COALESCE(SUM(COALESCE(net_payable_amount, grand_total, 0)), 0) as total_invoiced')
-            ->value('total_invoiced');
+                if ($vendorNames->isNotEmpty()) {
+                    $scopedQuery->orWhereIn(DB::raw('LOWER(TRIM(receiving_entries.vendor_name))'), $vendorNames->all());
+                }
+            });
+
+        $this->warehouseAccessService->scopeInventoryQuery($receivingTotalQuery, $user);
+
+        $totalReceived = (float) $receivingTotalQuery->sum(DB::raw('COALESCE(receiving_entries.total_value, 0)'));
+
+        $totalInvoiced = (float) (clone $invoiceBaseQuery)
+            ->get(['net_payable_amount', 'grand_total'])
+            ->sum(fn (VendorInvoice $invoice) => (float) ($invoice->net_payable_amount ?? $invoice->grand_total ?? 0));
 
         $monitoring = [
             'total_received' => $totalReceived,
