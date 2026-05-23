@@ -76,8 +76,6 @@ export default function Show({ purchaseOrder }) {
             <Table>
                 <Table.Thead>
                     <tr>
-                        {showReceivingInfo && <Table.Th>No Receiving</Table.Th>}
-                        {showReceivingInfo && <Table.Th>Tanggal Receiving</Table.Th>}
                         <Table.Th>Document Type</Table.Th>
                         <Table.Th>Judul</Table.Th>
                         <Table.Th>No Dokumen</Table.Th>
@@ -89,8 +87,6 @@ export default function Show({ purchaseOrder }) {
                 <Table.Tbody>
                     {documents.length ? documents.map((doc) => (
                         <tr key={`${showReceivingInfo ? `gr-${doc.receiving_number}-` : 'po-'}${doc.id}`}>
-                            {showReceivingInfo && <Table.Td>{doc.receiving_number || '-'}</Table.Td>}
-                            {showReceivingInfo && <Table.Td>{formatDisplayDate(doc.receiving_date)}</Table.Td>}
                             <Table.Td>{doc.document_type?.name || doc.document_type?.code || doc.type || '-'}</Table.Td>
                             <Table.Td>{doc.title || '-'}</Table.Td>
                             <Table.Td>{doc.document_number || doc.number || '-'}</Table.Td>
@@ -106,7 +102,7 @@ export default function Show({ purchaseOrder }) {
                         </tr>
                     )) : (
                         <tr>
-                            <Table.Td colSpan={showReceivingInfo ? 8 : 6} className='text-center text-gray-500'>
+                            <Table.Td colSpan={6} className='text-center text-gray-500'>
                                 {emptyMessage}
                             </Table.Td>
                         </tr>
