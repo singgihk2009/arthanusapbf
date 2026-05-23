@@ -288,7 +288,10 @@ class VendorController extends Controller
     }
     public function invoices(Vendor $vendor)
     {
-        $invoices = VendorInvoice::where('vendor_id', $vendor->id)
+        $invoiceBaseQuery = VendorInvoice::query()
+            ->where('vendor_id', $vendor->id);
+
+        $invoices = (clone $invoiceBaseQuery)
             ->latest('invoice_date')
             ->paginate(10);
 
@@ -318,7 +321,44 @@ class VendorController extends Controller
             });
         }
 
-        return response()->json(['invoices' => $invoices]);
+        $user = auth()->user();
+        abort_if(! $user, 401);
+
+        $vendorNames = collect([$vendor->vendor_name, $vendor->name])
+            ->filter(fn ($name) => is_string($name) && trim($name) !== '')
+            ->map(fn ($name) => mb_strtolower(trim((string) $name)))
+            ->unique()
+            ->values();
+
+        $receivingTotalQuery = DB::table('receiving_entries')
+            ->leftJoin('purchase_orders', function ($join) {
+                $join->on('purchase_orders.id', '=', 'receiving_entries.source_id')
+                    ->where('receiving_entries.source_type', '=', 'purchase_order');
+            })
+            ->where(function ($scopedQuery) use ($vendor, $vendorNames) {
+                $scopedQuery->where('receiving_entries.vendor_id', $vendor->id)
+                    ->orWhere('purchase_orders.vendor_id', $vendor->id);
+
+                if ($vendorNames->isNotEmpty()) {
+                    $scopedQuery->orWhereIn(DB::raw('LOWER(TRIM(receiving_entries.vendor_name))'), $vendorNames->all());
+                }
+            });
+
+        $this->warehouseAccessService->scopeInventoryQuery($receivingTotalQuery, $user);
+
+        $totalReceived = (float) $receivingTotalQuery->sum(DB::raw('COALESCE(receiving_entries.total_value, 0)'));
+
+        $totalInvoiced = (float) (clone $invoiceBaseQuery)
+            ->get(['net_payable_amount', 'grand_total'])
+            ->sum(fn (VendorInvoice $invoice) => (float) ($invoice->net_payable_amount ?? $invoice->grand_total ?? 0));
+
+        $monitoring = [
+            'total_received' => $totalReceived,
+            'total_invoiced' => $totalInvoiced,
+            'received_not_invoiced' => max(0, $totalReceived - $totalInvoiced),
+        ];
+
+        return response()->json(['invoices' => $invoices, 'monitoring' => $monitoring]);
     }
     public function payments(Vendor $vendor) {
         $payments = VendorPayment::where('vendor_id', $vendor->id)
