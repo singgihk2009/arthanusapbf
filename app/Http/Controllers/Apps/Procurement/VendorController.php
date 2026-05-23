@@ -288,7 +288,10 @@ class VendorController extends Controller
     }
     public function invoices(Vendor $vendor)
     {
-        $invoices = VendorInvoice::where('vendor_id', $vendor->id)
+        $invoiceBaseQuery = VendorInvoice::query()
+            ->where('vendor_id', $vendor->id);
+
+        $invoices = (clone $invoiceBaseQuery)
             ->latest('invoice_date')
             ->paginate(10);
 
