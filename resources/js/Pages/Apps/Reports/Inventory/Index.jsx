@@ -120,6 +120,7 @@ export default function Index() {
                         { key: 'facility_reference_date', label: 'Tgl Daftar' },
                         { key: 'gr_number', label: 'No Penerimaan Barang' },
                         { key: 'trx_datetime', label: 'Tanggal Terima', sortKey: 'trx_datetime' },
+                        { key: 'po_reference', label: 'Referensi' },
                         { key: 'vendor_name', label: 'Nama Pengirim Barang', sortKey: 'vendor' },
                         { key: 'sku', label: 'Kode Barang' },
                         { key: 'category_name', label: 'Kategory Barang', sortKey: 'category' },
@@ -128,7 +129,6 @@ export default function Index() {
                         { key: 'qty', label: 'Jumlah Barang', sortKey: 'qty' },
                         { key: 'unit_price', label: 'Harga Satuan', sortKey: 'unit_price' },
                         { key: 'value', label: 'Total Harga', sortKey: 'value' },
-                        { key: 'po_reference', label: 'Referensi' },
                     ])
                 : [
                     { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
