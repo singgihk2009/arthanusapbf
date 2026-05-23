@@ -2,9 +2,14 @@ import { Link } from '@inertiajs/react';
 
 const isDraft = (status) => String(status || '').toLowerCase() === 'draft';
 
+const resolveReceivingAmount = (entry) => Number(entry?.total_value ?? entry?.grand_total ?? entry?.total ?? 0);
+
+const formatAmount = (value) => Number(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 export default function ReceivingsTab({ data }) {
     const receivings = data?.receivings;
     const rows = receivings?.data || [];
+    const totalAmount = rows.reduce((sum, entry) => sum + resolveReceivingAmount(entry), 0);
 
     const extractErrorMessage = (error, fallbackMessage) => {
         return error?.response?.data?.message || fallbackMessage;
@@ -38,6 +43,10 @@ export default function ReceivingsTab({ data }) {
 
     return (
         <div className="space-y-3">
+            <div className="rounded border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm">
+                <div className="text-indigo-700">Total Amount Receiving (halaman ini)</div>
+                <div className="text-lg font-semibold text-indigo-900">{formatAmount(totalAmount)}</div>
+            </div>
             <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
                 <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
                     <thead className="bg-gray-50 dark:bg-gray-900">
@@ -68,7 +77,7 @@ export default function ReceivingsTab({ data }) {
                                 <td className="px-3 py-2">{entry.transaction_code || '-'}</td>
                                 <td className="px-3 py-2">{entry.vendor_name || '-'}</td>
                                 <td className="px-3 py-2"><span className="rounded border border-gray-300 px-2 py-1 text-xs">{entry.status || 'DRAFT'}</span></td>
-                                <td className="px-3 py-2 text-right">{Number(entry.total_value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td className="px-3 py-2 text-right">{formatAmount(resolveReceivingAmount(entry))}</td>
                                 <td className="px-3 py-2 text-center">
                                     <div className="flex flex-wrap justify-center gap-2">
                                         <Link href={route('apps.inbound.receiving.edit', entry.id)} className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700">Detail</Link>
