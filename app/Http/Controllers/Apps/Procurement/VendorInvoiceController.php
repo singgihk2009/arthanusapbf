@@ -101,6 +101,7 @@ class VendorInvoiceController extends Controller
                 'id' => $inv->id,
                 'invoice_no_internal' => $inv->invoice_no_internal,
                 'vendor_invoice_no' => $inv->vendor_invoice_no,
+                'vendor_id' => $inv->vendor_id ? (int) $inv->vendor_id : null,
                 'vendor_name' => $inv->vendor?->vendor_name ?: $inv->vendor?->name,
                 'invoice_date' => $inv->invoice_date,
                 'due_date' => $inv->due_date,
