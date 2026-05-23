@@ -36,7 +36,13 @@ class VendorInvoiceController extends Controller
             $documentStatus = strtoupper(trim((string) $request->input('status_dokumen', '')));
 
             if ($paymentStatus !== '') {
-                $query->whereRaw('LOWER(COALESCE(payment_status, "")) = ?', [$paymentStatus]);
+                if ($paymentStatus === 'paid') {
+                    $query->whereRaw('COALESCE(outstanding_amount, 0) <= 0');
+                } elseif ($paymentStatus === 'partial') {
+                    $query->whereRaw('COALESCE(paid_amount, 0) > 0 AND COALESCE(outstanding_amount, 0) > 0');
+                } elseif ($paymentStatus === 'unpaid') {
+                    $query->whereRaw('COALESCE(paid_amount, 0) <= 0 AND COALESCE(outstanding_amount, 0) > 0');
+                }
             }
 
             if ($search !== '') {
@@ -93,7 +99,7 @@ class VendorInvoiceController extends Controller
                 'paid_amount' => $calculatedPaid,
                 'outstanding_amount' => $outstanding,
                 'status' => strtolower((string) $inv->status),
-                'payment_status' => $outstanding <= 0 ? 'paid' : ($calculatedPaid > 0 ? 'partial_paid' : 'unpaid'),
+                'payment_status' => $outstanding <= 0 ? 'paid' : ($calculatedPaid > 0 ? 'partial' : 'unpaid'),
             ];
         }));
 
@@ -109,7 +115,7 @@ class VendorInvoiceController extends Controller
                 'status_invoice' => strtolower((string) $request->input('status_invoice', '')),
                 'status_dokumen' => strtoupper((string) $request->input('status_dokumen', '')),
             ],
-            'statusInvoiceOptions' => ['paid', 'partial_paid', 'unpaid'],
+            'statusInvoiceOptions' => ['paid', 'partial', 'unpaid'],
             'statusDokumenOptions' => ['DRAFT', 'SUBMITTED', 'APPROVED', 'POSTED', 'PAID', 'CANCELLED'],
         ]);
     }
