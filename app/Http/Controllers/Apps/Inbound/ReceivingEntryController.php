@@ -193,6 +193,7 @@ class ReceivingEntryController extends Controller
                 'transaction_code' => (string) $entry->transaction_code,
                 'reference' => (string) ($entry->reference ?? ''),
                 'vendor_name' => (string) ($entry->vendor_name ?? ''),
+                'vendor_id' => $entry->vendor_id ? (int) $entry->vendor_id : null,
                 'notes' => (string) ($entry->notes ?? ''),
             ],
             'lines' => $lines,
