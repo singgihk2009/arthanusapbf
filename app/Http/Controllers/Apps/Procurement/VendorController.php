@@ -347,9 +347,8 @@ class VendorController extends Controller
         $this->warehouseAccessService->scopeInventoryQuery($receivingBaseQuery, $user);
 
         $receivingRows = (clone $receivingBaseQuery)
+            ->whereIn(DB::raw("LOWER(COALESCE(receiving_entries.status, ''))"), ['posted', 'completed'])
             ->select('receiving_entries.total_value', 'receiving_entries.grand_total', 'receiving_entries.total')
-            ->orderByDesc('receiving_entries.id')
-            ->limit(10)
             ->get();
 
         $totalReceived = (float) $receivingRows->sum(function (object $entry): float {
@@ -357,8 +356,7 @@ class VendorController extends Controller
         });
 
         $totalInvoiced = (float) (clone $invoiceBaseQuery)
-            ->get(['net_payable_amount', 'grand_total'])
-            ->sum(fn (VendorInvoice $invoice) => (float) ($invoice->net_payable_amount ?? $invoice->grand_total ?? 0));
+            ->sum('grand_total');
 
         $monitoring = [
             'total_received' => $totalReceived,
