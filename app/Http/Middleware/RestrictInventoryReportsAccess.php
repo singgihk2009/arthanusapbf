@@ -16,7 +16,12 @@ class RestrictInventoryReportsAccess
             return $next($request);
         }
 
-        if ($request->routeIs('apps.reports.*')) {
+        if (
+            $request->routeIs('apps.reports.*')
+            || $request->routeIs('apps.procurement.purchase-orders.show')
+            || $request->routeIs('apps.document-center.documents.show')
+            || $request->routeIs('apps.document-center.documents.download')
+        ) {
             return $next($request);
         }
 
