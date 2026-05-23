@@ -240,7 +240,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
         $startDate = $request->date('start_date')?->toDateString() ?? now()->startOfYear()->toDateString();
         $endDate = $request->date('end_date')?->toDateString() ?? now()->toDateString();
 
-        if (in_array($type, ['stock-position', 'stock-card-movement'], true)) {
+        if ($type === 'stock-position') {
             $startDate = $endDate;
         }
 
