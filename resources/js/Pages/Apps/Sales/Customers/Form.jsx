@@ -1,3 +1,10 @@
-import React from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
-export default function Page(props){return <AppLayout><div className='p-6'><h1 className='text-xl font-semibold'>Sales Module</h1><pre className='text-xs mt-2 bg-gray-100 p-3 rounded'>{JSON.stringify(props,null,2)}</pre></div></AppLayout>}
+
+export default function Page({ customer }) {
+  const isEdit = !!customer;
+  const { data, setData, post, put, processing, errors } = useForm({ customer_code: customer?.customer_code || '', customer_name: customer?.customer_name || '', customer_type: customer?.customer_type || '', contact_person: customer?.contact_person || '', phone: customer?.phone || '', email: customer?.email || '', address: customer?.address || '', city: customer?.city || '', province: customer?.province || '', postal_code: customer?.postal_code || '', country: customer?.country || 'Indonesia', npwp: customer?.npwp || '', payment_term_days: customer?.payment_term_days ?? 0, credit_limit: customer?.credit_limit ?? 0, status: customer?.status || 'active', notes: customer?.notes || '' });
+  const submit = (e) => { e.preventDefault(); isEdit ? put(route('apps.customers.update', customer.id)) : post(route('apps.customers.store')); };
+  const fields = ['customer_code','customer_name','customer_type','contact_person','phone','email','address','city','province','postal_code','country','npwp','payment_term_days','credit_limit','notes'];
+  return <AppLayout><Head title={isEdit?'Edit Customer':'Add Customer'} /><div className='p-6'><form onSubmit={submit} className='space-y-3 max-w-3xl'>{fields.map((f)=><div key={f}><label className='block text-sm capitalize'>{f.replaceAll('_',' ')}</label><input value={data[f]} onChange={e=>setData(f,e.target.value)} className='w-full border rounded px-3 py-2' />{errors[f]&&<div className='text-red-600 text-xs'>{errors[f]}</div>}</div>)}<div><label>Status</label><select value={data.status} onChange={e=>setData('status',e.target.value)} className='w-full border rounded px-3 py-2'><option value='active'>Active</option><option value='inactive'>Inactive</option></select></div><div className='flex gap-2'><button disabled={processing} className='px-4 py-2 bg-blue-600 text-white rounded'>Save</button><Link href={route('apps.customers.index')} className='px-4 py-2 border rounded'>Cancel</Link></div></form></div></AppLayout>;
+}

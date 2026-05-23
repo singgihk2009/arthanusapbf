@@ -1,50 +1,8 @@
-import React, { useMemo, useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
 
 const tabs = ['Overview', 'Sales Orders', 'Shipments', 'Invoices', 'Payments', 'Ledger Placeholder'];
 
-export default function Show() {
-    const [activeTab, setActiveTab] = useState('Overview');
-
-    const tabContent = useMemo(() => {
-        if (activeTab === 'Ledger Placeholder') {
-            return 'Customer Ledger will be available in Phase 2.';
-        }
-
-        return `${activeTab} content placeholder.`;
-    }, [activeTab]);
-
-    return (
-        <AppLayout>
-            <Head title="Customer Details" />
-
-            <div className="p-6 space-y-6">
-                <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Customer Details</h1>
-
-                <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                    <div className="border-b border-gray-200 dark:border-gray-800">
-                        <nav className="flex flex-wrap gap-2 p-4">
-                            {tabs.map((tab) => (
-                                <button
-                                    key={tab}
-                                    type="button"
-                                    onClick={() => setActiveTab(tab)}
-                                    className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-                                        activeTab === tab
-                                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
-                                            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-                                    }`}
-                                >
-                                    {tab}
-                                </button>
-                            ))}
-                        </nav>
-                    </div>
-
-                    <div className="p-4 text-sm text-gray-700 dark:text-gray-300">{tabContent}</div>
-                </div>
-            </div>
-        </AppLayout>
-    );
+export default function Page({ customer, summary }) {
+  return <AppLayout><Head title='Customer Detail' /><div className='p-6 space-y-4'><div className='flex justify-between'><div><h1 className='text-xl font-semibold'>{customer.customer_code} - {customer.customer_name}</h1><span className={`px-2 py-1 rounded text-xs ${customer.status==='active'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-700'}`}>{customer.status}</span></div><Link href={route('apps.customers.edit',customer.id)} className='px-3 py-2 bg-amber-500 text-white rounded'>Edit</Link></div><div className='grid grid-cols-2 md:grid-cols-4 gap-3'>{[['Credit Limit',Number(customer.credit_limit||0).toLocaleString('id-ID',{style:'currency',currency:'IDR'})],['Payment Term',`${customer.payment_term_days} days`],['Total Sales Orders',summary.total_sales_orders],['Outstanding Balance',Number(summary.outstanding_balance||0).toLocaleString('id-ID',{style:'currency',currency:'IDR'})]].map(([k,v])=><div key={k} className='border rounded p-3'><div className='text-xs text-gray-500'>{k}</div><div className='font-semibold'>{v}</div></div>)}</div><div className='border rounded p-3'><div className='flex gap-3 text-sm mb-3'>{tabs.map(t=><span key={t} className='px-2 py-1 bg-gray-100 rounded'>{t}</span>)}</div><div className='text-sm space-y-1'><div>Contact: {customer.contact_person || '-'}</div><div>Phone: {customer.phone || '-'}</div><div>Email: {customer.email || '-'}</div><div>Address: {[customer.address,customer.city,customer.province,customer.postal_code,customer.country].filter(Boolean).join(', ') || '-'}</div><div>NPWP: {customer.npwp || '-'}</div><div>Notes: {customer.notes || '-'}</div><p className='mt-3 text-gray-600'>Customer Ledger will be available in Phase 2.</p><p className='text-gray-600'>No data available yet.</p></div></div></div></AppLayout>;
 }
