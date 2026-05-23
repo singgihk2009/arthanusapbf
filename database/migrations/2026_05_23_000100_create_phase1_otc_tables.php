@@ -44,7 +44,7 @@ return new class extends Migration {
         }
         if (!Schema::hasTable('customer_payments')) {
             Schema::create('customer_payments', function (Blueprint $table): void {
-                $table->id();$table->string('number')->unique();$table->foreignId('customer_id')->constrained('customers')->restrictOnDelete();$table->date('payment_date');$table->string('payment_method')->nullable();$table->foreignId('bank_account_id')->nullable()->constrained('bank_accounts')->nullOnDelete();$table->decimal('amount',18,2);$table->decimal('bank_charge',18,2)->default(0);$table->decimal('discount_taken',18,2)->default(0);$table->enum('status',['draft','posted','cancelled'])->default('draft');$table->text('notes')->nullable();$table->foreignId('posted_by')->nullable()->constrained('users')->nullOnDelete();$table->timestamp('posted_at')->nullable();$table->timestamps();$table->softDeletes();
+                $table->id();$table->string('number')->unique();$table->foreignId('customer_id')->constrained('customers')->restrictOnDelete();$table->date('payment_date');$table->string('payment_method')->nullable();$table->unsignedBigInteger('bank_account_id')->nullable();$table->decimal('amount',18,2);$table->decimal('bank_charge',18,2)->default(0);$table->decimal('discount_taken',18,2)->default(0);$table->enum('status',['draft','posted','cancelled'])->default('draft');$table->text('notes')->nullable();$table->foreignId('posted_by')->nullable()->constrained('users')->nullOnDelete();$table->timestamp('posted_at')->nullable();$table->timestamps();$table->softDeletes();
             });
         }
         if (!Schema::hasTable('customer_payment_allocations')) {
