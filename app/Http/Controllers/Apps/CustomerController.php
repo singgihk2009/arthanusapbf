@@ -49,7 +49,7 @@ class CustomerController extends Controller
 
         $customer = Customer::create($data);
 
-        return redirect()->route('customers.show', $customer)->with('success', 'Customer created successfully.');
+        return redirect()->route('apps.customers.show', $customer)->with('success', 'Customer created successfully.');
     }
 
     public function show(Customer $customer)
@@ -76,7 +76,7 @@ class CustomerController extends Controller
         $data['country'] = $data['country'] ?? 'Indonesia';
         $customer->update($data);
 
-        return redirect()->route('customers.show', $customer)->with('success', 'Customer updated successfully.');
+        return redirect()->route('apps.customers.show', $customer)->with('success', 'Customer updated successfully.');
     }
 
     public function destroy(Customer $customer)
@@ -88,7 +88,7 @@ class CustomerController extends Controller
         }
 
         $customer->delete();
-        return redirect()->route('customers.index')->with('success', 'Customer deleted successfully.');
+        return redirect()->route('apps.customers.index')->with('success', 'Customer deleted successfully.');
     }
 
     public function search(Request $request)
