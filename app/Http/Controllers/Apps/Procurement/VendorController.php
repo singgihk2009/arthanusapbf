@@ -346,7 +346,7 @@ class VendorController extends Controller
 
         $this->warehouseAccessService->scopeInventoryQuery($receivingTotalQuery, $user);
 
-        $totalReceived = (float) $receivingTotalQuery->sum(DB::raw('COALESCE(receiving_entries.total_value, 0)'));
+        $totalReceived = (float) $receivingTotalQuery->sum(DB::raw('COALESCE(receiving_entries.total_value, receiving_entries.grand_total, receiving_entries.total, 0)'));
 
         $totalInvoiced = (float) (clone $invoiceBaseQuery)
             ->get(['net_payable_amount', 'grand_total'])
