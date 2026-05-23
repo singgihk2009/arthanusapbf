@@ -318,7 +318,30 @@ class VendorController extends Controller
             });
         }
 
-        return response()->json(['invoices' => $invoices]);
+        $legacyReceivingTotal = (float) DB::table('receiving_entries')
+            ->where('vendor_id', $vendor->id)
+            ->sum('total_value');
+
+        $goodsReceiptTotal = (float) DB::table('goods_receipts as gr')
+            ->join('purchase_orders as po', 'po.id', '=', 'gr.purchase_order_id')
+            ->where('po.vendor_id', $vendor->id)
+            ->whereIn('gr.status', ['APPROVED', 'POSTED'])
+            ->sum(DB::raw('COALESCE(gr.grand_total, 0)'));
+
+        $totalReceived = max($legacyReceivingTotal, $goodsReceiptTotal);
+
+        $totalInvoiced = (float) VendorInvoice::query()
+            ->where('vendor_id', $vendor->id)
+            ->selectRaw('COALESCE(SUM(COALESCE(net_payable_amount, grand_total, 0)), 0) as total_invoiced')
+            ->value('total_invoiced');
+
+        $monitoring = [
+            'total_received' => $totalReceived,
+            'total_invoiced' => $totalInvoiced,
+            'received_not_invoiced' => max(0, $totalReceived - $totalInvoiced),
+        ];
+
+        return response()->json(['invoices' => $invoices, 'monitoring' => $monitoring]);
     }
     public function payments(Vendor $vendor) {
         $payments = VendorPayment::where('vendor_id', $vendor->id)
