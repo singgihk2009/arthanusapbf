@@ -76,12 +76,13 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
     };
 
     const totals = data.items.reduce((a, i) => ({ subtotal: a.subtotal + ((+i.qty_ordered || 0) * (+i.unit_price || 0)), discount: a.discount + (+i.discount_amount || 0), tax: a.tax + (+i.tax_amount || 0), grand: a.grand + (+i.line_total || 0) }), { subtotal: 0, discount: 0, tax: 0, grand: 0 });
-    const submit = (e) => {
+    const submit = (e, action = 'draft') => {
         e.preventDefault();
         setNotice(null);
         const filteredDocuments = (data.documents || []).filter((doc) => doc?.document_type_id && doc?.file);
         const submitPayload = {
             ...data,
+            action,
             documents: filteredDocuments,
         };
         const fallbackReturnTo = isEdit && data.vendor_id ? `/apps/procurement/vendors/${data.vendor_id}?tab=purchase-orders` : route('apps.procurement.purchase-orders.index');
@@ -122,7 +123,7 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
 
     return <>
         <Head title={isEdit ? 'Edit Purchase Order' : 'Create Purchase Order'} />
-        <Card title={isEdit ? 'Edit Purchase Order' : 'Create Purchase Order'} form={submit} footer={<div className='flex items-center gap-2'><Button type='submit' label='Save Draft' disabled={processing} variant='gray' /><button type='button' onClick={handleBack} className='rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50'>Back</button>{isDirty && <span className='text-xs text-amber-600'>Data belum disimpan.</span>}</div>}>
+        <Card title={isEdit ? 'Edit Purchase Order' : 'Create Purchase Order'} form={(e) => submit(e, 'draft')} footer={<div className='flex items-center gap-2'><Button type='submit' label='Save Draft' disabled={processing} variant='gray' /><button type='button' onClick={(e) => submit(e, 'approve')} disabled={processing} className='rounded-lg border border-emerald-300 px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60'>Approve</button><button type='button' onClick={handleBack} className='rounded-lg border border-rose-300 px-3 py-2 text-sm text-rose-700 hover:bg-rose-50'>Cancel</button>{isDirty && <span className='text-xs text-amber-600'>Data belum disimpan.</span>}</div>}>
             {notice && <div className={`mb-3 rounded border px-3 py-2 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{notice.text}</div>}
             <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Vendor</label><select value={data.vendor_id} onChange={(e) => setData('vendor_id', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300'><option value=''>-</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select>{errors.vendor_id && <small className='text-xs text-red-500'>{errors.vendor_id}</small>}</div>
