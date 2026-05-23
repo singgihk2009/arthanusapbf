@@ -237,6 +237,13 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             $perPage = 15;
         }
 
+        $startDate = $request->date('start_date')?->toDateString() ?? now()->startOfYear()->toDateString();
+        $endDate = $request->date('end_date')?->toDateString() ?? now()->toDateString();
+
+        if (in_array($type, ['stock-position', 'stock-card-movement'], true)) {
+            $startDate = $endDate;
+        }
+
         return [
             'type' => $type,
             'warehouse_id' => $request->integer('warehouse_id') ?: null,
@@ -248,8 +255,8 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             'per_page' => $perPage,
             'status' => strtolower($request->string('status')->toString() ?: 'all'),
             'facility_scheme_id' => $request->integer('facility_scheme_id') ?: null,
-            'start_date' => $request->date('start_date')?->toDateString() ?? now()->startOfYear()->toDateString(),
-            'end_date' => $request->date('end_date')?->toDateString() ?? now()->toDateString(),
+            'start_date' => $startDate,
+            'end_date' => $endDate,
         ];
     }
 
