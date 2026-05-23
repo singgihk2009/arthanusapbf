@@ -38,8 +38,12 @@ class VendorInvoiceController extends Controller
             if ($paymentStatus !== '') {
                 if (in_array($paymentStatus, ['lunas', 'paid'], true)) {
                     $query->whereRaw('COALESCE(outstanding_amount, 0) <= 0');
-                } elseif (in_array($paymentStatus, ['belum_lunas', 'partial', 'unpaid'], true)) {
+                } elseif (in_array($paymentStatus, ['belum_lunas'], true)) {
                     $query->whereRaw('COALESCE(outstanding_amount, 0) > 0');
+                } elseif (in_array($paymentStatus, ['partial'], true)) {
+                    $query->whereRaw('COALESCE(paid_amount, 0) > 0 AND COALESCE(outstanding_amount, 0) > 0');
+                } elseif (in_array($paymentStatus, ['unpaid'], true)) {
+                    $query->whereRaw('COALESCE(paid_amount, 0) <= 0 AND COALESCE(outstanding_amount, 0) > 0');
                 }
             }
 
