@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { Link, useForm } from '@inertiajs/react';
 
@@ -11,6 +11,7 @@ export default function Form({ priceList, uoms = [] }) {
   });
   const [search, setSearch] = useState(''); const [items, setItems] = useState([]);
   const fetchItems = async (q) => { setSearch(q); const r = await fetch(route('apps.items.search')+`?q=${encodeURIComponent(q)}`); setItems(await r.json()); };
+  useEffect(() => { fetchItems(''); }, []);
   const submit = (e) => { e.preventDefault(); if (priceList) put(route('apps.price-lists.update', priceList.id)); else post(route('apps.price-lists.store')); };
   const setLine = (i,k,v)=> setData('lines', data.lines.map((x,idx)=> idx===i? {...x,[k]:v}:x));
 
