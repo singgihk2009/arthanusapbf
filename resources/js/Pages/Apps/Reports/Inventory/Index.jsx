@@ -337,7 +337,7 @@ export default function Index() {
 
                         {isDateRangeReport && (
                             <>
-                                {!(isStockPositionReport || isStockCardReport) && (
+                                {!isStockPositionReport && (
                                     <input
                                         type="date"
                                         value={filters.start_date ?? ''}
@@ -345,7 +345,7 @@ export default function Index() {
                                         className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
                                     />
                                 )}
-                                {(isStockPositionReport || isStockCardReport) ? (
+                                {isStockPositionReport ? (
                                     <div className="flex items-center gap-2">
                                         <button
                                             type="button"
