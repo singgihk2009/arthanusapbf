@@ -94,8 +94,8 @@ export default function Show({ purchaseOrder }) {
                             <Table.Td>{doc.status || doc.upload_status || '-'}</Table.Td>
                             <Table.Td>
                                 {doc.id ? (
-                                    <a href={route('apps.document-center.documents.download', doc.id)} target='_blank' rel='noopener noreferrer' className='inline-flex rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50'>
-                                        Download
+                                    <a href={route('apps.document-center.documents.download', doc.id)} target='_blank' rel='noopener noreferrer' className='inline-flex rounded border border-lime-500 bg-lime-300 px-2 py-1 text-sm font-semibold text-gray-900 hover:bg-lime-400'>
+                                        View
                                     </a>
                                 ) : '-'}
                             </Table.Td>
