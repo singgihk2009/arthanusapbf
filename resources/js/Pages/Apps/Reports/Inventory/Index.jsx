@@ -112,6 +112,7 @@ export default function Index() {
                         { key: 'qty', label: 'Jumlah Barang', sortKey: 'qty' },
                         { key: 'unit_price', label: 'Harga Satuan', sortKey: 'unit_price' },
                         { key: 'value', label: 'Total Harga', sortKey: 'value' },
+                        { key: 'po_reference', label: 'Referensi' },
                     ]
                     : [
                         { key: 'facility_name', label: 'Jenis Dok' },
@@ -127,6 +128,7 @@ export default function Index() {
                         { key: 'qty', label: 'Jumlah Barang', sortKey: 'qty' },
                         { key: 'unit_price', label: 'Harga Satuan', sortKey: 'unit_price' },
                         { key: 'value', label: 'Total Harga', sortKey: 'value' },
+                        { key: 'po_reference', label: 'Referensi' },
                     ])
                 : [
                     { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
@@ -175,14 +177,14 @@ export default function Index() {
                 : 'Laporan Kartu Stok Movement per Item';
 
     const poLink = (row) => {
-        if (!row?.purchase_order_id || !row?.gr_number || row.gr_number === '-') return row?.gr_number ?? '-';
+        if (!row?.purchase_order_id || !row?.po_reference || row.po_reference === '-') return row?.po_reference ?? '-';
 
         return (
             <a
                 href={route('apps.procurement.purchase-orders.show', row.purchase_order_id)}
                 className="text-indigo-600 hover:underline dark:text-indigo-400"
             >
-                {row.gr_number}
+                {row.po_reference}
             </a>
         );
     };
@@ -427,6 +429,7 @@ export default function Index() {
                                                 <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
                                                 <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
                                                 <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
+                                                <Table.Td>{poLink(row)}</Table.Td>
                                             </>
                                         ) : (
                                             <>
@@ -440,6 +443,7 @@ export default function Index() {
                                                 <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
                                                 <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
                                                 <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
+                                                <Table.Td>{poLink(row)}</Table.Td>
                                             </>
                                         )
                                     )}
