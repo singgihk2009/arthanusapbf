@@ -31,6 +31,7 @@ export default function Edit() {
         transaction_code: entry.transaction_code,
         reference: entry.reference,
         vendor_name: entry.vendor_name,
+        vendor_id: entry.vendor_id || null,
         notes: entry.notes,
         lines: lines.length > 0 ? lines : [{ ...emptyLine }],
         documents: [{ ...emptyDocument }],
@@ -82,6 +83,7 @@ export default function Edit() {
             payload.append('transaction_code', form.transaction_code);
             payload.append('reference', form.reference || '');
             payload.append('vendor_name', form.vendor_name || '');
+            if (form.vendor_id) payload.append('vendor_id', form.vendor_id);
             payload.append('notes', form.notes || '');
             form.lines.forEach((line, index) => {
                 Object.entries(line).forEach(([key, value]) => payload.append(`lines[${index}][${key}]`, value ?? ''));
