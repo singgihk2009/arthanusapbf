@@ -55,6 +55,11 @@ export default function Create() {
                 updatedLine.uom_id = defaultUomByItemId.get(String(value)) ?? '';
             }
 
+            if (field === 'batch_number' && String(value || '').trim() === '') {
+                const dateText = String(prev.transaction_date || '').replaceAll('-', '');
+                updatedLine.batch_number = dateText ? `GR${dateText}` : '';
+            }
+
             lines[index] = updatedLine;
 
             return { ...prev, lines };
@@ -230,7 +235,7 @@ export default function Create() {
                                                     {errors[`lines.${index}.uom_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.uom_id`][0]}</p>}
                                                 </td>
                                                 <td className="p-2">
-                                                    <input readOnly={form.source_type === 'purchase_order'} type="number" min="0" step="0.000001" value={line.price} onChange={(e) => updateLine(index, 'price', e.target.value)} className={`w-36 ${lineInputClassName}`} />
+                                                    <input type="number" min="0" step="0.000001" value={line.price} onChange={(e) => updateLine(index, 'price', e.target.value)} className={`w-36 ${lineInputClassName}`} />
                                                     {errors[`lines.${index}.price`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.price`][0]}</p>}
                                                 </td>
                                                 <td className="p-2 font-medium text-gray-900 dark:text-gray-100">{value.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>

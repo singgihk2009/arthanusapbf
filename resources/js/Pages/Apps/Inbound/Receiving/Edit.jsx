@@ -60,6 +60,11 @@ export default function Edit() {
                 updatedLine.uom_id = defaultUomByItemId.get(String(value)) ?? '';
             }
 
+            if (field === 'batch_number' && String(value || '').trim() === '') {
+                const dateText = String(prev.transaction_date || '').replaceAll('-', '');
+                updatedLine.batch_number = dateText ? `GR${dateText}` : '';
+            }
+
             draft[index] = updatedLine;
 
             return { ...prev, lines: draft };

@@ -416,10 +416,16 @@ class ReceivingEntryController extends Controller
                 $remainingQty = max(0, $orderedQty - $previouslyReceived);
                 $qty = (float) $line['qty'];
                 abort_if($qty <= 0 || $qty > $remainingQty, 422, 'Qty receiving melebihi sisa qty PO.');
-                $price = (float) $poItem->unit_price;
+                $price = (float) ($line['price'] ?? $poItem->unit_price);
             } else {
                 $qty = (float) $line['qty'];
                 $price = (float) $line['price'];
+            }
+
+            $batchNumber = trim((string) ($line['batch_number'] ?? ''));
+            if ($batchNumber === '') {
+                $date = (string) ($header['transaction_date'] ?? now()->toDateString());
+                $batchNumber = 'GR'.str_replace('-', '', $date);
             }
 
             $value = round($qty * $price, 6);
@@ -437,7 +443,7 @@ class ReceivingEntryController extends Controller
                 'inventory_unit_cost' => $price,
                 'inventory_total_cost' => $value,
                 'value' => $value,
-                $batchColumn => $line['batch_number'] ?? null,
+                $batchColumn => $batchNumber,
                 'expired_date' => $line['expired_date'] ?? null,
                 'notes' => $line['notes'] ?? null,
                 'facility_scheme_id' => $line['facility_scheme_id'] ?? ($poItem->facility_scheme_id ?? null),
