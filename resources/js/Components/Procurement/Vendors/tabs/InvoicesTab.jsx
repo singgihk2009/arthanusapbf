@@ -28,6 +28,7 @@ const resolvePaymentStatus = (invoice) => {
 
 export default function Tab({ data, vendor, documentTypes = [] }) {
   const invoices = data?.invoices?.data ?? [];
+  const tableGrandTotal = invoices.reduce((total, invoice) => total + Number(invoice?.grand_total ?? 0), 0);
   const docs = vendor?.documents ?? [];
   const [notice, setNotice] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -103,7 +104,7 @@ export default function Tab({ data, vendor, documentTypes = [] }) {
       <div className='grid grid-cols-1 gap-3 text-sm md:grid-cols-3'>
         <Card label='Received Not Invoiced' value={formatCurrency(data?.monitoring?.received_not_invoiced || 0)} />
         <Card label='Total Received' value={formatCurrency(data?.monitoring?.total_received || 0)} />
-        <Card label='Total Invoiced' value={formatCurrency(data?.monitoring?.total_invoiced || 0)} />
+        <Card label='Total Invoiced' value={formatCurrency(tableGrandTotal)} />
       </div>
       <div className='overflow-auto border rounded'>
         <table className='min-w-full text-sm'>
