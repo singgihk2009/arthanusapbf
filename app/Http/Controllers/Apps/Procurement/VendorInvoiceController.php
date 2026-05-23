@@ -13,20 +13,70 @@ use App\Models\Procurement\VendorPaymentLine;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class VendorInvoiceController extends Controller
 {
-    public function index(Vendor $vendor)
+    public function index(Request $request, ?Vendor $vendor = null)
     {
         $companyId = (int) (auth()->user()?->company_id ?? 1);
 
-        $invoices = VendorInvoice::query()
-            ->where('vendor_id', $vendor->id)
-            ->where('company_id', $companyId)
-            ->latest('invoice_date')
-            ->paginate(10);
+
+        $paidTotalsSubquery = VendorPaymentLine::query()
+            ->select('vendor_invoice_id', DB::raw('SUM(payment_amount + COALESCE(wht_amount, 0)) as paid_total'))
+            ->whereHas('payment', function ($query) {
+                $query->whereIn('status', ['APPROVED', 'PAID', 'POSTED']);
+            })
+            ->groupBy('vendor_invoice_id');
+
+        $query = VendorInvoice::query()
+            ->with('vendor:id,name,vendor_name')
+            ->leftJoinSub($paidTotalsSubquery, 'invoice_paid_totals', function ($join) {
+                $join->on('invoice_paid_totals.vendor_invoice_id', '=', 'vendor_invoices.id');
+            })
+            ->select('vendor_invoices.*', DB::raw('COALESCE(invoice_paid_totals.paid_total, 0) as paid_amount_calc'))
+            ->where('vendor_invoices.company_id', $companyId)
+            ->latest('vendor_invoices.invoice_date');
+
+        if ($vendor) {
+            $query->where('vendor_id', $vendor->id);
+        } else {
+            $search = trim((string) $request->input('search', ''));
+            $paymentStatus = strtolower(trim((string) $request->input('status_invoice', '')));
+            $documentStatus = strtoupper(trim((string) $request->input('status_dokumen', '')));
+
+            if ($paymentStatus !== '') {
+                if (in_array($paymentStatus, ['lunas', 'paid'], true)) {
+                    $query->whereRaw('(COALESCE(vendor_invoices.net_payable_amount, vendor_invoices.grand_total, 0) - COALESCE(invoice_paid_totals.paid_total, 0)) <= 0');
+                } elseif (in_array($paymentStatus, ['belum_lunas'], true)) {
+                    $query->whereRaw('(COALESCE(vendor_invoices.net_payable_amount, vendor_invoices.grand_total, 0) - COALESCE(invoice_paid_totals.paid_total, 0)) > 0');
+                } elseif (in_array($paymentStatus, ['partial'], true)) {
+                    $query->whereRaw('COALESCE(invoice_paid_totals.paid_total, 0) > 0 AND (COALESCE(vendor_invoices.net_payable_amount, vendor_invoices.grand_total, 0) - COALESCE(invoice_paid_totals.paid_total, 0)) > 0');
+                } elseif (in_array($paymentStatus, ['unpaid'], true)) {
+                    $query->whereRaw('COALESCE(invoice_paid_totals.paid_total, 0) <= 0 AND (COALESCE(vendor_invoices.net_payable_amount, vendor_invoices.grand_total, 0) - COALESCE(invoice_paid_totals.paid_total, 0)) > 0');
+                }
+            }
+
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $like = '%'.$search.'%';
+                    $q->where('invoice_no_internal', 'like', $like)
+                        ->orWhere('vendor_invoice_no', 'like', $like)
+                        ->orWhereHas('vendor', function ($vendorQuery) use ($like) {
+                            $vendorQuery->where('vendor_name', 'like', $like)
+                                ->orWhere('name', 'like', $like);
+                        });
+                });
+            }
+
+            if ($documentStatus !== '') {
+                $query->whereRaw('UPPER(COALESCE(status, "")) = ?', [$documentStatus]);
+            }
+        }
+
+        $invoices = $query->paginate(10)->withQueryString();
 
         $invoiceIds = collect($invoices->items())->pluck('id')->filter()->values();
         $paidByInvoice = collect();
@@ -44,13 +94,14 @@ class VendorInvoiceController extends Controller
 
         $invoices->setCollection($invoices->getCollection()->map(function (VendorInvoice $inv) use ($paidByInvoice) {
             $netPayable = (float) ($inv->net_payable_amount ?? $inv->grand_total ?? 0);
-            $calculatedPaid = (float) ($paidByInvoice[$inv->id] ?? 0);
+            $calculatedPaid = (float) ($inv->paid_amount_calc ?? ($paidByInvoice[$inv->id] ?? 0));
             $outstanding = max(0, $netPayable - $calculatedPaid);
 
             return [
                 'id' => $inv->id,
                 'invoice_no_internal' => $inv->invoice_no_internal,
                 'vendor_invoice_no' => $inv->vendor_invoice_no,
+                'vendor_name' => $inv->vendor?->vendor_name ?: $inv->vendor?->name,
                 'invoice_date' => $inv->invoice_date,
                 'due_date' => $inv->due_date,
                 'subtotal' => $inv->subtotal,
@@ -62,11 +113,28 @@ class VendorInvoiceController extends Controller
                 'paid_amount' => $calculatedPaid,
                 'outstanding_amount' => $outstanding,
                 'status' => strtolower((string) $inv->status),
-                'payment_status' => $outstanding <= 0 ? 'paid' : ($calculatedPaid > 0 ? 'partial_paid' : 'unpaid'),
+                'payment_status' => $outstanding <= 0 ? 'paid' : ($calculatedPaid > 0 ? 'partial' : 'unpaid'),
             ];
         }));
 
-        return response()->json(['invoices' => $invoices]);
+
+        if ($vendor) {
+            return response()->json(['invoices' => $invoices]);
+        }
+
+        return Inertia::render('Apps/Procurement/VendorInvoices/Index', [
+            'invoices' => $invoices,
+            'filters' => [
+                'search' => (string) $request->input('search', ''),
+                'status_invoice' => strtolower((string) $request->input('status_invoice', '')),
+                'status_dokumen' => strtoupper((string) $request->input('status_dokumen', '')),
+            ],
+            'statusInvoiceOptions' => [
+                ['value' => 'lunas', 'label' => 'Lunas'],
+                ['value' => 'belum_lunas', 'label' => 'Belum Lunas'],
+            ],
+            'statusDokumenOptions' => ['DRAFT', 'SUBMITTED', 'APPROVED', 'POSTED', 'PAID', 'CANCELLED'],
+        ]);
     }
 
     public function create(Vendor $vendor)
