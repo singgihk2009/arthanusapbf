@@ -49,6 +49,7 @@ use App\Http\Controllers\Apps\CustomerInvoiceController;
 use App\Http\Controllers\Apps\CustomerPaymentController;
 
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::redirect('/', '/login');
 
@@ -208,6 +209,9 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
 
 
     
+    Route::get('/sales/dashboard', fn () => Inertia::render('Apps/Sales/Dashboard'))->name('sales.dashboard');
+    Route::get('/sales/order-tracking', fn () => Inertia::render('Apps/Sales/OrderTracking/Index'))->name('sales.order-tracking.index');
+
     // phase 1 sales otc
     Route::resource('/customers', CustomerController::class);
     Route::resource('/price-lists', PriceListController::class);
