@@ -93,6 +93,15 @@ class PermissionTableSeeder extends Seeder
             'integration-outbox-read',
             'integration-outbox-retry',
 
+            // sales otc permissions
+
+            'customer.view','customer.create','customer.update','customer.delete',
+            'price-list.view','price-list.create','price-list.update','price-list.delete',
+            'sales-order.view','sales-order.create','sales-order.update','sales-order.submit','sales-order.approve','sales-order.cancel',
+            'shipment.view','shipment.create','shipment.update','shipment.post','shipment.cancel',
+            'customer-invoice.view','customer-invoice.create','customer-invoice.update','customer-invoice.post','customer-invoice.cancel',
+            'customer-payment.view','customer-payment.create','customer-payment.update','customer-payment.post','customer-payment.cancel',
+
             // industry module permissions
             'modules.manage',
             'pbf.view',

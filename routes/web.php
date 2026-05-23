@@ -40,6 +40,14 @@ use App\Http\Controllers\Apps\DocumentMonitoringController;
 use App\Http\Controllers\Apps\DocumentCenterDocumentController;
 use App\Http\Controllers\Apps\CompanyProfileController;
 use App\Http\Controllers\ProfileController;
+
+use App\Http\Controllers\Apps\CustomerController;
+use App\Http\Controllers\Apps\PriceListController;
+use App\Http\Controllers\Apps\SalesOrderController;
+use App\Http\Controllers\Apps\ShipmentController;
+use App\Http\Controllers\Apps\CustomerInvoiceController;
+use App\Http\Controllers\Apps\CustomerPaymentController;
+
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -198,6 +206,30 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::put('/transfer/warehouse/{warehouseTransfer}', [WarehouseTransferController::class, 'update'])->name('transfer.warehouse.update');
     Route::delete('/transfer/warehouse/{warehouseTransfer}', [WarehouseTransferController::class, 'destroy'])->name('transfer.warehouse.destroy');
 
+
+    
+    // phase 1 sales otc
+    Route::resource('/customers', CustomerController::class);
+    Route::resource('/price-lists', PriceListController::class);
+    Route::resource('/sales-orders', SalesOrderController::class);
+    Route::post('/sales-orders/{id}/submit', [SalesOrderController::class, 'submit'])->name('sales-orders.submit');
+    Route::post('/sales-orders/{id}/approve', [SalesOrderController::class, 'approve'])->name('sales-orders.approve');
+    Route::post('/sales-orders/{id}/cancel', [SalesOrderController::class, 'cancel'])->name('sales-orders.cancel');
+    Route::get('/sales-orders/{id}/create-shipment', [SalesOrderController::class, 'createShipment'])->name('sales-orders.create-shipment');
+
+    Route::resource('/shipments', ShipmentController::class);
+    Route::get('/shipments/create-from-sale/{saleId}', [ShipmentController::class, 'createFromSale'])->name('shipments.create-from-sale');
+    Route::post('/shipments/{id}/post', [ShipmentController::class, 'post'])->name('shipments.post');
+    Route::post('/shipments/{id}/cancel', [ShipmentController::class, 'cancel'])->name('shipments.cancel');
+
+    Route::resource('/customer-invoices', CustomerInvoiceController::class);
+    Route::get('/customer-invoices/create-from-shipment/{shipmentId}', [CustomerInvoiceController::class, 'create'])->name('customer-invoices.create-from-shipment');
+    Route::post('/customer-invoices/{id}/post', [CustomerInvoiceController::class, 'post'])->name('customer-invoices.post');
+    Route::post('/customer-invoices/{id}/cancel', [CustomerInvoiceController::class, 'cancel'])->name('customer-invoices.cancel');
+
+    Route::resource('/customer-payments', CustomerPaymentController::class);
+    Route::post('/customer-payments/{id}/post', [CustomerPaymentController::class, 'post'])->name('customer-payments.post');
+    Route::post('/customer-payments/{id}/cancel', [CustomerPaymentController::class, 'cancel'])->name('customer-payments.cancel');
 
     // integration finance hub
     
