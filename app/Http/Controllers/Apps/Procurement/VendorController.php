@@ -318,7 +318,21 @@ class VendorController extends Controller
             });
         }
 
-        return response()->json(['invoices' => $invoices]);
+        $totalReceived = (float) DB::table('receiving_entries')
+            ->where('vendor_id', $vendor->id)
+            ->sum('total_value');
+
+        $totalInvoiced = (float) VendorInvoice::query()
+            ->where('vendor_id', $vendor->id)
+            ->sum(DB::raw('COALESCE(net_payable_amount, grand_total, 0)'));
+
+        $monitoring = [
+            'total_received' => $totalReceived,
+            'total_invoiced' => $totalInvoiced,
+            'received_not_invoiced' => max(0, $totalReceived - $totalInvoiced),
+        ];
+
+        return response()->json(['invoices' => $invoices, 'monitoring' => $monitoring]);
     }
     public function payments(Vendor $vendor) {
         $payments = VendorPayment::where('vendor_id', $vendor->id)
