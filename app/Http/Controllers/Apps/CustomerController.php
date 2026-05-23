@@ -43,6 +43,9 @@ class CustomerController extends Controller
         if (blank($data['customer_code'] ?? null)) {
             $data['customer_code'] = $this->nextCustomerCode();
         }
+        if (Schema::hasColumn('customers', 'code') && blank($data['code'] ?? null)) {
+            $data['code'] = $data['customer_code'];
+        }
         $data['country'] = $data['country'] ?? 'Indonesia';
         $data['payment_term_days'] = $data['payment_term_days'] ?? 0;
         $data['credit_limit'] = $data['credit_limit'] ?? 0;
