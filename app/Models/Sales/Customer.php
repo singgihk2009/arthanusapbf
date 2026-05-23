@@ -11,7 +11,7 @@ class Customer extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'customer_code','customer_name','customer_type','contact_person','phone','email','address','city','province','postal_code','country','npwp',
+        'code','customer_code','customer_name','customer_type','contact_person','phone','email','address','city','province','postal_code','country','npwp',
         'price_list_id','payment_term_days','credit_limit','salesman_id','status','notes',
     ];
 
