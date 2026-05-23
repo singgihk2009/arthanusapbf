@@ -92,7 +92,12 @@ export default function Menu() {
             title: 'SALES',
             permissions: true,
             details: [
-                { title: 'Sales Order', href: '/apps/dashboard', icon: <IconShoppingCart size={20} strokeWidth={1.5} />, active: false, permissions: true },
+                { title: 'Customers', href: '/apps/customers', icon: <IconUsers size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/customers'), permissions: true },
+                { title: 'Price Lists', href: '/apps/price-lists', icon: <IconReceipt size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/price-lists'), permissions: true },
+                { title: 'Sales Orders', href: '/apps/sales-orders', icon: <IconShoppingCart size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/sales-orders'), permissions: true },
+                { title: 'Shipments', href: '/apps/shipments', icon: <IconPackageExport size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/shipments'), permissions: true },
+                { title: 'Customer Invoices', href: '/apps/customer-invoices', icon: <IconFileDescription size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/customer-invoices'), permissions: true },
+                { title: 'Customer Payments', href: '/apps/customer-payments', icon: <IconReceipt size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/customer-payments'), permissions: true },
             ],
         },
         {
