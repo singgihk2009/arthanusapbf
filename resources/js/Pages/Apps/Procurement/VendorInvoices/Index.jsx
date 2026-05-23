@@ -47,7 +47,7 @@ export default function Page({ invoices, filters = {}, statusInvoiceOptions = []
         <label className='mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300'>Status Invoice</label>
         <select value={form.status_invoice} onChange={(e) => setForm((p) => ({ ...p, status_invoice: e.target.value }))} className='block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none dark:border-gray-900 dark:bg-gray-950 dark:text-gray-100'>
           <option value=''>Semua status</option>
-          {statusInvoiceOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+          {statusInvoiceOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
         </select>
       </div>
       <div className='md:col-span-2'>

@@ -36,12 +36,10 @@ class VendorInvoiceController extends Controller
             $documentStatus = strtoupper(trim((string) $request->input('status_dokumen', '')));
 
             if ($paymentStatus !== '') {
-                if ($paymentStatus === 'paid') {
+                if (in_array($paymentStatus, ['lunas', 'paid'], true)) {
                     $query->whereRaw('COALESCE(outstanding_amount, 0) <= 0');
-                } elseif ($paymentStatus === 'partial') {
-                    $query->whereRaw('COALESCE(paid_amount, 0) > 0 AND COALESCE(outstanding_amount, 0) > 0');
-                } elseif ($paymentStatus === 'unpaid') {
-                    $query->whereRaw('COALESCE(paid_amount, 0) <= 0 AND COALESCE(outstanding_amount, 0) > 0');
+                } elseif (in_array($paymentStatus, ['belum_lunas', 'partial', 'unpaid'], true)) {
+                    $query->whereRaw('COALESCE(outstanding_amount, 0) > 0');
                 }
             }
 
@@ -115,7 +113,10 @@ class VendorInvoiceController extends Controller
                 'status_invoice' => strtolower((string) $request->input('status_invoice', '')),
                 'status_dokumen' => strtoupper((string) $request->input('status_dokumen', '')),
             ],
-            'statusInvoiceOptions' => ['paid', 'partial', 'unpaid'],
+            'statusInvoiceOptions' => [
+                ['value' => 'lunas', 'label' => 'Lunas'],
+                ['value' => 'belum_lunas', 'label' => 'Belum Lunas'],
+            ],
             'statusDokumenOptions' => ['DRAFT', 'SUBMITTED', 'APPROVED', 'POSTED', 'PAID', 'CANCELLED'],
         ]);
     }
