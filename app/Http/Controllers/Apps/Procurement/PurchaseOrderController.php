@@ -131,6 +131,7 @@ class PurchaseOrderController extends Controller
                     'owner_id' => (int) $po->id,
                     'document_type_id' => (int) $documentPayload['document_type_id'],
                     'title' => $documentPayload['title'] ?? null,
+                    'document_number' => $documentPayload['document_number'] ?? null,
                 ], $documentPayload['file']);
             }
 
@@ -211,7 +212,21 @@ class PurchaseOrderController extends Controller
         $userNames = DB::table('users')->pluck('name', 'id');
         $warehouseNames = DB::table('warehouses')->pluck('name', 'id');
 
-        $purchaseOrder->goodsReceipts->each(function ($gr) use ($userNames, $warehouseNames) {
+        $receiptIds = $purchaseOrder->goodsReceipts
+            ->pluck('id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $receiptDocumentsByOwner = Document::query()
+            ->with('documentType:id,name,code')
+            ->whereIn('owner_id', $receiptIds)
+            ->whereIn('owner_type', ['goods_receipt', 'receiving_entry'])
+            ->latest('id')
+            ->get()
+            ->groupBy(fn (Document $document) => $document->owner_type.'#'.(int) $document->owner_id);
+
+        $purchaseOrder->goodsReceipts->each(function ($gr) use ($userNames, $warehouseNames, $receiptDocumentsByOwner) {
             $gr->received_by_name = $gr->received_by_name ?? ($userNames->get((int) ($gr->created_by ?? 0)) ?? null);
             $gr->warehouse_name = $gr->warehouse_name ?? ($warehouseNames->get((int) ($gr->warehouse_id ?? 0)) ?? null);
 
@@ -219,6 +234,10 @@ class PurchaseOrderController extends Controller
                 $gr->total_qty = $gr->items()->sum('received_qty');
                 $gr->total_value = $gr->items()->sum('inventory_total_cost');
             }
+
+            $goodsReceiptDocuments = $receiptDocumentsByOwner->get('goods_receipt#'.(int) ($gr->id ?? 0), collect());
+            $receivingEntryDocuments = $receiptDocumentsByOwner->get('receiving_entry#'.(int) ($gr->id ?? 0), collect());
+            $gr->documents = $goodsReceiptDocuments->concat($receivingEntryDocuments)->values();
         });
         $purchaseOrder->setRelation('documents', $purchaseOrderDocuments);
         return Inertia::render('Apps/Procurement/PurchaseOrders/Show', ['purchaseOrder' => $purchaseOrder]);
@@ -315,6 +334,7 @@ class PurchaseOrderController extends Controller
                     'owner_id' => (int) $purchaseOrder->id,
                     'document_type_id' => (int) $documentPayload['document_type_id'],
                     'title' => $documentPayload['title'] ?? null,
+                    'document_number' => $documentPayload['document_number'] ?? null,
                 ], $documentPayload['file']);
             }
 
@@ -377,6 +397,7 @@ class PurchaseOrderController extends Controller
             'documents' => ['nullable', 'array'],
             'documents.*.document_type_id' => ['required_with:documents', 'integer', 'exists:document_types,id'],
             'documents.*.title' => ['nullable', 'string', 'max:255'],
+            'documents.*.document_number' => ['nullable', 'string', 'max:255'],
             'documents.*.file' => ['required_with:documents', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
         ]);
     }
