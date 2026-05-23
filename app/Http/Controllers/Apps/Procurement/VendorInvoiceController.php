@@ -18,15 +18,20 @@ use Inertia\Inertia;
 
 class VendorInvoiceController extends Controller
 {
-    public function index(Vendor $vendor)
+    public function index(?Vendor $vendor = null)
     {
         $companyId = (int) (auth()->user()?->company_id ?? 1);
 
-        $invoices = VendorInvoice::query()
-            ->where('vendor_id', $vendor->id)
+        $query = VendorInvoice::query()
+            ->with('vendor:id,name,vendor_name')
             ->where('company_id', $companyId)
-            ->latest('invoice_date')
-            ->paginate(10);
+            ->latest('invoice_date');
+
+        if ($vendor) {
+            $query->where('vendor_id', $vendor->id);
+        }
+
+        $invoices = $query->paginate(10);
 
         $invoiceIds = collect($invoices->items())->pluck('id')->filter()->values();
         $paidByInvoice = collect();
@@ -51,6 +56,7 @@ class VendorInvoiceController extends Controller
                 'id' => $inv->id,
                 'invoice_no_internal' => $inv->invoice_no_internal,
                 'vendor_invoice_no' => $inv->vendor_invoice_no,
+                'vendor_name' => $inv->vendor?->vendor_name ?: $inv->vendor?->name,
                 'invoice_date' => $inv->invoice_date,
                 'due_date' => $inv->due_date,
                 'subtotal' => $inv->subtotal,
@@ -66,7 +72,13 @@ class VendorInvoiceController extends Controller
             ];
         }));
 
-        return response()->json(['invoices' => $invoices]);
+        if ($vendor) {
+            return response()->json(['invoices' => $invoices]);
+        }
+
+        return Inertia::render('Apps/Procurement/VendorInvoices/Index', [
+            'invoices' => $invoices,
+        ]);
     }
 
     public function create(Vendor $vendor)
