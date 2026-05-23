@@ -421,6 +421,7 @@ export default function Index() {
                                                 <Table.Td>{formatDate(row.facility_reference_date)}</Table.Td>
                                                 <Table.Td>{row.gr_number ?? '-'}</Table.Td>
                                                 <Table.Td>{formatDate(row.trx_datetime)}</Table.Td>
+                                                {isIncomingReport && <Table.Td>{poLink(row)}</Table.Td>}
                                                 <Table.Td>{vendorLink(row)}</Table.Td>
                                                 <Table.Td>{row.sku}</Table.Td>
                                                 <Table.Td>{row.category_name}</Table.Td>
@@ -429,7 +430,7 @@ export default function Index() {
                                                 <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
                                                 <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
                                                 <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
-                                                <Table.Td>{poLink(row)}</Table.Td>
+                                                {isUsageReport && <Table.Td>{poLink(row)}</Table.Td>}
                                             </>
                                         ) : (
                                             <>

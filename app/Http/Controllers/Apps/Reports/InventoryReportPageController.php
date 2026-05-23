@@ -114,8 +114,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'Tgl Daftar',
                 $isUsage ? 'Nomor Bukti Pengeluaran Barang' : 'No Penerimaan Barang',
                 $isUsage ? 'Tanggal Keluar' : 'Tanggal Terima',
-                $isUsage ? 'Nama Pengirim Barang' : 'Referensi',
-                $isUsage ? 'Referensi' : 'Nama Pengirim Barang',
+                ...($isUsage ? ['Nama Pengirim Barang'] : ['Referensi', 'Nama Pengirim Barang']),
                 'Kode Barang',
                 'Kategory Barang',
                 'Nama Barang',
@@ -123,6 +122,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'Jumlah Barang',
                 'Harga Satuan',
                 'Total Harga',
+                ...($isUsage ? ['Referensi'] : []),
             ]];
 
             $numberColumns = [10, 11, 12];
@@ -176,8 +176,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                     $row->facility_reference_date,
                     $isUsage ? $row->facility_reference_no : $row->gr_number,
                     $row->trx_datetime,
-                    $isUsage ? $row->vendor_name : $row->po_reference,
-                    $isUsage ? $row->po_reference : $row->vendor_name,
+                    ...($isUsage ? [$row->vendor_name] : [$row->po_reference, $row->vendor_name]),
                     $row->sku,
                     $row->category_name,
                     $row->item_name,
@@ -185,6 +184,7 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                     (float) $row->qty,
                     (float) $row->unit_price,
                     (float) $row->value,
+                    ...($isUsage ? [$row->po_reference] : []),
                 ];
             } else {
                 $line = [
