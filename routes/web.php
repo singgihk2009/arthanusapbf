@@ -213,6 +213,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::get('/sales/order-tracking', fn () => Inertia::render('Apps/Sales/OrderTracking/Index'))->name('sales.order-tracking.index');
 
     // phase 1 sales otc
+    Route::get('/customers/search', [CustomerController::class, 'search'])->name('customers.search');
     Route::resource('/customers', CustomerController::class);
     Route::resource('/price-lists', PriceListController::class);
     Route::resource('/sales-orders', SalesOrderController::class);
