@@ -331,10 +331,7 @@ class VendorController extends Controller
             ->values();
 
         $receivingBaseQuery = DB::table('receiving_entries')
-            ->leftJoin('purchase_orders', function ($join) {
-                $join->on('purchase_orders.id', '=', 'receiving_entries.source_id')
-                    ->where('receiving_entries.source_type', '=', 'purchase_order');
-            })
+            ->leftJoin('purchase_orders', 'purchase_orders.id', '=', 'receiving_entries.source_id')
             ->where(function ($scopedQuery) use ($vendor, $vendorNames) {
                 $scopedQuery->where('receiving_entries.vendor_id', $vendor->id)
                     ->orWhere('purchase_orders.vendor_id', $vendor->id);
@@ -347,7 +344,7 @@ class VendorController extends Controller
         $this->warehouseAccessService->scopeInventoryQuery($receivingBaseQuery, $user);
 
         $receivingRows = (clone $receivingBaseQuery)
-            ->whereIn(DB::raw("LOWER(COALESCE(receiving_entries.status, ''))"), ['posted', 'completed'])
+            ->whereIn(DB::raw("LOWER(COALESCE(receiving_entries.status, ''))"), ['posted', 'completed', 'approved', 'close', 'closed'])
             ->select('receiving_entries.total_value', 'receiving_entries.grand_total', 'receiving_entries.total')
             ->get();
 
@@ -355,8 +352,42 @@ class VendorController extends Controller
             return (float) ($entry->total_value ?? $entry->grand_total ?? $entry->total ?? 0);
         });
 
-        $totalInvoiced = (float) (clone $invoiceBaseQuery)
-            ->sum('grand_total');
+        $invoiceRows = (clone $invoiceBaseQuery)
+            ->get([
+                'grand_total',
+                'net_payable_amount',
+                'subtotal',
+                'discount_amount',
+                'tax_amount',
+                'wht_tax_amount',
+            ]);
+
+        $totalInvoiced = (float) $invoiceRows->sum(function (VendorInvoice $invoice): float {
+            $grandTotal = (float) ($invoice->grand_total ?? 0);
+            if ($grandTotal > 0) {
+                return $grandTotal;
+            }
+
+            $netPayable = (float) ($invoice->net_payable_amount ?? 0);
+            if ($netPayable > 0) {
+                return $netPayable;
+            }
+
+            $subtotal = (float) ($invoice->subtotal ?? 0);
+            $discount = (float) ($invoice->discount_amount ?? 0);
+            $taxAmount = (float) ($invoice->tax_amount ?? 0);
+            $whtAmount = (float) ($invoice->wht_tax_amount ?? 0);
+
+            return max(0, $subtotal - $discount + $taxAmount - $whtAmount);
+        });
+
+        Log::debug('Vendor invoice monitoring totals', [
+            'vendor_id' => $vendor->id,
+            'invoice_count' => $invoiceRows->count(),
+            'total_invoiced' => $totalInvoiced,
+            'receiving_count' => $receivingRows->count(),
+            'total_received' => $totalReceived,
+        ]);
 
         $monitoring = [
             'total_received' => $totalReceived,
