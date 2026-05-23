@@ -120,6 +120,7 @@ export default function Index() {
                         { key: 'facility_reference_date', label: 'Tgl Daftar' },
                         { key: 'gr_number', label: 'No Penerimaan Barang' },
                         { key: 'trx_datetime', label: 'Tanggal Terima', sortKey: 'trx_datetime' },
+                        { key: 'po_reference', label: 'Referensi' },
                         { key: 'vendor_name', label: 'Nama Pengirim Barang', sortKey: 'vendor' },
                         { key: 'sku', label: 'Kode Barang' },
                         { key: 'category_name', label: 'Kategory Barang', sortKey: 'category' },
@@ -128,7 +129,6 @@ export default function Index() {
                         { key: 'qty', label: 'Jumlah Barang', sortKey: 'qty' },
                         { key: 'unit_price', label: 'Harga Satuan', sortKey: 'unit_price' },
                         { key: 'value', label: 'Total Harga', sortKey: 'value' },
-                        { key: 'po_reference', label: 'Referensi' },
                     ])
                 : [
                     { key: 'warehouse_name', label: 'Warehouse', sortKey: 'warehouse' },
@@ -421,6 +421,7 @@ export default function Index() {
                                                 <Table.Td>{formatDate(row.facility_reference_date)}</Table.Td>
                                                 <Table.Td>{row.gr_number ?? '-'}</Table.Td>
                                                 <Table.Td>{formatDate(row.trx_datetime)}</Table.Td>
+                                                {isIncomingReport && <Table.Td>{poLink(row)}</Table.Td>}
                                                 <Table.Td>{vendorLink(row)}</Table.Td>
                                                 <Table.Td>{row.sku}</Table.Td>
                                                 <Table.Td>{row.category_name}</Table.Td>
@@ -429,7 +430,7 @@ export default function Index() {
                                                 <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
                                                 <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
                                                 <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
-                                                <Table.Td>{poLink(row)}</Table.Td>
+                                                {isUsageReport && <Table.Td>{poLink(row)}</Table.Td>}
                                             </>
                                         ) : (
                                             <>
