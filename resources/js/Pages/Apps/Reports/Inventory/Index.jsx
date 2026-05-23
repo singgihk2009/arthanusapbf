@@ -16,6 +16,17 @@ const formatDate = (value) => {
     }).format(date);
 };
 
+
+const shiftIsoDate = (value, deltaDays) => {
+    if (!value) return value;
+
+    const parsed = new Date(`${value}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) return value;
+
+    parsed.setUTCDate(parsed.getUTCDate() + deltaDays);
+    return parsed.toISOString().slice(0, 10);
+};
+
 export default function Index() {
     const { filters, warehouses, categories, items, selectedItem, facilitySchemes, reportData } = usePage().props;
     const isIncomingReport = filters.type === 'incoming-items';
@@ -326,18 +337,57 @@ export default function Index() {
 
                         {isDateRangeReport && (
                             <>
-                                <input
-                                    type="date"
-                                    value={filters.start_date ?? ''}
-                                    onChange={(e) => updateFilters({ start_date: e.target.value, page: 1 })}
-                                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
-                                />
-                                <input
-                                    type="date"
-                                    value={filters.end_date ?? ''}
-                                    onChange={(e) => updateFilters({ end_date: e.target.value, page: 1 })}
-                                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
-                                />
+                                {!isStockPositionReport && (
+                                    <input
+                                        type="date"
+                                        value={filters.start_date ?? ''}
+                                        onChange={(e) => updateFilters({ start_date: e.target.value, page: 1 })}
+                                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
+                                    />
+                                )}
+                                {isStockPositionReport ? (
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const shiftedDate = shiftIsoDate(filters.end_date, -1);
+                                                updateFilters({ end_date: shiftedDate, page: 1 });
+                                            }}
+                                            disabled={!filters.end_date}
+                                            className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-rose-600 text-lg font-bold text-white shadow-sm hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300 dark:bg-rose-500 dark:hover:bg-rose-400 dark:disabled:bg-rose-800"
+                                            title="Mundur 1 hari"
+                                            aria-label="Mundur 1 hari"
+                                        >
+                                            «
+                                        </button>
+                                        <input
+                                            type="date"
+                                            value={filters.end_date ?? ''}
+                                            onChange={(e) => updateFilters({ end_date: e.target.value, page: 1 })}
+                                            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const shiftedDate = shiftIsoDate(filters.end_date, 1);
+                                                updateFilters({ end_date: shiftedDate, page: 1 });
+                                            }}
+                                            disabled={!filters.end_date}
+                                            className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-600 text-lg font-bold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300 dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:disabled:bg-emerald-800"
+                                            title="Maju 1 hari"
+                                            aria-label="Maju 1 hari"
+                                        >
+                                            »
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <input
+                                        type="date"
+                                        value={filters.end_date ?? ''}
+                                        onChange={(e) => updateFilters({ end_date: e.target.value, page: 1 })}
+                                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
+                                    />
+                                )}
                             </>
                         )}
 
