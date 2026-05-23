@@ -112,6 +112,11 @@ class PriceListController extends Controller
 
     public function searchItems(Request $request): JsonResponse
     {
+        abort_unless(
+            $request->user()?->canAny(['price-list.view', 'price-list.create', 'price-list.update']),
+            403
+        );
+
         $q = (string) $request->query('q', '');
         $query = Item::query()->select(['id', 'sku', 'name', 'base_uom_id'])
             ->with('baseUom:id,name')
