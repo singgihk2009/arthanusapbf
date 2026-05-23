@@ -78,7 +78,7 @@ class PurchaseOrderController extends Controller
             ? Carbon::parse($data['expected_delivery_date'])->toDateString()
             : null;
 
-        DB::transaction(function () use ($data, $request, $poDate, $expectedDeliveryDate, $documentVersioningService) {
+        $po = DB::transaction(function () use ($data, $request, $poDate, $expectedDeliveryDate, $documentVersioningService) {
             $poNumber = $this->generateNumber();
             $warehouseId = Warehouse::query()->value('id');
             $supplierId = $this->resolveSupplierId((int) $data['vendor_id']);
@@ -135,7 +135,14 @@ class PurchaseOrderController extends Controller
             }
 
             $po->recalculateTotals();
+
+            return $po;
         });
+        if ($request->input('action') === 'approve') {
+            $po->approve($request->user()?->id);
+        }
+
+
         $returnTo = (string) $request->input('return_to', '');
         if ($returnTo !== '') {
             return redirect($returnTo)->with('success', 'Purchase Order dibuat.');
@@ -313,6 +320,10 @@ class PurchaseOrderController extends Controller
 
             $purchaseOrder->recalculateTotals();
         });
+        if ($request->input('action') === 'approve') {
+            $purchaseOrder->approve($request->user()?->id);
+        }
+
         $returnTo = (string) $request->input('return_to', '');
         if ($returnTo !== '') {
             return redirect($returnTo)->with('success', 'Purchase Order diupdate.');
@@ -362,6 +373,7 @@ class PurchaseOrderController extends Controller
             'items.*.facility_reference_date' => ['nullable','date'],
             'items.*.facility_reference_note' => ['nullable','string'],
             'items.*.notes' => ['nullable','string'],
+            'action' => ['nullable', 'in:draft,approve'],
             'documents' => ['nullable', 'array'],
             'documents.*.document_type_id' => ['required_with:documents', 'integer', 'exists:document_types,id'],
             'documents.*.title' => ['nullable', 'string', 'max:255'],
