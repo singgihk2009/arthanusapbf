@@ -131,6 +131,7 @@ class PurchaseOrderController extends Controller
                     'owner_id' => (int) $po->id,
                     'document_type_id' => (int) $documentPayload['document_type_id'],
                     'title' => $documentPayload['title'] ?? null,
+                    'document_number' => $documentPayload['document_number'] ?? null,
                 ], $documentPayload['file']);
             }
 
@@ -315,6 +316,7 @@ class PurchaseOrderController extends Controller
                     'owner_id' => (int) $purchaseOrder->id,
                     'document_type_id' => (int) $documentPayload['document_type_id'],
                     'title' => $documentPayload['title'] ?? null,
+                    'document_number' => $documentPayload['document_number'] ?? null,
                 ], $documentPayload['file']);
             }
 
@@ -377,6 +379,7 @@ class PurchaseOrderController extends Controller
             'documents' => ['nullable', 'array'],
             'documents.*.document_type_id' => ['required_with:documents', 'integer', 'exists:document_types,id'],
             'documents.*.title' => ['nullable', 'string', 'max:255'],
+            'documents.*.document_number' => ['nullable', 'string', 'max:255'],
             'documents.*.file' => ['required_with:documents', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
         ]);
     }
