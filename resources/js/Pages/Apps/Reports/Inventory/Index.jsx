@@ -277,15 +277,6 @@ export default function Index() {
                                     className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-900 dark:bg-gray-950 dark:text-gray-200"
                                     placeholder={selectedItem ? `${selectedItem.sku} - ${selectedItem.name}` : 'Pilih Item (Wajib) - ketik min. 3 karakter'}
                                 />
-                                {filters.item_id && selectedItem && (
-                                    <div className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
-                                        Terpilih: {selectedItem.sku} - {selectedItem.name}{' '}
-                                        <button type="button" className="text-rose-600" onClick={() => updateFilters({ item_id: null, page: 1 })}>Hapus</button>
-                                    </div>
-                                )}
-                                {!canSearchItem && (
-                                    <div className="mt-1 text-xs text-gray-500">Ketik minimal 3 karakter untuk mencari item.</div>
-                                )}
                                 {itemLoading && <div className="mt-1 text-xs text-gray-500">Mencari item...</div>}
                                 {itemError && <div className="mt-1 text-xs text-rose-600">{itemError}</div>}
                                 {!itemLoading && canSearchItem && !itemError && itemOptions.length > 0 && (
