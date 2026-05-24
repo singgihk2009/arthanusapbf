@@ -28,6 +28,20 @@ export default function Page({ customer, salesOrder, warehouses = [], items = []
     lines: salesOrder?.lines || [emptyLine],
   });
 
+
+  const findItemById = (itemId) => items.find((item) => String(item.id) === String(itemId));
+
+  const setItemForLine = (index, itemId) => {
+    const selectedItem = findItemById(itemId);
+    const lines = [...data.lines];
+    lines[index] = {
+      ...lines[index],
+      item_id: itemId,
+      uom_id: selectedItem?.base_uom_id || '',
+    };
+    setData('lines', lines);
+  };
+
   const setLine = (index, key, value) => {
     const lines = [...data.lines];
     lines[index] = { ...lines[index], [key]: value };
@@ -134,6 +148,7 @@ export default function Page({ customer, salesOrder, warehouses = [], items = []
               <thead className='bg-gray-50 dark:bg-gray-900'>
                 <tr>
                   <th className='border p-2 text-left'>Item</th>
+                  <th className='border p-2 text-left'>UoM</th>
                   <th className='border p-2 text-left'>Qty</th>
                   <th className='border p-2 text-left'>Price</th>
                   <th className='border p-2 text-left'>Notes</th>
@@ -145,7 +160,7 @@ export default function Page({ customer, salesOrder, warehouses = [], items = []
                     <td className='border p-2'>
                       <select
                         value={line.item_id}
-                        onChange={(e) => setLine(index, 'item_id', e.target.value)}
+                        onChange={(e) => setItemForLine(index, e.target.value)}
                         onBlur={() => resolvePrice(index)}
                         className='w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
                       >
@@ -156,6 +171,14 @@ export default function Page({ customer, salesOrder, warehouses = [], items = []
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td className='border p-2'>
+                      <input
+                        type='text'
+                        value={findItemById(line.item_id)?.base_uom?.name || ''}
+                        readOnly
+                        className='w-full px-3 py-1.5 border text-sm rounded-md bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
+                      />
                     </td>
                     <td className='border p-2'>
                       <input
