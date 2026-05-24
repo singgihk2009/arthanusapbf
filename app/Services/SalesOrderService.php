@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\Inventory\Item;
 use App\Models\Sales\Customer;
 use App\Models\Sales\PriceList;
 use App\Models\Sales\Sale;
+use App\Services\Inventory\UomConversionService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -40,6 +42,8 @@ class SalesOrderService
     public function cancel(Sale $sale,?string $reason=null): Sale { if(in_array($sale->status,['fully_shipped','fully_invoiced','closed','cancelled'],true)){throw ValidationException::withMessages(['status'=>'Cannot cancel this order']);}$sale->update(['status'=>'cancelled','cancelled_by'=>Auth::id(),'cancelled_at'=>now(),'cancel_reason'=>$reason]);return $sale; }
     public function syncLines(Sale $sale,array $lines): array { if($sale->status!=='draft'){throw ValidationException::withMessages(['status'=>'Lines can only be changed on draft']);}
         $existing = $sale->lines()->get()->keyBy('id'); $keep=[]; $calculated=[];
-        foreach($lines as $line){$line=$this->calculateLine($line); if(!empty($line['id']) && $existing->has($line['id'])){$model=$existing[$line['id']]; if($model->qty_shipped>0||$model->qty_invoiced>0){throw ValidationException::withMessages(['lines'=>'Cannot edit fulfilled lines']);}$model->update($line);$keep[]=$model->id;} else {$created=$sale->lines()->create($line);$keep[]=$created->id;} $calculated[]=$line;}
+        foreach($lines as $line){if(empty($line['uom_id']) && !empty($line['item_id'])){$line['uom_id']=Item::query()->whereKey($line['item_id'])->value('base_uom_id');}
+            if(empty($line['qty_base']) && !empty($line['item_id']) && !empty($line['uom_id'])){$line['qty_base']=app(UomConversionService::class)->toBase((int)$line['item_id'],(int)$line['uom_id'],(float)$line['qty_sold']);}
+            $line=$this->calculateLine($line); if(!empty($line['id']) && $existing->has($line['id'])){$model=$existing[$line['id']]; if($model->qty_shipped>0||$model->qty_invoiced>0){throw ValidationException::withMessages(['lines'=>'Cannot edit fulfilled lines']);}$model->update($line);$keep[]=$model->id;} else {$created=$sale->lines()->create($line);$keep[]=$created->id;} $calculated[]=$line;}
         $sale->lines()->whereNotIn('id',$keep)->where('qty_shipped',0)->where('qty_invoiced',0)->delete(); return $calculated; }
 }
