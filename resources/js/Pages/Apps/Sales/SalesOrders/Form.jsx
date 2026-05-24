@@ -20,7 +20,7 @@ export default function Page({ customer, salesOrder, warehouses = [], items = []
   const isEdit = Boolean(salesOrder);
 
   const { data, setData, post, put, processing, errors } = useForm({
-    warehouse_id: salesOrder?.warehouse_id || '',
+    warehouse_id: salesOrder?.warehouse_id || warehouses?.[0]?.id || '',
     document_date: salesOrder?.document_date || new Date().toISOString().slice(0, 10),
     expected_delivery_date: salesOrder?.expected_delivery_date || '',
     price_list_id: salesOrder?.price_list_id || customer?.price_list_id || '',
@@ -98,6 +98,21 @@ export default function Page({ customer, salesOrder, warehouses = [], items = []
           </div>
 
           <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+
+            <div>
+              <label className='text-gray-600 text-sm'>Warehouse</label>
+              <select
+                value={data.warehouse_id}
+                onChange={(e) => setData('warehouse_id', e.target.value)}
+                className='mt-2 w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
+              >
+                <option value=''>Pilih Warehouse</option>
+                {warehouses.map((warehouse) => (
+                  <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>
+                ))}
+              </select>
+              {errors.warehouse_id && <small className='text-xs text-red-500'>{errors.warehouse_id}</small>}
+            </div>
             <Input type='date' label='Document Date' value={data.document_date} onChange={(e) => setData('document_date', e.target.value)} />
             <Input
               type='date'
