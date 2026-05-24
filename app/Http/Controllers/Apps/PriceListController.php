@@ -111,35 +111,96 @@ class PriceListController extends Controller
     public function searchItems(Request $request): JsonResponse
     {
         abort_unless(
-            $request->user()?->canAny(['price-list.view', 'price-list.create', 'price-list.update']),
+            $request->user()?->canAny([
+                'price-list.view', 'price-list.create', 'price-list.update',
+                'sales-order.create', 'sales-order.update', 'sales-order.view',
+                'item.view', 'item.create', 'item.update',
+            ]),
             403
         );
 
-        $q = (string) $request->query('q', '');
-        $query = Item::query()->select(['id', 'sku', 'name', 'base_uom_id'])
-            ->with('baseUom:id,name')
-            ->when(Schema::hasColumn('items', 'is_active'), fn ($x) => $x->where('is_active', true))
-            ->when($q !== '', fn ($x) => $x->where(function ($y) use ($q) {
-                $y->where('sku', 'like', "%{$q}%")
-                    ->orWhere('name', 'like', "%{$q}%")
-                    ->orWhere('default_barcode', 'like', "%{$q}%")
-                    ->orWhereExists(function ($b) use ($q) {
-                        $b->selectRaw('1')->from('item_barcodes as ib')->whereColumn('ib.item_id', 'items.id')->where('ib.barcode', 'like', "%{$q}%");
-                    });
-            }))
-            ->limit(20);
+        $data = $request->validate([
+            'q' => ['required', 'string', 'max:100'],
+            'mode' => ['nullable', 'in:auto,barcode,sku,name'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'warehouse_id' => ['nullable', 'integer'],
+        ]);
 
-        return response()->json($query->get()->map(fn ($item) => [
-            'id' => $item->id,
-            'code' => $item->sku,
-            'name' => $item->name,
-            'uom_id' => $item->base_uom_id,
-            'uom_name' => $item->baseUom?->name,
-            'selling_price' => $item->selling_price ?? $item->sale_price ?? $item->price ?? $item->default_price ?? null,
-            'available_stock' => ($stock = $this->availabilityService->getAvailableStock((int) $item->id, request()->integer('warehouse_id') ?: null)),
-            'stock_status' => $this->availabilityService->stockStatus($stock),
-            'cogs' => (float) (DB::table('stock_balances')->where('item_id', $item->id)->when(request()->integer('warehouse_id'), fn ($q, $w) => $q->where('warehouse_id', $w))->value('avg_cost') ?? 0),
-        ]));
+        $q = trim((string) ($data['q'] ?? ''));
+        $mode = $data['mode'] ?? 'auto';
+        $limit = min((int) ($data['limit'] ?? 20), 50);
+        $barcodeLike = (bool) preg_match('/^[0-9]{8,}$/', $q);
+
+        if ($mode !== 'barcode' && mb_strlen($q) < 3) {
+            return response()->json([]);
+        }
+
+        $baseQuery = Item::query()
+            ->select(['items.id', 'items.sku', 'items.name', 'items.base_uom_id', 'items.default_barcode'])
+            ->with('baseUom:id,name')
+            ->when(Schema::hasColumn('items', 'is_active'), fn ($x) => $x->where('is_active', true));
+
+        if ($mode === 'barcode' || ($mode === 'auto' && $barcodeLike)) {
+            $exactBarcode = (clone $baseQuery)
+                ->where(function ($x) use ($q) {
+                    $x->where('default_barcode', $q)
+                        ->orWhereExists(function ($b) use ($q) {
+                            $b->selectRaw('1')->from('item_barcodes as ib')->whereColumn('ib.item_id', 'items.id')->where('ib.barcode', $q);
+                        });
+                })
+                ->limit(1)
+                ->get();
+
+            if ($exactBarcode->isNotEmpty()) {
+                return response()->json($this->mapSearchItems($exactBarcode, $data['warehouse_id'] ?? null));
+            }
+
+            if ($mode === 'barcode') {
+                return response()->json([]);
+            }
+        }
+
+        $rows = (clone $baseQuery)
+            ->where(function ($x) use ($q) {
+                $x->where('sku', 'like', "{$q}%")
+                    ->orWhere('sku', $q)
+                    ->orWhere('name', 'like', "%{$q}%")
+                    ->orWhere('default_barcode', 'like', "{$q}%")
+                    ->orWhere('default_barcode', $q);
+            })
+            ->orderByRaw("CASE
+                WHEN default_barcode = ? THEN 1
+                WHEN sku = ? THEN 2
+                WHEN sku LIKE ? THEN 4
+                WHEN name LIKE ? THEN 6
+                ELSE 7 END", [$q, $q, "{$q}%", "%{$q}%"])
+            ->orderBy('name')
+            ->limit($limit)
+            ->get();
+
+        return response()->json($this->mapSearchItems($rows, $data['warehouse_id'] ?? null));
+    }
+
+    private function mapSearchItems($rows, ?int $warehouseId): array
+    {
+        return $rows->map(function ($item) use ($warehouseId) {
+            $stock = $this->availabilityService->getAvailableStock((int) $item->id, $warehouseId ?: null);
+
+            return [
+                'id' => $item->id,
+                'sku' => $item->sku,
+                'barcode' => $item->default_barcode,
+                // Mapping note: this project uses items.sku as code and items.name as product name.
+                'code' => $item->sku,
+                'name' => $item->name,
+                'uom_id' => $item->base_uom_id,
+                'uom_name' => $item->baseUom?->name,
+                'selling_price' => $item->selling_price ?? $item->sale_price ?? $item->price ?? $item->default_price ?? null,
+                'available_stock' => $stock,
+                'stock_status' => $this->availabilityService->stockStatus($stock),
+                'cogs' => (float) (DB::table('stock_balances')->where('item_id', $item->id)->when($warehouseId, fn ($q, $w) => $q->where('warehouse_id', $w))->value('avg_cost') ?? 0),
+            ];
+        })->values()->all();
     }
 
     private function uomOptions(): array
