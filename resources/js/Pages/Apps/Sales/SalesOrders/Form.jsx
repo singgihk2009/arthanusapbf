@@ -4,217 +4,31 @@ import Card from '@/Components/Card';
 import Input from '@/Components/Input';
 import { Head, Link, useForm } from '@inertiajs/react';
 import axios from 'axios';
+import { useMemo, useState } from 'react';
 
-const emptyLine = {
-  item_id: '',
-  uom_id: '',
-  facility_scheme_id: '',
-  qty_sold: 1,
-  unit_price: 0,
-  discount_percent: 0,
-  tax_percent: 0,
-  notes: '',
-};
+const makeLine = () => ({ item_id: '', item_name:'', uom_id:'', uom_name:'', available_stock:null, stock_status:'unknown', qty_sold:1, unit_price:0, discount_percent:0, tax_percent:11, discount_amount:0, tax_amount:0, line_total:0, notes:'', price_list_id:null, price_list_line_id:null });
+const money=(n)=>Number(n||0).toLocaleString('id-ID',{style:'currency',currency:'IDR'});
 
-export default function Page({ customer, salesOrder, warehouses = [], items = [] }) {
-  const isEdit = Boolean(salesOrder);
+export default function Page({ customer, salesOrder, warehouses = [], priceList, priceListSource }) {
+  const isEdit = Boolean(salesOrder?.id);
+  const [q,setQ]=useState(''); const [opts,setOpts]=useState([]);
+  const { data, setData, post, put, processing, errors } = useForm({ warehouse_id: salesOrder?.warehouse_id || warehouses?.[0]?.id || '', document_date: salesOrder?.document_date || new Date().toISOString().slice(0,10), expected_delivery_date: salesOrder?.expected_delivery_date || '', price_list_id: salesOrder?.price_list_id || priceList?.id || '', notes: salesOrder?.notes || '', lines: salesOrder?.lines?.length ? salesOrder.lines.map(l=>({...makeLine(),...l, item_name:l.item?.name,uom_name:l.uom?.name,available_stock:l.available_stock??null,stock_status:l.stock_status??'unknown'})) : [makeLine()] });
+  const totals=useMemo(()=>data.lines.reduce((a,l)=>{const gross=Number(l.qty_sold||0)*Number(l.unit_price||0);const disc=gross*Number(l.discount_percent||0)/100;const tax=(gross-disc)*Number(l.tax_percent||0)/100;const total=gross-disc+tax; a.subtotal+=gross;a.discount+=disc;a.tax+=tax;a.grand+=total; return a;},{subtotal:0,discount:0,tax:0,grand:0}),[data.lines]);
+  const setLine=(i,k,v)=>{const ls=[...data.lines]; ls[i]={...ls[i],[k]:v}; const l=ls[i]; const gross=Number(l.qty_sold||0)*Number(l.unit_price||0); const disc=gross*Number(l.discount_percent||0)/100; const tax=(gross-disc)*Number(l.tax_percent||0)/100; ls[i].discount_amount=disc; ls[i].tax_amount=tax; ls[i].line_total=gross-disc+tax; setData('lines',ls);};
+  const search=async(v)=>{setQ(v); if(v.length<2)return; const r=await axios.get(route('apps.items.search'),{params:{q:v,warehouse_id:data.warehouse_id}}); setOpts(r.data||[]);};
+  const choose=async(i,item)=>{setLine(i,'item_id',item.id); setLine(i,'item_name',`${item.code} - ${item.name}`); setLine(i,'uom_id',item.uom_id||''); setLine(i,'uom_name',item.uom_name||''); setLine(i,'available_stock',item.available_stock); setLine(i,'stock_status',item.stock_status||'unknown'); await resolvePrice(i); setQ(''); setOpts([]);};
+  const resolvePrice=async(i)=>{const l=data.lines[i]; if(!l.item_id) return; const r=await axios.get(route('apps.price-lists.resolve-price'),{params:{item_id:l.item_id,qty:l.qty_sold,uom_id:l.uom_id,date:data.document_date,price_list_id:data.price_list_id}}); setLine(i,'unit_price',r.data.unit_price||0); setLine(i,'discount_percent',r.data.discount_percent||0); setLine(i,'price_list_id',r.data.price_list_id||null); setLine(i,'price_list_line_id',r.data.price_list_line_id||null);};
+  const save=(e)=>{e.preventDefault(); isEdit ? put(route('apps.sales-orders.update',salesOrder.id)) : post(route('apps.customers.sales-orders.store',customer.id));};
 
-  const { data, setData, post, put, processing, errors } = useForm({
-    warehouse_id: salesOrder?.warehouse_id || warehouses?.[0]?.id || '',
-    document_date: salesOrder?.document_date || new Date().toISOString().slice(0, 10),
-    expected_delivery_date: salesOrder?.expected_delivery_date || '',
-    price_list_id: salesOrder?.price_list_id || customer?.price_list_id || '',
-    notes: salesOrder?.notes || '',
-    lines: salesOrder?.lines || [emptyLine],
-  });
-
-
-  const findItemById = (itemId) => items.find((item) => String(item.id) === String(itemId));
-
-  const setItemForLine = (index, itemId) => {
-    const selectedItem = findItemById(itemId);
-    const lines = [...data.lines];
-    lines[index] = {
-      ...lines[index],
-      item_id: itemId,
-      uom_id: selectedItem?.base_uom_id || '',
-    };
-    setData('lines', lines);
-  };
-
-  const setLine = (index, key, value) => {
-    const lines = [...data.lines];
-    lines[index] = { ...lines[index], [key]: value };
-    setData('lines', lines);
-  };
-
-  const resolvePrice = async (index) => {
-    const line = data.lines[index];
-    if (!line.item_id) return;
-
-    const { data: result } = await axios.get(route('apps.price-lists.resolve-price'), {
-      params: {
-        item_id: line.item_id,
-        qty: line.qty_sold,
-        uom_id: line.uom_id,
-        date: data.document_date,
-        price_list_id: data.price_list_id,
-      },
-    });
-
-    const lines = [...data.lines];
-    lines[index] = {
-      ...lines[index],
-      unit_price: result.price || 0,
-      discount_percent: result.discount_percent || 0,
-    };
-    setData('lines', lines);
-  };
-
-  const save = (e) => {
-    e.preventDefault();
-    if (isEdit) {
-      put(route('apps.sales-orders.update', salesOrder.id));
-      return;
-    }
-
-    post(route('apps.customers.sales-orders.store', customer.id));
-  };
-
-  return (
-    <>
-      <Head title='Sales Order Form' />
-      <Card
-        title={`${isEdit ? 'Edit' : 'Create'} Sales Order`}
-        form={save}
-        footer={(
-          <div className='flex flex-wrap items-center gap-2'>
-            <Button type='submit' label='Save Draft' variant='gray' disabled={processing} />
-            <Button
-              type='button'
-              label='Add Line'
-              variant='orange'
-              onClick={() => setData('lines', [...data.lines, { ...emptyLine }])}
-              disabled={processing}
-            />
-            <Link
-              href={route('apps.customers.show', customer?.id || salesOrder?.customer_id)}
-              className='px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-semibold bg-white text-rose-500 hover:bg-gray-100 border dark:bg-gray-950 dark:border-gray-800 dark:hover:bg-gray-900'
-            >
-              Cancel
-            </Link>
-          </div>
-        )}
-      >
-        <div className='space-y-4'>
-          <div className='text-sm text-gray-700 dark:text-gray-300'>
-            Customer: <b>{customer?.customer_name}</b>
-          </div>
-
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-
-            <div>
-              <label className='text-gray-600 text-sm'>Warehouse</label>
-              <select
-                value={data.warehouse_id}
-                onChange={(e) => setData('warehouse_id', e.target.value)}
-                className='mt-2 w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
-              >
-                <option value=''>Pilih Warehouse</option>
-                {warehouses.map((warehouse) => (
-                  <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>
-                ))}
-              </select>
-              {errors.warehouse_id && <small className='text-xs text-red-500'>{errors.warehouse_id}</small>}
-            </div>
-            <Input type='date' label='Document Date' value={data.document_date} onChange={(e) => setData('document_date', e.target.value)} />
-            <Input
-              type='date'
-              label='Expected Delivery Date'
-              value={data.expected_delivery_date}
-              onChange={(e) => setData('expected_delivery_date', e.target.value)}
-            />
-          </div>
-
-          <Input
-            label='Notes'
-            value={data.notes || ''}
-            onChange={(e) => setData('notes', e.target.value)}
-            errors={errors.notes}
-          />
-
-          <div className='overflow-x-auto'>
-            <table className='w-full border text-sm'>
-              <thead className='bg-gray-50 dark:bg-gray-900'>
-                <tr>
-                  <th className='border p-2 text-left'>Item</th>
-                  <th className='border p-2 text-left'>UoM</th>
-                  <th className='border p-2 text-left'>Qty</th>
-                  <th className='border p-2 text-left'>Price</th>
-                  <th className='border p-2 text-left'>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.lines.map((line, index) => (
-                  <tr key={index}>
-                    <td className='border p-2'>
-                      <select
-                        value={line.item_id}
-                        onChange={(e) => setItemForLine(index, e.target.value)}
-                        onBlur={() => resolvePrice(index)}
-                        className='w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
-                      >
-                        <option value=''>Pilih Item</option>
-                        {items.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className='border p-2'>
-                      <input
-                        type='text'
-                        value={findItemById(line.item_id)?.base_uom?.name || ''}
-                        readOnly
-                        className='w-full px-3 py-1.5 border text-sm rounded-md bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
-                      />
-                    </td>
-                    <td className='border p-2'>
-                      <input
-                        type='number'
-                        value={line.qty_sold}
-                        onChange={(e) => setLine(index, 'qty_sold', e.target.value)}
-                        className='w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
-                      />
-                    </td>
-                    <td className='border p-2'>
-                      <input
-                        type='number'
-                        value={line.unit_price}
-                        onChange={(e) => setLine(index, 'unit_price', e.target.value)}
-                        className='w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
-                      />
-                    </td>
-                    <td className='border p-2'>
-                      <input
-                        type='text'
-                        value={line.notes || ''}
-                        onChange={(e) => setLine(index, 'notes', e.target.value)}
-                        className='w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {errors.lines && <small className='text-xs text-red-500'>{errors.lines}</small>}
-        </div>
-      </Card>
-    </>
-  );
+  return <><Head title='Sales Order Form'/><Card title={`${isEdit?'Edit':'Create'} Sales Order`} form={save} footer={<div className='flex gap-2'><Button type='submit' label='Save Draft' variant='gray' disabled={processing}/>{isEdit && salesOrder?.status==='draft' && <Link href={route('apps.sales-orders.show',salesOrder.id)} className='px-3 py-2 border rounded text-sm'>Go to Show (Submit)</Link>}<Link href={route('apps.customers.show',customer.id)} className='px-3 py-2 border rounded text-sm'>Cancel</Link></div>}>
+    <div className='space-y-4'>
+      <div className='flex justify-between'><h2 className='font-semibold'>{isEdit?'Edit':'Create'} Sales Order</h2><span className='px-2 py-1 rounded bg-slate-100 text-xs'>{salesOrder?.status_label||'Draft'}</span></div>
+      <div className='grid md:grid-cols-2 gap-3'><div className='border rounded p-3 text-sm'><div><b>{customer?.customer_code}</b> - {customer?.customer_name}</div><div>{customer?.contact_person||'-'} | {customer?.phone||'-'}</div><div>{customer?.email||'-'}</div><div>{customer?.address||'-'}, {customer?.city||'-'}, {customer?.province||'-'}</div><div>NPWP: {customer?.npwp||'-'}</div><div>Payment: {customer?.payment_term_days||0} days</div><div>Credit: {money(customer?.credit_limit)}</div></div><div className='border rounded p-3 text-sm'><div><b>Price List</b>: {priceList?.code||'-'} - {priceList?.name||'-'}</div><div>Period: {priceList?.effective_from||'-'} to {priceList?.effective_to||'-'}</div><div>Source: {priceListSource==='customer'?'Customer Price List':priceList?'Default Price List':'No Price List'}</div>{!priceList && <div className='text-amber-600'>No active price list assigned. Item price may default to 0.</div>}</div></div>
+      <div className='grid md:grid-cols-2 gap-3'><select value={data.warehouse_id} onChange={e=>setData('warehouse_id',e.target.value)} className='border rounded p-2'><option value=''>Warehouse</option>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select><Input type='date' label='Document Date' value={data.document_date} onChange={e=>setData('document_date',e.target.value)}/><Input type='date' label='Expected Delivery Date' value={data.expected_delivery_date} onChange={e=>setData('expected_delivery_date',e.target.value)}/></div>
+      <Input label='Notes' value={data.notes} onChange={e=>setData('notes',e.target.value)} errors={errors.notes}/>
+      <table className='w-full text-xs border'><thead><tr><th>Item</th><th>UoM</th><th>Stock</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Disc Amt</th><th>Tax%</th><th>Tax Amt</th><th>Line Total</th><th>Notes</th></tr></thead><tbody>{data.lines.map((l,i)=><tr key={i}><td className='border p-1'><input className='border p-1 w-full' value={l.item_name||''} onChange={e=>search(e.target.value)}/>{opts.length>0 && <div className='absolute bg-white border z-20'>{opts.map(o=><div key={o.id} className='px-2 py-1 cursor-pointer' onClick={()=>choose(i,o)}>{o.code} - {o.name}</div>)}</div>}</td><td>{l.uom_name||'-'}</td><td>{l.available_stock===null?'Unknown':l.available_stock}</td><td><input type='number' value={l.qty_sold} onChange={e=>{setLine(i,'qty_sold',e.target.value);resolvePrice(i);}}/></td><td><input type='number' value={l.unit_price} onChange={e=>setLine(i,'unit_price',e.target.value)}/></td><td><input type='number' value={l.discount_percent} onChange={e=>setLine(i,'discount_percent',e.target.value)}/></td><td>{money(l.discount_amount)}</td><td><input type='number' value={l.tax_percent} onChange={e=>setLine(i,'tax_percent',e.target.value)}/></td><td>{money(l.tax_amount)}</td><td>{money(l.line_total)}</td><td><input value={l.notes||''} onChange={e=>setLine(i,'notes',e.target.value)}/></td></tr>)}</tbody></table>
+      <Button type='button' label='Add Line' variant='orange' onClick={()=>setData('lines',[...data.lines,makeLine()])}/>
+      <div className='border rounded p-3 text-sm'><div>Subtotal: {money(totals.subtotal)}</div><div>Discount: {money(totals.discount)}</div><div>Tax: {money(totals.tax)}</div><div className='font-semibold'>Grand Total: {money(totals.grand)}</div></div>
+    </div></Card></>;
 }
-
 Page.layout = (page) => <AppLayout children={page} />;

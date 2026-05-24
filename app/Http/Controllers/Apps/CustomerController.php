@@ -60,7 +60,7 @@ class CustomerController extends Controller
 
     public function show(Customer $customer)
     {
-        $salesOrders = Schema::hasTable('sales') ? $customer->salesOrders()?->with('warehouse:id,name')->latest()->get() : collect();
+        $salesOrders = Schema::hasTable('sales') ? $customer->salesOrders()?->with('warehouse:id,name','priceList:id,name')->latest()->get() : collect();
 
         return Inertia::render('Apps/Sales/Customers/Show', [
             'customer' => $customer,
