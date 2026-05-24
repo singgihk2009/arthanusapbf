@@ -12,7 +12,7 @@ class SalesLine extends Model
     protected $table = 'sales_lines';
 
     protected $fillable = [
-        'sale_id','item_id','uom_id','facility_scheme_id','qty_sold','qty_base','qty_shipped','qty_invoiced','unit_price',
+        'sale_id','item_id','batch_id','uom_id','facility_scheme_id','qty_sold','qty_base','qty_shipped','qty_invoiced','unit_price',
         'discount_percent','discount_amount','tax_percent','tax_amount','line_total','price_list_id','price_list_line_id','notes',
     ];
 
@@ -24,6 +24,7 @@ class SalesLine extends Model
 
     public function sale(){ return $this->belongsTo(Sale::class); }
     public function item(){ return $this->belongsTo(Item::class); }
+    public function batch(){ return $this->belongsTo(\App\Models\Inventory\ItemBatch::class); }
     public function uom(){ return $this->belongsTo(Uom::class); }
     public function facilityScheme(){ return $this->belongsTo(FacilityScheme::class); }
     public function priceList(){ return $this->belongsTo(PriceList::class); }
