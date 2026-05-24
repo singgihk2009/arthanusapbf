@@ -70,7 +70,7 @@ export default function Page({ customer, summary, salesOrders = [] }) {
                 key={tab}
                 type='button'
                 onClick={() => setActiveTab(tab)}
-                className={`rounded-md border px-2 py-1 ${activeTab === tab ? 'border-gray-300 bg-gray-100 font-medium text-gray-900' : 'border-gray-200 bg-gray-50 text-gray-700'}`}
+                className={`rounded-md border px-2 py-1 ${activeTab === tab ? 'border-indigo-600 bg-indigo-600 font-medium text-white' : 'border-gray-200 bg-gray-50 text-gray-700'}`}
               >
                 {tab}
               </button>
