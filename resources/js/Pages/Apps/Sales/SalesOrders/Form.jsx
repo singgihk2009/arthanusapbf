@@ -122,6 +122,13 @@ export default function Page({ customer, salesOrder, warehouses = [], items = []
             />
           </div>
 
+          <Input
+            label='Notes'
+            value={data.notes || ''}
+            onChange={(e) => setData('notes', e.target.value)}
+            errors={errors.notes}
+          />
+
           <div className='overflow-x-auto'>
             <table className='w-full border text-sm'>
               <thead className='bg-gray-50 dark:bg-gray-900'>
@@ -129,6 +136,7 @@ export default function Page({ customer, salesOrder, warehouses = [], items = []
                   <th className='border p-2 text-left'>Item</th>
                   <th className='border p-2 text-left'>Qty</th>
                   <th className='border p-2 text-left'>Price</th>
+                  <th className='border p-2 text-left'>Notes</th>
                 </tr>
               </thead>
               <tbody>
@@ -162,6 +170,14 @@ export default function Page({ customer, salesOrder, warehouses = [], items = []
                         type='number'
                         value={line.unit_price}
                         onChange={(e) => setLine(index, 'unit_price', e.target.value)}
+                        className='w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
+                      />
+                    </td>
+                    <td className='border p-2'>
+                      <input
+                        type='text'
+                        value={line.notes || ''}
+                        onChange={(e) => setLine(index, 'notes', e.target.value)}
                         className='w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
                       />
                     </td>
