@@ -31,18 +31,33 @@ export default function Page({ customer, salesOrder, warehouses = [], priceList 
   const chooseItem=async(i,item)=>{patchLine(i,{item_id:item.id,item_name:item.name||'',item_code:item.code||item.sku||'',sku:item.sku||'',barcode:item.barcode||'',uom_id:item.uom_id||'',uom_name:item.uom_name||'',available_stock:item.available_stock,cogs:item.cogs||0,batch_id:'',qty_sold:data.lines[i]?.qty_sold || 1}); const b=await axios.get(route('apps.sales-orders.batches'),{params:{item_id:item.id,warehouse_id:data.warehouse_id||null}}); patchLine(i,{batch_options:b.data||[]}); await resolvePrice(i); searchRef.current?.focus();};
 
   const handleSearchSelect = async (item) => {
-    const currentLine = data.lines[selectedRow];
-    const targetIndex = currentLine?.item_id ? data.lines.length : selectedRow;
+    const safeSelectedRow = Math.max(0, Math.min(selectedRow, (data.lines?.length || 1) - 1));
+    const currentLine = data.lines[safeSelectedRow];
+    const hasEmptyLine = data.lines.some((line) => !line?.item_id);
 
-    if (targetIndex === data.lines.length) {
-      setData((prev) => ({ ...prev, lines: [...(prev.lines || []), makeLine()] }));
+    let targetIndex = safeSelectedRow;
+    if (currentLine?.item_id) {
+      const firstEmptyIndex = data.lines.findIndex((line) => !line?.item_id);
+      if (firstEmptyIndex >= 0) {
+        targetIndex = firstEmptyIndex;
+      } else {
+        targetIndex = data.lines.length;
+        setData((prev) => ({ ...prev, lines: [...(prev.lines || []), makeLine()] }));
+      }
     }
 
     await chooseItem(targetIndex, item);
 
-    setData((prev) => ({ ...prev, lines: [...(prev.lines || []), makeLine()] }));
-    setSelectedRow((targetIndex + 1));
+    if (!hasEmptyLine && targetIndex === data.lines.length - 1) {
+      setData((prev) => ({ ...prev, lines: [...(prev.lines || []), makeLine()] }));
+      setSelectedRow(targetIndex + 1);
+    } else {
+      const firstEmptyAfter = data.lines.findIndex((line, idx) => idx !== targetIndex && !line?.item_id);
+      setSelectedRow(firstEmptyAfter >= 0 ? firstEmptyAfter : targetIndex);
+    }
+
     setSearchResetKey((k) => k + 1);
+    searchRef.current?.focus();
   };
   const chooseBatch=(i,batchId)=>{const b=(data.lines[i].batch_options||[]).find(x=>String(x.id)===String(batchId)); patchLine(i,{batch_id:batchId,available_stock:b?.available_stock ?? data.lines[i].available_stock,cogs:b?.cogs ?? data.lines[i].cogs});};
   const resolvePrice=async(i)=>{const l=data.lines[i]; if(!l.item_id) return; const r=await axios.get(route('apps.price-lists.resolve-price'),{params:{item_id:l.item_id,qty:l.qty_sold,uom_id:l.uom_id,date:data.document_date,price_list_id:data.price_list_id}}); patchLine(i,{unit_price:r.data.unit_price||0,discount_percent:r.data.discount_percent||0,price_list_id:r.data.price_list_id||null,price_list_line_id:r.data.price_list_line_id||null});};
