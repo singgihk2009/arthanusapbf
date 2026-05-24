@@ -9,6 +9,7 @@ use App\Models\Inventory\Item;
 use App\Models\Inventory\Uom;
 use App\Models\Sales\Customer;
 use App\Models\Sales\PriceList;
+use App\Services\Inventory\InventoryAvailabilityService;
 use App\Services\PriceListService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ use Inertia\Response;
 
 class PriceListController extends Controller
 {
-    public function __construct(private readonly PriceListService $service)
+    public function __construct(private readonly PriceListService $service, private readonly InventoryAvailabilityService $availabilityService)
     {
     }
 
@@ -101,13 +102,9 @@ class PriceListController extends Controller
             'price_list_id' => ['nullable', 'integer'],
         ]);
 
-        return response()->json($this->service->resolvePrice(
-            $data['item_id'],
-            $data['qty'] ?? 1,
-            $data['uom_id'] ?? null,
-            $data['date'] ?? null,
-            $data['price_list_id'] ?? null,
-        ));
+        $resolved = $this->service->resolvePrice($data['item_id'],$data['qty'] ?? 1,$data['uom_id'] ?? null,$data['date'] ?? null,$data['price_list_id'] ?? null);
+        if (($resolved['source'] ?? null) === 'none') { $resolved['message'] = 'No price found for this item.'; }
+        return response()->json($resolved);
     }
 
     public function searchItems(Request $request): JsonResponse
@@ -131,6 +128,8 @@ class PriceListController extends Controller
             'uom_id' => $item->base_uom_id,
             'uom_name' => $item->baseUom?->name,
             'selling_price' => $item->selling_price ?? $item->sale_price ?? $item->price ?? $item->default_price ?? null,
+            'available_stock' => ($stock = $this->availabilityService->getAvailableStock((int) $item->id, request()->integer('warehouse_id') ?: null)),
+            'stock_status' => $this->availabilityService->stockStatus($stock),
         ]));
     }
 

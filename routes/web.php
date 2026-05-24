@@ -217,6 +217,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::resource('/customers', CustomerController::class);
     Route::get('/price-lists/resolve-price', [PriceListController::class, 'resolvePrice'])->name('price-lists.resolve-price')->middleware('can:price-list.view');
     Route::get('/items/search', [PriceListController::class, 'searchItems'])->name('items.search');
+    Route::get('/sales-orders/batches', [SalesOrderController::class, 'batches'])->name('sales-orders.batches');
     
     Route::get('/price-lists', [PriceListController::class, 'index'])->name('price-lists.index')->middleware('can:price-list.view');
     Route::get('/price-lists/create', [PriceListController::class, 'create'])->name('price-lists.create')->middleware('can:price-list.create');
