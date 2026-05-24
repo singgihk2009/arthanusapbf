@@ -198,9 +198,31 @@ class PriceListController extends Controller
                 'selling_price' => $item->selling_price ?? $item->sale_price ?? $item->price ?? $item->default_price ?? null,
                 'available_stock' => $stock,
                 'stock_status' => $this->availabilityService->stockStatus($stock),
-                'cogs' => (float) (DB::table('stock_balances')->where('item_id', $item->id)->when($warehouseId, fn ($q, $w) => $q->where('warehouse_id', $w))->value('avg_cost') ?? 0),
+                'cogs' => $this->resolveCogs((int) $item->id, $warehouseId),
             ];
         })->values()->all();
+    }
+
+    private function resolveCogs(int $itemId, ?int $warehouseId): float
+    {
+        if (! Schema::hasTable('stock_balances')) {
+            return 0.0;
+        }
+
+        $column = Schema::hasColumn('stock_balances', 'avg_cost')
+            ? 'avg_cost'
+            : (Schema::hasColumn('stock_balances', 'unit_cost') ? 'unit_cost' : null);
+
+        if (! $column) {
+            return 0.0;
+        }
+
+        $value = DB::table('stock_balances')
+            ->where('item_id', $itemId)
+            ->when($warehouseId, fn ($q, $w) => $q->where('warehouse_id', $w))
+            ->value($column);
+
+        return (float) ($value ?? 0);
     }
 
     private function uomOptions(): array
