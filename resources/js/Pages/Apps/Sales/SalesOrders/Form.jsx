@@ -4,217 +4,28 @@ import Card from '@/Components/Card';
 import Input from '@/Components/Input';
 import { Head, Link, useForm } from '@inertiajs/react';
 import axios from 'axios';
+import { useMemo, useState } from 'react';
 
-const emptyLine = {
-  item_id: '',
-  uom_id: '',
-  facility_scheme_id: '',
-  qty_sold: 1,
-  unit_price: 0,
-  discount_percent: 0,
-  tax_percent: 0,
-  notes: '',
-};
+const makeLine = () => ({ item_id:'', item_label:'', search_text:'', batch_id:'', uom_id:'', uom_name:'', available_stock:null, cogs:0, qty_sold:1, unit_price:0, discount_percent:0, tax_percent:11, discount_amount:0, tax_amount:0, line_total:0, notes:'', price_list_id:null, price_list_line_id:null, batch_options:[], suggestions:[] });
+const money=(n)=>Number(n||0).toLocaleString('id-ID',{style:'currency',currency:'IDR'});
 
-export default function Page({ customer, salesOrder, warehouses = [], items = [] }) {
-  const isEdit = Boolean(salesOrder);
+export default function Page({ customer, salesOrder, warehouses = [], priceList, priceListSource }) {
+  const isEdit = Boolean(salesOrder?.id);
+  const { data, setData, post, put, processing } = useForm({ warehouse_id: salesOrder?.warehouse_id || warehouses?.[0]?.id || '', document_date: salesOrder?.document_date || new Date().toISOString().slice(0,10), expected_delivery_date: salesOrder?.expected_delivery_date || '', price_list_id: salesOrder?.price_list_id || priceList?.id || '', notes: salesOrder?.notes || '', lines: salesOrder?.lines?.length ? salesOrder.lines.map(l=>({...makeLine(),...l,item_label:l.item?.name||'',uom_name:l.uom?.name||'',search_text:l.item?.name||''})) : [makeLine()] });
+  const totals=useMemo(()=>data.lines.reduce((a,l)=>{const gross=+l.qty_sold*(+l.unit_price);const disc=gross*(+l.discount_percent)/100;const tax=(gross-disc)*(+l.tax_percent)/100;a.subtotal+=gross;a.discount+=disc;a.tax+=tax;a.grand+=gross-disc+tax;return a;},{subtotal:0,discount:0,tax:0,grand:0}),[data.lines]);
+  const patchLine=(i,patch)=>{const ls=[...data.lines];ls[i]={...ls[i],...patch};const l=ls[i];const gross=+l.qty_sold*(+l.unit_price);const disc=gross*(+l.discount_percent)/100;const tax=(gross-disc)*(+l.tax_percent)/100;ls[i].discount_amount=disc;ls[i].tax_amount=tax;ls[i].line_total=gross-disc+tax;setData('lines',ls);};
 
-  const { data, setData, post, put, processing, errors } = useForm({
-    warehouse_id: salesOrder?.warehouse_id || warehouses?.[0]?.id || '',
-    document_date: salesOrder?.document_date || new Date().toISOString().slice(0, 10),
-    expected_delivery_date: salesOrder?.expected_delivery_date || '',
-    price_list_id: salesOrder?.price_list_id || customer?.price_list_id || '',
-    notes: salesOrder?.notes || '',
-    lines: salesOrder?.lines || [emptyLine],
-  });
+  const searchItems=async(i,text)=>{patchLine(i,{search_text:text}); if(text.length<3){patchLine(i,{suggestions:[]});return;} const r=await axios.get(route('apps.items.search'),{params:{q:text,warehouse_id:data.warehouse_id}}); patchLine(i,{suggestions:r.data||[]});};
+  const chooseItem=async(i,item)=>{patchLine(i,{item_id:item.id,item_label:`${item.code} - ${item.name}`,search_text:`${item.code} - ${item.name}`,uom_id:item.uom_id||'',uom_name:item.uom_name||'',available_stock:item.available_stock,cogs:item.cogs||0,batch_id:'',suggestions:[]}); const b=await axios.get(route('apps.sales-orders.batches'),{params:{item_id:item.id,warehouse_id:data.warehouse_id||null}}); patchLine(i,{batch_options:b.data||[]}); await resolvePrice(i);};
+  const chooseBatch=(i,batchId)=>{const b=(data.lines[i].batch_options||[]).find(x=>String(x.id)===String(batchId)); patchLine(i,{batch_id:batchId,available_stock:b?.available_stock ?? data.lines[i].available_stock,cogs:b?.cogs ?? data.lines[i].cogs});};
+  const resolvePrice=async(i)=>{const l=data.lines[i]; if(!l.item_id) return; const r=await axios.get(route('apps.price-lists.resolve-price'),{params:{item_id:l.item_id,qty:l.qty_sold,uom_id:l.uom_id,date:data.document_date,price_list_id:data.price_list_id}}); patchLine(i,{unit_price:r.data.unit_price||0,discount_percent:r.data.discount_percent||0,price_list_id:r.data.price_list_id||null,price_list_line_id:r.data.price_list_line_id||null});};
+  const save=(e)=>{e.preventDefault(); isEdit ? put(route('apps.sales-orders.update',salesOrder.id)) : post(route('apps.customers.sales-orders.store',customer.id));};
 
-
-  const findItemById = (itemId) => items.find((item) => String(item.id) === String(itemId));
-
-  const setItemForLine = (index, itemId) => {
-    const selectedItem = findItemById(itemId);
-    const lines = [...data.lines];
-    lines[index] = {
-      ...lines[index],
-      item_id: itemId,
-      uom_id: selectedItem?.base_uom_id || '',
-    };
-    setData('lines', lines);
-  };
-
-  const setLine = (index, key, value) => {
-    const lines = [...data.lines];
-    lines[index] = { ...lines[index], [key]: value };
-    setData('lines', lines);
-  };
-
-  const resolvePrice = async (index) => {
-    const line = data.lines[index];
-    if (!line.item_id) return;
-
-    const { data: result } = await axios.get(route('apps.price-lists.resolve-price'), {
-      params: {
-        item_id: line.item_id,
-        qty: line.qty_sold,
-        uom_id: line.uom_id,
-        date: data.document_date,
-        price_list_id: data.price_list_id,
-      },
-    });
-
-    const lines = [...data.lines];
-    lines[index] = {
-      ...lines[index],
-      unit_price: result.price || 0,
-      discount_percent: result.discount_percent || 0,
-    };
-    setData('lines', lines);
-  };
-
-  const save = (e) => {
-    e.preventDefault();
-    if (isEdit) {
-      put(route('apps.sales-orders.update', salesOrder.id));
-      return;
-    }
-
-    post(route('apps.customers.sales-orders.store', customer.id));
-  };
-
-  return (
-    <>
-      <Head title='Sales Order Form' />
-      <Card
-        title={`${isEdit ? 'Edit' : 'Create'} Sales Order`}
-        form={save}
-        footer={(
-          <div className='flex flex-wrap items-center gap-2'>
-            <Button type='submit' label='Save Draft' variant='gray' disabled={processing} />
-            <Button
-              type='button'
-              label='Add Line'
-              variant='orange'
-              onClick={() => setData('lines', [...data.lines, { ...emptyLine }])}
-              disabled={processing}
-            />
-            <Link
-              href={route('apps.customers.show', customer?.id || salesOrder?.customer_id)}
-              className='px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-semibold bg-white text-rose-500 hover:bg-gray-100 border dark:bg-gray-950 dark:border-gray-800 dark:hover:bg-gray-900'
-            >
-              Cancel
-            </Link>
-          </div>
-        )}
-      >
-        <div className='space-y-4'>
-          <div className='text-sm text-gray-700 dark:text-gray-300'>
-            Customer: <b>{customer?.customer_name}</b>
-          </div>
-
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-
-            <div>
-              <label className='text-gray-600 text-sm'>Warehouse</label>
-              <select
-                value={data.warehouse_id}
-                onChange={(e) => setData('warehouse_id', e.target.value)}
-                className='mt-2 w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
-              >
-                <option value=''>Pilih Warehouse</option>
-                {warehouses.map((warehouse) => (
-                  <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>
-                ))}
-              </select>
-              {errors.warehouse_id && <small className='text-xs text-red-500'>{errors.warehouse_id}</small>}
-            </div>
-            <Input type='date' label='Document Date' value={data.document_date} onChange={(e) => setData('document_date', e.target.value)} />
-            <Input
-              type='date'
-              label='Expected Delivery Date'
-              value={data.expected_delivery_date}
-              onChange={(e) => setData('expected_delivery_date', e.target.value)}
-            />
-          </div>
-
-          <Input
-            label='Notes'
-            value={data.notes || ''}
-            onChange={(e) => setData('notes', e.target.value)}
-            errors={errors.notes}
-          />
-
-          <div className='overflow-x-auto'>
-            <table className='w-full border text-sm'>
-              <thead className='bg-gray-50 dark:bg-gray-900'>
-                <tr>
-                  <th className='border p-2 text-left'>Item</th>
-                  <th className='border p-2 text-left'>UoM</th>
-                  <th className='border p-2 text-left'>Qty</th>
-                  <th className='border p-2 text-left'>Price</th>
-                  <th className='border p-2 text-left'>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.lines.map((line, index) => (
-                  <tr key={index}>
-                    <td className='border p-2'>
-                      <select
-                        value={line.item_id}
-                        onChange={(e) => setItemForLine(index, e.target.value)}
-                        onBlur={() => resolvePrice(index)}
-                        className='w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
-                      >
-                        <option value=''>Pilih Item</option>
-                        {items.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className='border p-2'>
-                      <input
-                        type='text'
-                        value={findItemById(line.item_id)?.base_uom?.name || ''}
-                        readOnly
-                        className='w-full px-3 py-1.5 border text-sm rounded-md bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
-                      />
-                    </td>
-                    <td className='border p-2'>
-                      <input
-                        type='number'
-                        value={line.qty_sold}
-                        onChange={(e) => setLine(index, 'qty_sold', e.target.value)}
-                        className='w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
-                      />
-                    </td>
-                    <td className='border p-2'>
-                      <input
-                        type='number'
-                        value={line.unit_price}
-                        onChange={(e) => setLine(index, 'unit_price', e.target.value)}
-                        className='w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
-                      />
-                    </td>
-                    <td className='border p-2'>
-                      <input
-                        type='text'
-                        value={line.notes || ''}
-                        onChange={(e) => setLine(index, 'notes', e.target.value)}
-                        className='w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none bg-white text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800'
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {errors.lines && <small className='text-xs text-red-500'>{errors.lines}</small>}
-        </div>
-      </Card>
-    </>
-  );
+  return <><Head title='Sales Order Form'/><Card title={`${isEdit?'Edit':'Create'} Sales Order`} form={save} footer={<div className='flex gap-2'><Button type='submit' label='Save Draft' variant='gray' disabled={processing}/><Link href={route('apps.customers.show',customer.id)} className='px-3 py-2 border rounded text-sm'>Cancel</Link></div>}><div className='space-y-4'>
+    <div className='grid md:grid-cols-2 gap-3'><select value={data.warehouse_id} onChange={e=>setData('warehouse_id',e.target.value)} className='border rounded p-2'><option value=''>Warehouse</option>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select><Input type='date' label='Document Date' value={data.document_date} onChange={e=>setData('document_date',e.target.value)}/></div>
+    <table className='w-full text-xs border'><thead><tr><th>Item (Scan/Ketik Nama)</th><th>UoM</th><th>Batch</th><th>Avail Qty</th><th>Price</th><th>COGS</th><th>Qty</th><th>Total</th></tr></thead><tbody>{data.lines.map((l,i)=><tr key={i}><td className='border p-1'><input className='border p-1 w-full' placeholder='Scan barcode / ketik min 3 karakter' value={l.search_text||''} onChange={e=>searchItems(i,e.target.value)}/>{(l.suggestions||[]).length>0&&<select className='border p-1 w-full mt-1' value={l.item_id||''} onChange={e=>{const it=(l.suggestions||[]).find(x=>String(x.id)===String(e.target.value)); if(it) chooseItem(i,it);}}><option value=''>Pilih produk...</option>{(l.suggestions||[]).slice(0,20).map(o=><option key={o.id} value={o.id}>{o.code} - {o.name}</option>)}</select>}</td><td>{l.uom_name||'-'}</td><td><select value={l.batch_id||''} onChange={e=>chooseBatch(i,e.target.value)} className='border p-1 w-full' disabled={!l.item_id}><option value=''>Pilih batch</option>{(l.batch_options||[]).map(b=><option key={b.id} value={b.id}>{b.batch_no}{b.expired_date?` (EXP ${b.expired_date})`:''}</option>)}</select></td><td>{l.available_stock??'Unknown'}</td><td><input type='number' value={l.unit_price} onChange={e=>patchLine(i,{unit_price:e.target.value})}/></td><td>{money(l.cogs)}</td><td><input type='number' value={l.qty_sold} onChange={e=>{patchLine(i,{qty_sold:e.target.value});resolvePrice(i);}}/></td><td>{money(l.line_total)}</td></tr>)}</tbody></table>
+    <Button type='button' label='Add Line' variant='orange' onClick={()=>setData('lines',[...data.lines,makeLine()])}/>
+    <div className='text-sm'>Grand Total: <b>{money(totals.grand)}</b></div>
+  </div></Card></>;
 }
-
-Page.layout = (page) => <AppLayout children={page} />;
+Page.layout=(p)=><AppLayout children={p}/>;

@@ -9,16 +9,18 @@ use App\Models\Inventory\Item;
 use App\Models\Inventory\Uom;
 use App\Models\Sales\Customer;
 use App\Models\Sales\PriceList;
+use App\Services\Inventory\InventoryAvailabilityService;
 use App\Services\PriceListService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class PriceListController extends Controller
 {
-    public function __construct(private readonly PriceListService $service)
+    public function __construct(private readonly PriceListService $service, private readonly InventoryAvailabilityService $availabilityService)
     {
     }
 
@@ -101,13 +103,9 @@ class PriceListController extends Controller
             'price_list_id' => ['nullable', 'integer'],
         ]);
 
-        return response()->json($this->service->resolvePrice(
-            $data['item_id'],
-            $data['qty'] ?? 1,
-            $data['uom_id'] ?? null,
-            $data['date'] ?? null,
-            $data['price_list_id'] ?? null,
-        ));
+        $resolved = $this->service->resolvePrice($data['item_id'],$data['qty'] ?? 1,$data['uom_id'] ?? null,$data['date'] ?? null,$data['price_list_id'] ?? null);
+        if (($resolved['source'] ?? null) === 'none') { $resolved['message'] = 'No price found for this item.'; }
+        return response()->json($resolved);
     }
 
     public function searchItems(Request $request): JsonResponse
@@ -121,7 +119,14 @@ class PriceListController extends Controller
         $query = Item::query()->select(['id', 'sku', 'name', 'base_uom_id'])
             ->with('baseUom:id,name')
             ->when(Schema::hasColumn('items', 'is_active'), fn ($x) => $x->where('is_active', true))
-            ->when($q !== '', fn ($x) => $x->where(fn ($y) => $y->where('sku', 'like', "%{$q}%")->orWhere('name', 'like', "%{$q}%")))
+            ->when($q !== '', fn ($x) => $x->where(function ($y) use ($q) {
+                $y->where('sku', 'like', "%{$q}%")
+                    ->orWhere('name', 'like', "%{$q}%")
+                    ->orWhere('default_barcode', 'like', "%{$q}%")
+                    ->orWhereExists(function ($b) use ($q) {
+                        $b->selectRaw('1')->from('item_barcodes as ib')->whereColumn('ib.item_id', 'items.id')->where('ib.barcode', 'like', "%{$q}%");
+                    });
+            }))
             ->limit(20);
 
         return response()->json($query->get()->map(fn ($item) => [
@@ -131,6 +136,9 @@ class PriceListController extends Controller
             'uom_id' => $item->base_uom_id,
             'uom_name' => $item->baseUom?->name,
             'selling_price' => $item->selling_price ?? $item->sale_price ?? $item->price ?? $item->default_price ?? null,
+            'available_stock' => ($stock = $this->availabilityService->getAvailableStock((int) $item->id, request()->integer('warehouse_id') ?: null)),
+            'stock_status' => $this->availabilityService->stockStatus($stock),
+            'cogs' => (float) (DB::table('stock_balances')->where('item_id', $item->id)->when(request()->integer('warehouse_id'), fn ($q, $w) => $q->where('warehouse_id', $w))->value('avg_cost') ?? 0),
         ]));
     }
 
