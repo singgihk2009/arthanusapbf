@@ -6,7 +6,7 @@ import Input from '@/Components/Input';
 
 const tabs = ['Overview', 'Profile', 'Sales Orders', 'Shipments', 'Invoices', 'Payments', 'Ledger Placeholder'];
 
-export default function Page({ customer, summary }) {
+export default function Page({ customer, summary, salesOrders = [] }) {
   const [activeTab, setActiveTab] = useState('Overview');
 
   const statusClassName = customer.status === 'active'
@@ -142,7 +142,9 @@ export default function Page({ customer, summary }) {
             </form>
           )}
 
-          {activeTab !== 'Overview' && activeTab !== 'Profile' && (
+          {activeTab === 'Sales Orders' && (<div className='space-y-2'><Link href={route('apps.customers.sales-orders.create', customer.id)} className='inline-block rounded border px-3 py-1 text-sm'>Create Sales Order</Link><table className='w-full text-sm border'><thead><tr><th>SO Number</th><th>Document Date</th><th>Expected Delivery</th><th>Warehouse</th><th>Status</th><th>Grand Total</th><th>Actions</th></tr></thead><tbody>{salesOrders.map((so)=><tr key={so.id}><td>{so.number}</td><td>{so.document_date}</td><td>{so.expected_delivery_date||'-'}</td><td>{so.warehouse?.name||'-'}</td><td>{so.status}</td><td>{Number(so.grand_total||0).toLocaleString('id-ID')}</td><td className='space-x-2'><Link href={route('apps.sales-orders.show', so.id)} className='text-blue-600'>View</Link>{so.status==='draft' && <Link href={route('apps.sales-orders.edit', so.id)} className='text-amber-600'>Edit</Link>}</td></tr>)}</tbody></table></div>)}
+
+          {activeTab !== 'Overview' && activeTab !== 'Profile' && activeTab !== 'Sales Orders' && (
             <p className='text-gray-600 text-sm'>No data available yet.</p>
           )}
         </div>

@@ -226,12 +226,15 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::put('/price-lists/{price_list}', [PriceListController::class, 'update'])->name('price-lists.update')->middleware('can:price-list.update');
     Route::delete('/price-lists/{price_list}', [PriceListController::class, 'destroy'])->name('price-lists.destroy')->middleware('can:price-list.delete');
 
-    Route::resource('/sales-orders', SalesOrderController::class);
-    Route::post('/sales-orders/{id}/submit', [SalesOrderController::class, 'submit'])->name('sales-orders.submit');
-    Route::post('/sales-orders/{id}/approve', [SalesOrderController::class, 'approve'])->name('sales-orders.approve');
-    Route::post('/sales-orders/{id}/cancel', [SalesOrderController::class, 'cancel'])->name('sales-orders.cancel');
-    Route::get('/sales-orders/{id}/create-shipment', [SalesOrderController::class, 'createShipment'])->name('sales-orders.create-shipment');
+    Route::get('/customers/{customer}/sales-orders', [SalesOrderController::class, 'customerIndex'])->name('customers.sales-orders.index');
+    Route::get('/customers/{customer}/sales-orders/create', [SalesOrderController::class, 'createForCustomer'])->name('customers.sales-orders.create');
+    Route::post('/customers/{customer}/sales-orders', [SalesOrderController::class, 'storeForCustomer'])->name('customers.sales-orders.store');
 
+    Route::resource('/sales-orders', SalesOrderController::class)->parameters(['sales-orders' => 'salesOrder']);
+    Route::post('/sales-orders/{salesOrder}/submit', [SalesOrderController::class, 'submit'])->name('sales-orders.submit');
+    Route::post('/sales-orders/{salesOrder}/approve', [SalesOrderController::class, 'approve'])->name('sales-orders.approve');
+    Route::post('/sales-orders/{salesOrder}/cancel', [SalesOrderController::class, 'cancel'])->name('sales-orders.cancel');
+    
     Route::resource('/shipments', ShipmentController::class);
     Route::get('/shipments/create-from-sale/{saleId}', [ShipmentController::class, 'createFromSale'])->name('shipments.create-from-sale');
     Route::post('/shipments/{id}/post', [ShipmentController::class, 'post'])->name('shipments.post');
