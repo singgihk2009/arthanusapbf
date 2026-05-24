@@ -3,12 +3,13 @@ import Button from '@/Components/Button';
 import Card from '@/Components/Card';
 import SmartItemInput from '@/Components/SmartItemInput';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { IconCopy, IconTrash, IconAdjustmentsHorizontal } from '@tabler/icons-react';
+import { IconCopy, IconTrash } from '@tabler/icons-react';
 import axios from 'axios';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 const makeLine = () => ({ item_id:'', item_name:'', item_code:'', sku:'', barcode:'', batch_id:'', uom_id:'', uom_name:'', available_stock:null, cogs:0, qty_sold:1, unit_price:0, discount_percent:0, tax_percent:11, discount_amount:0, tax_amount:0, line_total:0, notes:'', price_list_id:null, price_list_line_id:null, batch_options:[] });
 const money=(n)=>Number(n||0).toLocaleString('id-ID',{style:'currency',currency:'IDR'});
+const calcMarkupPrice = (cogs) => Number(cogs || 0) * 1.15;
 
 const stockTone = (stock) => {
   if (stock === null || stock === undefined) return 'bg-slate-100 text-slate-600';
@@ -28,7 +29,7 @@ export default function Page({ customer, salesOrder, warehouses = [], priceList 
 
   const patchLine=(i,patch)=>{setData((prev)=>{const ls=[...(prev.lines||[])];ls[i]={...ls[i],...patch};const l=ls[i]||{};const gross=+l.qty_sold*(+l.unit_price);const disc=gross*(+l.discount_percent)/100;const tax=(gross-disc)*(+l.tax_percent)/100;ls[i]={...ls[i],discount_amount:disc,tax_amount:tax,line_total:gross-disc+tax};return {...prev,lines:ls};});};
 
-  const chooseItem=async(i,item)=>{patchLine(i,{item_id:item.id,item_name:item.name||'',item_code:item.code||item.sku||'',sku:item.sku||'',barcode:item.barcode||'',uom_id:item.uom_id||'',uom_name:item.uom_name||'',available_stock:item.available_stock,cogs:item.cogs||0,batch_id:'',qty_sold:data.lines[i]?.qty_sold || 1}); const b=await axios.get(route('apps.sales-orders.batches'),{params:{item_id:item.id,warehouse_id:data.warehouse_id||null}}); patchLine(i,{batch_options:b.data||[]}); await resolvePrice(i); searchRef.current?.focus();};
+  const chooseItem=async(i,item)=>{const cogs=Number(item.cogs||0); patchLine(i,{item_id:item.id,item_name:item.name||'',item_code:item.code||item.sku||'',sku:item.sku||'',barcode:item.barcode||'',uom_id:item.uom_id||'',uom_name:item.uom_name||'',available_stock:item.available_stock,cogs,batch_id:'',qty_sold:data.lines[i]?.qty_sold || 1,unit_price:calcMarkupPrice(cogs)}); const b=await axios.get(route('apps.sales-orders.batches'),{params:{item_id:item.id,warehouse_id:data.warehouse_id||null}}); patchLine(i,{batch_options:b.data||[]}); searchRef.current?.focus();};
 
   const handleSearchSelect = async (item) => {
     const safeSelectedRow = Math.max(0, Math.min(selectedRow, (data.lines?.length || 1) - 1));
@@ -59,8 +60,7 @@ export default function Page({ customer, salesOrder, warehouses = [], priceList 
     setSearchResetKey((k) => k + 1);
     searchRef.current?.focus();
   };
-  const chooseBatch=(i,batchId)=>{const b=(data.lines[i].batch_options||[]).find(x=>String(x.id)===String(batchId)); patchLine(i,{batch_id:batchId,available_stock:b?.available_stock ?? data.lines[i].available_stock,cogs:b?.cogs ?? data.lines[i].cogs});};
-  const resolvePrice=async(i)=>{const l=data.lines[i]; if(!l.item_id) return; const r=await axios.get(route('apps.price-lists.resolve-price'),{params:{item_id:l.item_id,qty:l.qty_sold,uom_id:l.uom_id,date:data.document_date,price_list_id:data.price_list_id}}); patchLine(i,{unit_price:r.data.unit_price||0,discount_percent:r.data.discount_percent||0,price_list_id:r.data.price_list_id||null,price_list_line_id:r.data.price_list_line_id||null});};
+  const chooseBatch=(i,batchId)=>{const b=(data.lines[i].batch_options||[]).find(x=>String(x.id)===String(batchId)); const cogs = Number(b?.cogs ?? data.lines[i].cogs ?? 0); patchLine(i,{batch_id:batchId,available_stock:b?.available_stock ?? data.lines[i].available_stock,cogs,unit_price:calcMarkupPrice(cogs)});};
   const save=(e)=>{e.preventDefault(); isEdit ? put(route('apps.sales-orders.update',salesOrder.id)) : post(route('apps.customers.sales-orders.store',customer.id));};
 
   const addLine = () => setData('lines',[...data.lines,makeLine()]);
@@ -99,23 +99,23 @@ export default function Page({ customer, salesOrder, warehouses = [], priceList 
 
       <div className='mt-4 rounded border border-gray-200 p-3'>
         <label className='mb-2 block text-sm text-gray-600'>Product Search</label>
-        <SmartItemInput key={searchResetKey} inputClassName='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700' inputRef={searchRef} autoFocus value={null} onSelect={handleSearchSelect} warehouseId={data.warehouse_id} placeholder='Scan barcode / SKU / product name...' />
+        <SmartItemInput key={searchResetKey} inputClassName='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700' inputRef={searchRef} autoFocus value={{ id: searchResetKey, name: '' }} onSelect={handleSearchSelect} warehouseId={data.warehouse_id} placeholder='Scan barcode / SKU / product name...' />
       </div>
 
       <div className='mt-4 overflow-x-auto'>
         <table className='min-w-[1200px] w-full border border-gray-200 text-sm'>
-          <thead><tr className='bg-gray-50'><th className='border px-2 py-2 text-left'>Product</th><th className='border px-2 py-2'>Batch</th><th className='border px-2 py-2'>Expiry</th><th className='border px-2 py-2'>Stock</th><th className='border px-2 py-2'>Price</th><th className='border px-2 py-2'>Qty</th><th className='border px-2 py-2'>Disc%</th><th className='border px-2 py-2'>Tax%</th><th className='border px-2 py-2'>Line Total</th><th className='border px-2 py-2'>Action</th></tr></thead>
+          <thead><tr className='bg-gray-50'><th className='border px-2 py-2 text-left'>Product</th><th className='border px-2 py-2'>Batch</th><th className='border px-2 py-2'>Stock</th><th className='border px-2 py-2'>COGS</th><th className='border px-2 py-2'>Price</th><th className='border px-2 py-2'>Qty</th><th className='border px-2 py-2'>Disc%</th><th className='border px-2 py-2'>Tax%</th><th className='border px-2 py-2'>Line Total</th><th className='border px-2 py-2'>Action</th></tr></thead>
           <tbody>{data.lines.map((l,i)=>{const active = i===selectedRow; const selectedBatch=(l.batch_options||[]).find(b=>String(b.id)===String(l.batch_id)); return <tr key={i} onClick={()=>setSelectedRow(i)} className={`${active ? 'bg-amber-50' : ''}`}>
-            <td className='border px-2 py-2 align-top'><div className='font-medium text-gray-800'>{l.item_name || 'Select product...'}</div><div className='text-xs text-gray-500'>SKU: {l.sku||'-'} • Barcode: {l.barcode||'-'}</div></td>
+            <td className='border px-2 py-2 align-top'><div className='font-medium text-gray-800'>{l.item_name || 'Select product...'}</div></td>
             <td className='border px-2 py-2'><select value={l.batch_id||''} onChange={e=>chooseBatch(i,e.target.value)} className='w-full rounded border border-gray-200 px-2 py-1 text-xs' disabled={!l.item_id}><option value=''>Pilih batch</option>{(l.batch_options||[]).map(b=><option key={b.id} value={b.id}>{b.batch_no}{b.expired_date?` (EXP ${b.expired_date})`:''}</option>)}</select></td>
-            <td className='border px-2 py-2 text-xs text-gray-600'>{selectedBatch?.expired_date || '-'}</td>
             <td className='border px-2 py-2 text-center'><span className={`rounded-full px-2 py-1 text-xs ${stockTone(l.available_stock)}`}>{l.available_stock ?? 'Unknown'}</span></td>
-            <td className='border px-2 py-2'><input className='w-28 rounded border border-gray-200 px-2 py-1 text-right' type='number' value={l.unit_price} onChange={e=>patchLine(i,{unit_price:e.target.value})}/></td>
-            <td className='border px-2 py-2'><input className='w-20 rounded border border-gray-200 px-2 py-1 text-center' type='number' value={l.qty_sold} onChange={e=>{patchLine(i,{qty_sold:e.target.value});resolvePrice(i);}}/></td>
+            <td className='border px-2 py-2 text-right font-medium'>{money(l.cogs || 0)}</td>
+            <td className='border px-2 py-2'><input className='w-28 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-right' type='number' value={l.unit_price} readOnly /></td>
+            <td className='border px-2 py-2'><input className='w-20 rounded border border-gray-200 px-2 py-1 text-center' type='number' value={l.qty_sold} onChange={e=>{patchLine(i,{qty_sold:e.target.value});}}/></td>
             <td className='border px-2 py-2'><input className='w-20 rounded border border-gray-200 px-2 py-1 text-right' type='number' value={l.discount_percent} onChange={e=>patchLine(i,{discount_percent:e.target.value})}/></td>
             <td className='border px-2 py-2'><input className='w-20 rounded border border-gray-200 px-2 py-1 text-right' type='number' value={l.tax_percent} onChange={e=>patchLine(i,{tax_percent:e.target.value})}/></td>
             <td className='border px-2 py-2 text-right font-semibold'>{money(l.line_total)}</td>
-            <td className='border px-2 py-2'><div className='flex items-center justify-center gap-1'><button type='button' onClick={()=>duplicateLine(i)} className='rounded p-1 text-gray-500 hover:bg-gray-200'><IconCopy className='h-4 w-4'/></button><button type='button' onClick={()=>removeLine(i)} className='rounded p-1 text-rose-600 hover:bg-rose-100'><IconTrash className='h-4 w-4'/></button><button type='button' className='rounded p-1 text-gray-500 hover:bg-gray-200'><IconAdjustmentsHorizontal className='h-4 w-4'/></button></div></td>
+            <td className='border px-2 py-2'><div className='flex items-center justify-center gap-1'><button type='button' onClick={()=>duplicateLine(i)} className='rounded p-1 text-gray-500 hover:bg-gray-200'><IconCopy className='h-4 w-4'/></button><button type='button' onClick={()=>removeLine(i)} className='rounded p-1 text-rose-600 hover:bg-rose-100'><IconTrash className='h-4 w-4'/></button></div></td>
           </tr>;})}</tbody>
         </table>
       </div>

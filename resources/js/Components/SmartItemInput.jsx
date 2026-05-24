@@ -41,7 +41,7 @@ export default function SmartItemInput({ value, onSelect, placeholder = 'Scan ba
 
   const selectItem = (item) => {
     onSelect?.(item);
-    setQuery(item?.name || item?.label || '');
+    setQuery('');
     setResults([]);
     setIsOpen(false);
     setHighlightedIndex(-1);
