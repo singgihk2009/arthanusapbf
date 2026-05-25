@@ -88,21 +88,6 @@ export default function Form({ priceList, uoms = [] }) {
     setSearchResetKey((prev) => prev + 1);
   };
 
-  const addScannedItem = (item) => {
-    if (!item?.id) return;
-
-    setLineItemCache((prev) => uniqById([item, ...prev]));
-
-    const firstEmptyLineIndex = data.lines.findIndex((line) => !String(line.item_id || '').trim());
-    if (firstEmptyLineIndex >= 0) {
-      setData('lines', data.lines.map((line, index) => (index === firstEmptyLineIndex ? { ...line, item_id: String(item.id) } : line)));
-    } else {
-      setData('lines', [...data.lines, { ...makeEmptyLine(), item_id: String(item.id) }]);
-    }
-
-    setSearchResetKey((prev) => prev + 1);
-  };
-
   return (
     <>
       <Head title={isEdit ? 'Edit Price List' : 'Create Price List'} />
