@@ -156,6 +156,25 @@ export default function Form({ priceList, uoms = [] }) {
           <div className='rounded border border-gray-200 p-3'>
             <label className='mb-2 block text-sm text-gray-600'>Search Item (Manual List)</label>
             <input className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700' placeholder='Search item...' value={search} onChange={(e) => fetchItems(e.target.value)} />
+            {search.trim().length > 0 && (
+              <div className='mt-2 max-h-52 overflow-auto rounded-md border border-gray-200'>
+                {items.length === 0 ? (
+                  <div className='px-3 py-2 text-xs text-gray-500'>Item tidak ditemukan. Coba kata kunci lain atau scan barcode pada Kasir Mode.</div>
+                ) : (
+                  items.map((item) => (
+                    <button
+                      key={item.id}
+                      type='button'
+                      className='flex w-full items-center justify-between border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-orange-50 last:border-b-0'
+                      onClick={() => addScannedItem(item)}
+                    >
+                      <span className='text-gray-700'>{item.name}</span>
+                      <span className='text-xs text-gray-500'>{item.sku || item.barcode || '-'}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           <div className='overflow-x-auto'>
