@@ -1,47 +1,171 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
-import { Link, useForm } from '@inertiajs/react';
+import Button from '@/Components/Button';
+import Card from '@/Components/Card';
+import { Head, Link, useForm } from '@inertiajs/react';
 
-const emptyLine = { item_id:'', uom_id:'', min_qty:1, price:0, discount_percent:0, tax_included:false, status:'active' };
+const makeEmptyLine = () => ({ item_id: '', uom_id: '', min_qty: 1, price: 0, discount_percent: 0, tax_included: false, status: 'active' });
+
+const uniqById = (list = []) => {
+  const seen = new Set();
+  return list.filter((item) => {
+    const id = String(item?.id ?? '');
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+};
 
 export default function Form({ priceList, uoms = [] }) {
-  const { data, setData, post, put, processing, errors } = useForm({
-    code: priceList?.code || '', name: priceList?.name || '', description: priceList?.description || '', effective_from: priceList?.effective_from || '', effective_to: priceList?.effective_to || '', status: priceList?.status || 'active', is_default: !!priceList?.is_default,
-    lines: priceList?.lines?.length ? priceList.lines.map(l => ({...l, tax_included:!!l.tax_included})) : [emptyLine],
-  });
-  const [search, setSearch] = useState(''); const [items, setItems] = useState([]);
-  const fetchItems = async (q) => { setSearch(q); const r = await fetch(route('apps.items.search')+`?q=${encodeURIComponent(q)}`); setItems(await r.json()); };
-  useEffect(() => { fetchItems(''); }, []);
-  const submit = (e) => { e.preventDefault(); if (priceList) put(route('apps.price-lists.update', priceList.id)); else post(route('apps.price-lists.store')); };
-  const setLine = (i,k,v)=> setData('lines', data.lines.map((x,idx)=> idx===i? {...x,[k]:v}:x));
+  const isEdit = Boolean(priceList?.id);
 
-  return <AppLayout><form onSubmit={submit} className='p-6 space-y-4'>
-    <h1 className='text-xl font-semibold'>{priceList ? 'Edit' : 'Create'} Price List</h1>
-    {data.is_default && data.status === 'active' && <div className='p-2 bg-yellow-100 text-yellow-800 rounded'>This will replace the current default active price list.</div>}
-    <div className='grid grid-cols-3 gap-3'>
-      <input className='border p-2' placeholder='Code' value={data.code} onChange={e=>setData('code',e.target.value)} />
-      <input className='border p-2' placeholder='Name' value={data.name} onChange={e=>setData('name',e.target.value)} />
-      <select className='border p-2' value={data.status} onChange={e=>setData('status',e.target.value)}><option value='active'>active</option><option value='inactive'>inactive</option></select>
-      <input type='date' className='border p-2' value={data.effective_from || ''} onChange={e=>setData('effective_from',e.target.value)} />
-      <input type='date' className='border p-2' value={data.effective_to || ''} onChange={e=>setData('effective_to',e.target.value)} />
-      <label><input type='checkbox' checked={data.is_default} onChange={e=>setData('is_default', e.target.checked)} /> Is Default</label>
-    </div>
-    <textarea className='border p-2 w-full' placeholder='Description' value={data.description || ''} onChange={e=>setData('description',e.target.value)} />
-    <div><input className='border p-2 mb-2' placeholder='Search item...' value={search} onChange={e=>fetchItems(e.target.value)} /><table className='w-full text-sm border'><thead><tr><th>Item</th><th>UOM</th><th>Min Qty</th><th>Price</th><th>Disc%</th><th>Tax Inc</th><th>Status</th><th></th></tr></thead><tbody>
-      {data.lines.map((line, i) => <tr key={i} className='border-t'>
-        <td><select className='border p-1' value={line.item_id} onChange={e=>setLine(i,'item_id',e.target.value)}><option value=''>Select Item</option>{items.map(it => <option key={it.id} value={it.id}>{it.code} - {it.name}</option>)}</select></td>
-        <td><select className='border p-1' value={line.uom_id || ''} onChange={e=>setLine(i,'uom_id',e.target.value || null)}><option value=''>-</option>{uoms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></td>
-        <td><input className='border p-1 w-24' type='number' step='0.0001' value={line.min_qty} onChange={e=>setLine(i,'min_qty',e.target.value)} /></td>
-        <td><input className='border p-1 w-28' type='number' step='0.01' value={line.price} onChange={e=>setLine(i,'price',e.target.value)} /></td>
-        <td><input className='border p-1 w-20' type='number' step='0.01' value={line.discount_percent} onChange={e=>setLine(i,'discount_percent',e.target.value)} /></td>
-        <td><input type='checkbox' checked={!!line.tax_included} onChange={e=>setLine(i,'tax_included',e.target.checked)} /></td>
-        <td><select value={line.status} onChange={e=>setLine(i,'status',e.target.value)}><option value='active'>active</option><option value='inactive'>inactive</option></select></td>
-        <td><button type='button' onClick={()=>setData('lines', data.lines.filter((_,idx)=>idx!==i))}>Remove</button></td>
-      </tr>)}
-    </tbody></table>
-    {errors.lines && <div className='text-red-600 text-sm'>{errors.lines}</div>}
-    </div>
-    <button type='button' className='px-3 py-1 border rounded' onClick={()=>setData('lines', [...data.lines, {...emptyLine}])}>Add Line</button>
-    <div className='space-x-2'><button disabled={processing} className='px-4 py-2 bg-indigo-600 text-white rounded'>Save</button><Link href={route('apps.price-lists.index')} className='px-4 py-2 border rounded'>Cancel</Link></div>
-  </form></AppLayout>;
+  const { data, setData, post, put, processing, errors } = useForm({
+    code: priceList?.code || '',
+    name: priceList?.name || '',
+    description: priceList?.description || '',
+    effective_from: priceList?.effective_from || '',
+    effective_to: priceList?.effective_to || '',
+    status: priceList?.status || 'active',
+    is_default: !!priceList?.is_default,
+    lines: priceList?.lines?.length
+      ? priceList.lines.map((line) => ({ ...line, tax_included: !!line.tax_included }))
+      : [makeEmptyLine()],
+  });
+
+  const [search, setSearch] = useState('');
+  const [items, setItems] = useState([]);
+  const [lineItemCache, setLineItemCache] = useState(() =>
+    (priceList?.lines || []).map((line) => line.item).filter(Boolean),
+  );
+
+  const fetchItems = async (query) => {
+    setSearch(query);
+    const response = await fetch(`${route('apps.items.search')}?q=${encodeURIComponent(query)}`);
+    const json = await response.json();
+    setItems(Array.isArray(json) ? json : []);
+  };
+
+  useEffect(() => {
+    fetchItems('');
+  }, []);
+
+  const itemOptions = useMemo(() => uniqById([...(items || []), ...(lineItemCache || [])]), [items, lineItemCache]);
+
+  const submit = (event) => {
+    event.preventDefault();
+    if (isEdit) {
+      put(route('apps.price-lists.update', priceList.id));
+      return;
+    }
+
+    post(route('apps.price-lists.store'));
+  };
+
+  const setLine = (index, key, value) => {
+    setData('lines', data.lines.map((line, currentIndex) => (currentIndex === index ? { ...line, [key]: value } : line)));
+  };
+
+  const onSelectItem = (index, value) => {
+    setLine(index, 'item_id', value);
+    const selected = itemOptions.find((item) => String(item.id) === String(value));
+    if (selected) {
+      setLineItemCache((prev) => uniqById([selected, ...prev]));
+    }
+  };
+
+  return (
+    <>
+      <Head title={isEdit ? 'Edit Price List' : 'Create Price List'} />
+      <Card
+        title={isEdit ? 'Edit Price List' : 'Create Price List'}
+        form={submit}
+        footer={(
+          <div className='flex items-center gap-2'>
+            <Button type='submit' label='Save' disabled={processing} variant='orange' />
+            <Link href={route('apps.price-lists.index')} className='rounded-lg border border-rose-300 px-3 py-2 text-sm text-rose-700 hover:bg-rose-50'>
+              Cancel
+            </Link>
+          </div>
+        )}
+      >
+        <div className='space-y-4'>
+          {data.is_default && data.status === 'active' && (
+            <div className='rounded-md bg-yellow-100 p-2 text-sm text-yellow-800'>
+              This will replace the current default active price list.
+            </div>
+          )}
+
+          <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
+            <div className='flex flex-col gap-2'>
+              <label className='text-sm text-gray-600'>Code</label>
+              <input className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700' placeholder='Code' value={data.code} onChange={(e) => setData('code', e.target.value)} />
+            </div>
+            <div className='flex flex-col gap-2'>
+              <label className='text-sm text-gray-600'>Name</label>
+              <input className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700' placeholder='Name' value={data.name} onChange={(e) => setData('name', e.target.value)} />
+            </div>
+            <div className='flex flex-col gap-2'>
+              <label className='text-sm text-gray-600'>Status</label>
+              <select className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700' value={data.status} onChange={(e) => setData('status', e.target.value)}><option value='active'>active</option><option value='inactive'>inactive</option></select>
+            </div>
+            <div className='flex flex-col gap-2'>
+              <label className='text-sm text-gray-600'>Effective From</label>
+              <input type='date' className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700' value={data.effective_from || ''} onChange={(e) => setData('effective_from', e.target.value)} />
+            </div>
+            <div className='flex flex-col gap-2'>
+              <label className='text-sm text-gray-600'>Effective To</label>
+              <input type='date' className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700' value={data.effective_to || ''} onChange={(e) => setData('effective_to', e.target.value)} />
+            </div>
+            <div className='flex items-end'>
+              <label className='inline-flex items-center gap-2 text-sm text-gray-700'><input type='checkbox' checked={data.is_default} onChange={(e) => setData('is_default', e.target.checked)} /> Is Default</label>
+            </div>
+          </div>
+
+          <div className='flex flex-col gap-2'>
+            <label className='text-sm text-gray-600'>Description</label>
+            <textarea className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700' placeholder='Description' value={data.description || ''} onChange={(e) => setData('description', e.target.value)} />
+          </div>
+
+          <div className='rounded border border-gray-200 p-3'>
+            <label className='mb-2 block text-sm text-gray-600'>Search Item</label>
+            <input className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700' placeholder='Search item...' value={search} onChange={(e) => fetchItems(e.target.value)} />
+          </div>
+
+          <div className='overflow-x-auto'>
+            <table className='w-full min-w-[900px] border border-gray-200 text-sm'>
+              <thead>
+                <tr className='bg-gray-50'>
+                  <th className='border px-2 py-2 text-left'>Item</th><th className='border px-2 py-2 text-left'>UOM</th><th className='border px-2 py-2'>Min Qty</th><th className='border px-2 py-2'>Price</th><th className='border px-2 py-2'>Disc%</th><th className='border px-2 py-2'>Tax Inc</th><th className='border px-2 py-2'>Status</th><th className='border px-2 py-2'>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.lines.map((line, index) => (
+                  <tr key={index} className='border-t'>
+                    <td className='border px-2 py-2'>
+                      <select className='w-full rounded border border-gray-200 px-2 py-1' value={line.item_id} onChange={(e) => onSelectItem(index, e.target.value)}>
+                        <option value=''>Select Item</option>
+                        {itemOptions.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
+                      </select>
+                    </td>
+                    <td className='border px-2 py-2'><select className='w-full rounded border border-gray-200 px-2 py-1' value={line.uom_id || ''} onChange={(e) => setLine(index, 'uom_id', e.target.value || null)}><option value=''>-</option>{uoms.map((uom) => <option key={uom.id} value={uom.id}>{uom.name}</option>)}</select></td>
+                    <td className='border px-2 py-2'><input className='w-24 rounded border border-gray-200 px-2 py-1 text-right' type='number' step='0.0001' value={line.min_qty} onChange={(e) => setLine(index, 'min_qty', e.target.value)} /></td>
+                    <td className='border px-2 py-2'><input className='w-28 rounded border border-gray-200 px-2 py-1 text-right' type='number' step='0.01' value={line.price} onChange={(e) => setLine(index, 'price', e.target.value)} /></td>
+                    <td className='border px-2 py-2'><input className='w-20 rounded border border-gray-200 px-2 py-1 text-right' type='number' step='0.01' value={line.discount_percent} onChange={(e) => setLine(index, 'discount_percent', e.target.value)} /></td>
+                    <td className='border px-2 py-2 text-center'><input type='checkbox' checked={!!line.tax_included} onChange={(e) => setLine(index, 'tax_included', e.target.checked)} /></td>
+                    <td className='border px-2 py-2'><select className='w-full rounded border border-gray-200 px-2 py-1' value={line.status} onChange={(e) => setLine(index, 'status', e.target.value)}><option value='active'>active</option><option value='inactive'>inactive</option></select></td>
+                    <td className='border px-2 py-2 text-center'><button type='button' className='rounded border border-rose-300 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50' onClick={() => setData('lines', data.lines.filter((_, currentIndex) => currentIndex !== index))}>Remove</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {errors.lines && <div className='mt-2 text-sm text-red-600'>{errors.lines}</div>}
+          </div>
+
+          <div><Button type='button' label='Add Line' variant='gray' onClick={() => setData('lines', [...data.lines, makeEmptyLine()])} /></div>
+        </div>
+      </Card>
+    </>
+  );
 }
+
+Form.layout = (page) => <AppLayout children={page} />;
