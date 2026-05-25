@@ -68,25 +68,35 @@ class CustomerController extends Controller
                 continue;
             }
 
+            $payload = [
+                'customer_name' => $row['customer_name'] ?? $customerCode,
+                'contact_person' => $row['contact_person'] ?? null,
+                'phone' => $row['phone'] ?? null,
+                'email' => $row['email'] ?? null,
+                'address' => $row['address'] ?? null,
+                'city' => $row['city'] ?? null,
+                'province' => $row['province'] ?? null,
+                'postal_code' => $row['postal_code'] ?? null,
+                'npwp' => $row['npwp'] ?? null,
+                'payment_term_days' => (int) ($row['payment_term_days'] ?? 0),
+                'credit_limit' => (float) ($row['credit_limit'] ?? 0),
+                'status' => in_array(strtolower((string) ($row['status'] ?? 'active')), ['active', 'inactive'], true)
+                    ? strtolower((string) $row['status'])
+                    : 'active',
+                'country' => $row['country'] ?? 'Indonesia',
+            ];
+
+            if (Schema::hasColumn('customers', 'code')) {
+                $payload['code'] = $customerCode;
+            }
+
+            if (Schema::hasColumn('customers', 'name')) {
+                $payload['name'] = $payload['customer_name'];
+            }
+
             Customer::query()->updateOrCreate(
                 ['customer_code' => $customerCode],
-                [
-                    'customer_name' => $row['customer_name'] ?? $customerCode,
-                    'contact_person' => $row['contact_person'] ?? null,
-                    'phone' => $row['phone'] ?? null,
-                    'email' => $row['email'] ?? null,
-                    'address' => $row['address'] ?? null,
-                    'city' => $row['city'] ?? null,
-                    'province' => $row['province'] ?? null,
-                    'postal_code' => $row['postal_code'] ?? null,
-                    'npwp' => $row['npwp'] ?? null,
-                    'payment_term_days' => (int) ($row['payment_term_days'] ?? 0),
-                    'credit_limit' => (float) ($row['credit_limit'] ?? 0),
-                    'status' => in_array(strtolower((string) ($row['status'] ?? 'active')), ['active', 'inactive'], true)
-                        ? strtolower((string) $row['status'])
-                        : 'active',
-                    'country' => $row['country'] ?? 'Indonesia',
-                ]
+                $payload
             );
         }
 
