@@ -37,7 +37,7 @@ export default function Index() {
 
     const applyFilter = (e) => {
         e.preventDefault();
-        router.get(route('apps.inventory.items.index'), queryParams, {
+        router.get(route('apps.master-data.items.index'), queryParams, {
             preserveState: true,
             preserveScroll: true,
         });
@@ -45,7 +45,7 @@ export default function Index() {
 
     const resetFilter = () => {
         setForm(defaultFilters);
-        router.get(route('apps.inventory.items.index'), {}, {
+        router.get(route('apps.master-data.items.index'), {}, {
             preserveState: true,
             preserveScroll: true,
         });
@@ -67,7 +67,7 @@ export default function Index() {
             sort_dir: nextDirection,
         }));
 
-        router.get(route('apps.inventory.items.index'), nextParams, {
+        router.get(route('apps.master-data.items.index'), nextParams, {
             preserveState: true,
             preserveScroll: true,
         });
