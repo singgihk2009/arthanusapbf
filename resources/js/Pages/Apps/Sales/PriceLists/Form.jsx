@@ -67,12 +67,25 @@ export default function Form({ priceList, uoms = [] }) {
     setData('lines', data.lines.map((line, currentIndex) => (currentIndex === index ? { ...line, [key]: value } : line)));
   };
 
-  const onSelectItem = (index, value) => {
-    setLine(index, 'item_id', value);
-    const selected = itemOptions.find((item) => String(item.id) === String(value));
-    if (selected) {
-      setLineItemCache((prev) => uniqById([selected, ...prev]));
+  const onSelectRowItem = (index, item) => {
+    if (!item?.id) return;
+    setLine(index, 'item_id', String(item.id));
+    setLineItemCache((prev) => uniqById([item, ...prev]));
+  };
+
+  const addScannedItem = (item) => {
+    if (!item?.id) return;
+
+    setLineItemCache((prev) => uniqById([item, ...prev]));
+
+    const firstEmptyLineIndex = data.lines.findIndex((line) => !String(line.item_id || '').trim());
+    if (firstEmptyLineIndex >= 0) {
+      setData('lines', data.lines.map((line, index) => (index === firstEmptyLineIndex ? { ...line, item_id: String(item.id) } : line)));
+    } else {
+      setData('lines', [...data.lines, { ...makeEmptyLine(), item_id: String(item.id) }]);
     }
+
+    setSearchResetKey((prev) => prev + 1);
   };
 
   const addScannedItem = (item) => {
@@ -171,10 +184,12 @@ export default function Form({ priceList, uoms = [] }) {
                 {data.lines.map((line, index) => (
                   <tr key={index} className='border-t'>
                     <td className='border px-2 py-2'>
-                      <select className='w-full rounded border border-gray-200 px-2 py-1' value={line.item_id} onChange={(e) => onSelectItem(index, e.target.value)}>
-                        <option value=''>Select Item</option>
-                        {itemOptions.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
-                      </select>
+                      <SmartItemInput
+                        value={itemOptions.find((item) => String(item.id) === String(line.item_id)) || { id: `line-${index}`, name: '' }}
+                        onSelect={(item) => onSelectRowItem(index, item)}
+                        placeholder='Scan barcode / SKU / product name...'
+                        inputClassName='w-full rounded border border-gray-200 px-2 py-1 text-sm'
+                      />
                     </td>
                     <td className='border px-2 py-2'><select className='w-full rounded border border-gray-200 px-2 py-1' value={line.uom_id || ''} onChange={(e) => setLine(index, 'uom_id', e.target.value || null)}><option value=''>-</option>{uoms.map((uom) => <option key={uom.id} value={uom.id}>{uom.name}</option>)}</select></td>
                     <td className='border px-2 py-2'><input className='w-24 rounded border border-gray-200 px-2 py-1 text-right' type='number' step='0.0001' value={line.min_qty} onChange={(e) => setLine(index, 'min_qty', e.target.value)} /></td>
