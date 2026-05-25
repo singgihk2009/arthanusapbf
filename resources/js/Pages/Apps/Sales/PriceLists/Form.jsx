@@ -69,7 +69,7 @@ export default function Form({ priceList, uoms = [] }) {
 
   const onSelectRowItem = (index, item) => {
     if (!item?.id) return;
-    setLine(index, 'item_id', String(item.id));
+    setData('lines', data.lines.map((line, currentIndex) => (currentIndex === index ? { ...line, item_id: String(item.id), item_name: item.name || item.label || '' } : line)));
     setLineItemCache((prev) => uniqById([item, ...prev]));
   };
 
@@ -80,9 +80,9 @@ export default function Form({ priceList, uoms = [] }) {
 
     const firstEmptyLineIndex = data.lines.findIndex((line) => !String(line.item_id || '').trim());
     if (firstEmptyLineIndex >= 0) {
-      setData('lines', data.lines.map((line, index) => (index === firstEmptyLineIndex ? { ...line, item_id: String(item.id) } : line)));
+      setData('lines', data.lines.map((line, index) => (index === firstEmptyLineIndex ? { ...line, item_id: String(item.id), item_name: item.name || item.label || '' } : line)));
     } else {
-      setData('lines', [...data.lines, { ...makeEmptyLine(), item_id: String(item.id) }]);
+      setData('lines', [...data.lines, { ...makeEmptyLine(), item_id: String(item.id), item_name: item.name || item.label || '' }]);
     }
 
     setSearchResetKey((prev) => prev + 1);
@@ -189,7 +189,7 @@ export default function Form({ priceList, uoms = [] }) {
                   <tr key={index} className='border-t'>
                     <td className='border px-2 py-2'>
                       <SmartItemInput
-                        value={itemOptions.find((item) => String(item.id) === String(line.item_id)) || { id: `line-${index}`, name: '' }}
+                        value={itemOptions.find((item) => String(item.id) === String(line.item_id)) || { id: line.item_id || `line-${index}`, name: line.item_name || '' }}
                         onSelect={(item) => onSelectRowItem(index, item)}
                         placeholder='Scan barcode / SKU / product name...'
                         inputClassName='w-full rounded border border-gray-200 px-2 py-1 text-sm'
