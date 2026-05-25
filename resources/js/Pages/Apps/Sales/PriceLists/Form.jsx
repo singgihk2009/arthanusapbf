@@ -69,7 +69,7 @@ export default function Form({ priceList, uoms = [] }) {
 
   const onSelectRowItem = (index, item) => {
     if (!item?.id) return;
-    setLine(index, 'item_id', String(item.id));
+    setData('lines', data.lines.map((line, currentIndex) => (currentIndex === index ? { ...line, item_id: String(item.id), item_name: item.name || item.label || '' } : line)));
     setLineItemCache((prev) => uniqById([item, ...prev]));
   };
 
@@ -80,24 +80,9 @@ export default function Form({ priceList, uoms = [] }) {
 
     const firstEmptyLineIndex = data.lines.findIndex((line) => !String(line.item_id || '').trim());
     if (firstEmptyLineIndex >= 0) {
-      setData('lines', data.lines.map((line, index) => (index === firstEmptyLineIndex ? { ...line, item_id: String(item.id) } : line)));
+      setData('lines', data.lines.map((line, index) => (index === firstEmptyLineIndex ? { ...line, item_id: String(item.id), item_name: item.name || item.label || '' } : line)));
     } else {
-      setData('lines', [...data.lines, { ...makeEmptyLine(), item_id: String(item.id) }]);
-    }
-
-    setSearchResetKey((prev) => prev + 1);
-  };
-
-  const addScannedItem = (item) => {
-    if (!item?.id) return;
-
-    setLineItemCache((prev) => uniqById([item, ...prev]));
-
-    const firstEmptyLineIndex = data.lines.findIndex((line) => !String(line.item_id || '').trim());
-    if (firstEmptyLineIndex >= 0) {
-      setData('lines', data.lines.map((line, index) => (index === firstEmptyLineIndex ? { ...line, item_id: String(item.id) } : line)));
-    } else {
-      setData('lines', [...data.lines, { ...makeEmptyLine(), item_id: String(item.id) }]);
+      setData('lines', [...data.lines, { ...makeEmptyLine(), item_id: String(item.id), item_name: item.name || item.label || '' }]);
     }
 
     setSearchResetKey((prev) => prev + 1);
@@ -171,6 +156,25 @@ export default function Form({ priceList, uoms = [] }) {
           <div className='rounded border border-gray-200 p-3'>
             <label className='mb-2 block text-sm text-gray-600'>Search Item (Manual List)</label>
             <input className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700' placeholder='Search item...' value={search} onChange={(e) => fetchItems(e.target.value)} />
+            {search.trim().length > 0 && (
+              <div className='mt-2 max-h-52 overflow-auto rounded-md border border-gray-200'>
+                {items.length === 0 ? (
+                  <div className='px-3 py-2 text-xs text-gray-500'>Item tidak ditemukan. Coba kata kunci lain atau scan barcode pada Kasir Mode.</div>
+                ) : (
+                  items.map((item) => (
+                    <button
+                      key={item.id}
+                      type='button'
+                      className='flex w-full items-center justify-between border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-orange-50 last:border-b-0'
+                      onClick={() => addScannedItem(item)}
+                    >
+                      <span className='text-gray-700'>{item.name}</span>
+                      <span className='text-xs text-gray-500'>{item.sku || item.barcode || '-'}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           <div className='overflow-x-auto'>
@@ -185,7 +189,7 @@ export default function Form({ priceList, uoms = [] }) {
                   <tr key={index} className='border-t'>
                     <td className='border px-2 py-2'>
                       <SmartItemInput
-                        value={itemOptions.find((item) => String(item.id) === String(line.item_id)) || { id: `line-${index}`, name: '' }}
+                        value={itemOptions.find((item) => String(item.id) === String(line.item_id)) || { id: line.item_id || `line-${index}`, name: line.item_name || '' }}
                         onSelect={(item) => onSelectRowItem(index, item)}
                         placeholder='Scan barcode / SKU / product name...'
                         inputClassName='w-full rounded border border-gray-200 px-2 py-1 text-sm'
