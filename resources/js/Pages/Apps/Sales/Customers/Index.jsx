@@ -3,7 +3,7 @@ import Button from '@/Components/Button';
 import Pagination from '@/Components/Pagination';
 import Table from '@/Components/Table';
 import { Head, Link, router } from '@inertiajs/react';
-import { IconDatabaseOff, IconRefresh, IconTrash } from '@tabler/icons-react';
+import { IconDatabaseOff, IconFileImport, IconRefresh, IconTrash } from '@tabler/icons-react';
 import React from 'react';
 
 const defaultFilters = {
@@ -13,6 +13,9 @@ const defaultFilters = {
 
 export default function Page({ customers, filters = {} }) {
     const [form, setForm] = React.useState({ ...defaultFilters, ...filters });
+    const [importFile, setImportFile] = React.useState(null);
+    const [importing, setImporting] = React.useState(false);
+    const [importResult, setImportResult] = React.useState(null);
 
     const onDelete = (id) => {
         if (!window.confirm('Delete this customer?')) return;
@@ -38,6 +41,24 @@ export default function Page({ customers, filters = {} }) {
             preserveScroll: true,
             replace: true,
         });
+    };
+
+    const handleImport = async () => {
+        if (!importFile || importing) return;
+        setImporting(true);
+        setImportResult(null);
+        try {
+            const formData = new FormData();
+            formData.append('file', importFile);
+            await window.axios.post(route('apps.customers.import.excel'), formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            setImportResult({ type: 'success', message: 'Import customer berhasil diproses.' });
+            setImportFile(null);
+            router.reload({ only: ['customers'] });
+        } catch (error) {
+            setImportResult({ type: 'error', message: error?.response?.data?.message || 'Import customer gagal diproses.' });
+        } finally {
+            setImporting(false);
+        }
     };
 
     return <>
@@ -71,7 +92,12 @@ export default function Page({ customers, filters = {} }) {
             </div>
         </form>
 
-        <div className='mb-5 flex justify-end'>
+        <div className='mb-5 flex flex-wrap items-center justify-end gap-2'>
+            <a href={route('apps.customers.template.excel')} className='rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50'>Download Template</a>
+            <a href={route('apps.customers.export.excel')} className='rounded-lg border border-emerald-500 px-3 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50'>Export Customer</a>
+            <input type='file' accept='.xlsx,.csv,.txt' onChange={(e) => setImportFile(e.target.files?.[0] || null)} className='block rounded-lg border border-gray-300 px-2 py-2 text-xs' />
+            <button type='button' onClick={handleImport} disabled={!importFile || importing} className='inline-flex items-center gap-1 rounded-lg border border-indigo-500 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50'><IconFileImport size={16} strokeWidth={1.5} />{importing ? 'Importing...' : 'Import Customer'}</button>
+            {importResult && <span className={`text-xs ${importResult.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>{importResult.message}</span>}
             <Button type='link' href={route('apps.customers.create')} variant='gray' label='Add Customer' />
         </div>
 
