@@ -371,30 +371,40 @@ class InventoryReportPageController extends Controller implements HasMiddleware
             return DB::table('stock_ledgers')->whereRaw('1 = 0');
         }
 
-        $startDate = $filters['start_date'].' 00:00:00';
-        $endDate = $filters['end_date'].' 23:59:59';
+        $startDate = Carbon::parse($filters['start_date'])->toDateString();
+        $endDate = Carbon::parse($filters['end_date'])->toDateString();
+
+        $effectiveLedgerDate = "COALESCE(source_receiving_entries.transaction_date, DATE(stock_ledgers.trx_datetime))";
 
         $openingBalancePerWarehouse = DB::table('stock_ledgers')
+            ->leftJoin('receiving_entries as source_receiving_entries', function ($join) {
+                $join->on('source_receiving_entries.id', '=', 'stock_ledgers.trx_id')
+                    ->where('stock_ledgers.trx_type', '=', 'RCV_IN');
+            })
             ->select([
-                'warehouse_id',
-                DB::raw('SUM(qty_base) as opening_balance'),
+                'stock_ledgers.warehouse_id',
+                DB::raw('SUM(stock_ledgers.qty_base) as opening_balance'),
             ])
-            ->where('item_id', $filters['item_id'])
-            ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('warehouse_id', $warehouseId))
-            ->when($filters['facility_scheme_id'], fn ($query, $facilitySchemeId) => $query->where('facility_scheme_id', $facilitySchemeId))
-            ->where('trx_datetime', '<', $startDate)
-            ->groupBy('warehouse_id');
+            ->where('stock_ledgers.item_id', $filters['item_id'])
+            ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_ledgers.warehouse_id', $warehouseId))
+            ->when($filters['facility_scheme_id'], fn ($query, $facilitySchemeId) => $query->where('stock_ledgers.facility_scheme_id', $facilitySchemeId))
+            ->whereRaw("{$effectiveLedgerDate} < ?", [$startDate])
+            ->groupBy('stock_ledgers.warehouse_id');
 
         return DB::table('stock_ledgers')
             ->join('warehouses', 'warehouses.id', '=', 'stock_ledgers.warehouse_id')
             ->join('items', 'items.id', '=', 'stock_ledgers.item_id')
+            ->leftJoin('receiving_entries as source_receiving_entries', function ($join) {
+                $join->on('source_receiving_entries.id', '=', 'stock_ledgers.trx_id')
+                    ->where('stock_ledgers.trx_type', '=', 'RCV_IN');
+            })
             ->leftJoinSub($openingBalancePerWarehouse, 'opening_balances', function ($join) {
                 $join->on('opening_balances.warehouse_id', '=', 'stock_ledgers.warehouse_id');
             })
             ->where('stock_ledgers.item_id', $filters['item_id'])
             ->when($filters['warehouse_id'], fn ($query, $warehouseId) => $query->where('stock_ledgers.warehouse_id', $warehouseId))
             ->when($filters['facility_scheme_id'], fn ($query, $facilitySchemeId) => $query->where('stock_ledgers.facility_scheme_id', $facilitySchemeId))
-            ->whereBetween('stock_ledgers.trx_datetime', [$startDate, $endDate])
+            ->whereRaw("{$effectiveLedgerDate} BETWEEN ? AND ?", [$startDate, $endDate])
             ->when($filters['search'] !== '', function ($query) use ($filters) {
                 $keyword = '%'.$filters['search'].'%';
                 $query->where(function ($subQuery) use ($keyword) {
@@ -409,13 +419,14 @@ class InventoryReportPageController extends Controller implements HasMiddleware
                 'warehouses.name as warehouse_name',
                 'items.name as item_name',
                 'items.sku',
-                DB::raw("DATE_FORMAT(stock_ledgers.trx_datetime, '%Y-%m-%d %H:%i:%s') as trx_datetime"),
+                DB::raw("CONCAT({$effectiveLedgerDate}, ' ', DATE_FORMAT(stock_ledgers.trx_datetime, '%H:%i:%s')) as trx_datetime"),
                 DB::raw("CONCAT(stock_ledgers.trx_type, '-', stock_ledgers.trx_id) as reference"),
                 DB::raw('stock_ledgers.qty_base as qty'),
                 DB::raw('COALESCE(stock_ledgers.unit_cost, 0) as unit_price'),
                 DB::raw('stock_ledgers.qty_base * COALESCE(stock_ledgers.unit_cost, 0) as value'),
-                DB::raw('(COALESCE(opening_balances.opening_balance, 0) + SUM(stock_ledgers.qty_base) OVER (PARTITION BY stock_ledgers.warehouse_id ORDER BY stock_ledgers.trx_datetime, stock_ledgers.id)) as running_balance'),
+                DB::raw('(COALESCE(opening_balances.opening_balance, 0) + SUM(stock_ledgers.qty_base) OVER (PARTITION BY stock_ledgers.warehouse_id ORDER BY {$effectiveLedgerDate}, stock_ledgers.trx_datetime, stock_ledgers.id)) as running_balance'),
             ])
+            ->orderByRaw("{$effectiveLedgerDate} asc")
             ->orderBy('stock_ledgers.trx_datetime')
             ->orderBy('stock_ledgers.id');
     }
