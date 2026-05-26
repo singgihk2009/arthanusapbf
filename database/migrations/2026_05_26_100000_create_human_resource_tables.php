@@ -32,7 +32,13 @@ return new class extends Migration {
    });
   }
   if (Schema::hasTable('users') && !Schema::hasColumn('users', 'employee_id')) {
-   Schema::table('users', function (Blueprint $table) {$table->foreignId('employee_id')->nullable()->after('company_id')->constrained('employees')->nullOnDelete();});
+   Schema::table('users', function (Blueprint $table) {
+    $column = $table->foreignId('employee_id')->nullable();
+    if (Schema::hasColumn('users', 'company_id')) {
+     $column->after('company_id');
+    }
+    $column->constrained('employees')->nullOnDelete();
+   });
   }
  }
  public function down(): void {
