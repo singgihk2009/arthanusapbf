@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Apps;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCustomerRequest;
 use App\Http\Requests\UpdateCustomerRequest;
+use App\Models\DocumentType;
 use App\Models\Sales\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -161,6 +162,8 @@ class CustomerController extends Controller
 
     public function show(Customer $customer)
     {
+        $customer->load(['documents.documentType']);
+
         $salesOrders = Schema::hasTable('sales') ? $customer->salesOrders()?->with('warehouse:id,name','priceList:id,name')->latest()->get() : collect();
 
         return Inertia::render('Apps/Sales/Customers/Show', [
@@ -172,6 +175,7 @@ class CustomerController extends Controller
                 'total_payments' => Schema::hasTable('customer_payments') ? $customer->payments()?->count() ?? 0 : 0,
                 'outstanding_balance' => 0,
             ],
+            'documentTypes' => DocumentType::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'code', 'name']),
         ]);
     }
 
