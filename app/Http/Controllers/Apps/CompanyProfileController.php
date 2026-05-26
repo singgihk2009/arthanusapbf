@@ -49,6 +49,10 @@ class CompanyProfileController extends Controller implements HasMiddleware
             'province' => ['nullable', 'string', 'max:100'],
             'postal_code' => ['nullable', 'string', 'max:20'],
             'country' => ['nullable', 'string', 'max:100'],
+            'pbf_license_number' => ['nullable', 'string', 'max:100'],
+            'idak_license_number' => ['nullable', 'string', 'max:100'],
+            'cdob_other_license_number' => ['nullable', 'string', 'max:100'],
+            'cdob_ccp_license_number' => ['nullable', 'string', 'max:100'],
             'invoice_footer' => ['nullable', 'string'],
             'invoice_terms' => ['nullable', 'string'],
         ]);
