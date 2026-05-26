@@ -47,6 +47,8 @@ use App\Http\Controllers\Apps\SalesOrderController;
 use App\Http\Controllers\Apps\ShipmentController;
 use App\Http\Controllers\Apps\CustomerInvoiceController;
 use App\Http\Controllers\Apps\CustomerPaymentController;
+use App\Http\Controllers\Apps\HumanResource\EmployeeController as HrEmployeeController;
+use App\Http\Controllers\Apps\HumanResource\EmployeeLicenseController;
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -79,6 +81,11 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::resource('/roles', RoleController::class)->except(['create', 'edit', 'show']);
     // users route
     Route::resource('/users', UserController::class)->except('show');
+
+    Route::prefix('human-resource')->name('human-resource.')->group(function () {
+        Route::resource('/employees', HrEmployeeController::class);
+        Route::post('/employees/{employee}/licenses', [EmployeeLicenseController::class, 'store'])->name('employees.licenses.store');
+    });
 
 
     // inventory master data routes

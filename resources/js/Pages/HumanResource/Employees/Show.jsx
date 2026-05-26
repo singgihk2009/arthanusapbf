@@ -1,0 +1,2 @@
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';import { Head } from '@inertiajs/react';
+export default function Show({employee}){return <AuthenticatedLayout><Head title='Employee Card'/><div className='p-6'><h1 className='text-2xl font-bold'>{employee.full_name}</h1><p>{employee.position?.name} - {employee.department?.name}</p><div className='mt-4'>Licenses: {employee.licenses?.length}</div></div></AuthenticatedLayout>}
