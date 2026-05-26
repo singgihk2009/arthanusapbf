@@ -72,6 +72,14 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/setup/company-profile/logo', [CompanyProfileController::class, 'deleteLogo'])->name('setup.company-profile.logo.delete.alias');
 });
 
+
+Route::middleware(['auth'])->group(function () {
+    Route::redirect('/human-resource/employees', '/apps/human-resource/employees', 301);
+    Route::redirect('/human-resource/employees/create', '/apps/human-resource/employees/create', 301);
+    Route::redirect('/human-resource/employees/{employee}', '/apps/human-resource/employees/{employee}', 301);
+    Route::redirect('/human-resource/employees/{employee}/edit', '/apps/human-resource/employees/{employee}/edit', 301);
+});
+
 Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 'restrict_inventory_reports_access']], function(){
     // dashboard route
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
