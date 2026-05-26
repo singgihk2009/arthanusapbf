@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useRef, useState, useEffect } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import Button from '@/Components/Button';
@@ -8,6 +8,7 @@ const tabs = ['Overview', 'Profile', 'Documents', 'Sales Orders', 'Shipments', '
 
 export default function Page({ customer, summary, salesOrders = [], documentTypes = [] }) {
   const [activeTab, setActiveTab] = useState('Overview');
+  const { auth } = usePage().props;
 
   const statusClassName = customer.status === 'active'
     ? 'bg-emerald-100 text-emerald-700'
@@ -45,6 +46,7 @@ export default function Page({ customer, summary, salesOrders = [], documentType
 
     setNotice({ type: 'info', text: 'Sedang upload dokumen...' });
     router.post(route('apps.document-center.documents.store'), {
+      business_id: auth?.user?.business_id ?? auth?.user?.company_id ?? 1,
       owner_type: 'customer',
       owner_id: customer.id,
       document_type_id: customForm.document_type_id,
