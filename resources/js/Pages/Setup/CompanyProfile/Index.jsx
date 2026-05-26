@@ -7,6 +7,24 @@ export default function Index({ companyProfile, party, documents, documentTypes 
   const docForm = useForm({ file: null, document_type_id: '', title: '', document_number: '', issue_date: '', expiry_date: '' });
 
   const submitProfile = (e) => { e.preventDefault(); put('/apps/setup/company-profile'); };
+  const profileFields = [
+    { key: 'legal_name', label: 'Nama Legal' },
+    { key: 'tax_id', label: 'NPWP' },
+    { key: 'phone', label: 'Telepon' },
+    { key: 'email', label: 'Email' },
+    { key: 'website', label: 'Website' },
+    { key: 'address', label: 'Alamat' },
+    { key: 'city', label: 'Kota' },
+    { key: 'province', label: 'Provinsi' },
+    { key: 'postal_code', label: 'Kode Pos' },
+    { key: 'country', label: 'Negara' },
+    { key: 'pbf_license_number', label: 'No Izin PBF' },
+    { key: 'idak_license_number', label: 'No Izin IDAK' },
+    { key: 'cdob_other_license_number', label: 'No Izin CDOB Obat Lain' },
+    { key: 'cdob_ccp_license_number', label: 'No Izin CDOB CCP' },
+    { key: 'invoice_footer', label: 'Footer Invoice' },
+    { key: 'invoice_terms', label: 'Syarat Invoice' },
+  ];
   const submitLogo = (e) => { e.preventDefault(); logoForm.post('/apps/setup/company-profile/logo'); };
   const submitDoc = (e) => { e.preventDefault(); docForm.transform((d) => ({ ...d, owner_type: 'party', owner_id: party.id, business_id: 1 })).post('/apps/document-center/documents'); };
 
@@ -21,8 +39,8 @@ export default function Index({ companyProfile, party, documents, documentTypes 
     </div>
 
     <form onSubmit={submitProfile} className='bg-white rounded shadow p-4 grid grid-cols-2 gap-3'>
-      {['legal_name','tax_id','phone','email','website','address','city','province','postal_code','country','invoice_footer','invoice_terms'].map((f) =>
-        <input key={f} className='border p-2 rounded' placeholder={f} value={data[f] || ''} onChange={(e) => setData(f, e.target.value)} />)}
+      {profileFields.map((field) =>
+        <input key={field.key} className='border p-2 rounded' placeholder={field.label} value={data[field.key] || ''} onChange={(e) => setData(field.key, e.target.value)} />)}
       <button className='bg-blue-600 text-white px-4 py-2 rounded col-span-2'>Simpan Profile</button>
     </form>
 
