@@ -119,6 +119,7 @@ class PermissionTableSeeder extends Seeder
             'setup.company_profile.view',
             'setup.company_profile.update',
             'setup.company_profile.upload_logo',
+            'hr.employee.view','hr.employee.create','hr.employee.update','hr.employee.delete','hr.employee.license.view','hr.employee.license.create','hr.employee.license.update','hr.employee.license.delete',
         ];
 
         foreach ($permissions as $permission) {

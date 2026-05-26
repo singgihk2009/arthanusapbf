@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Spatie\Permission\Traits\HasRoles;
 use App\Models\Inventory\Warehouse;
+use App\Models\Employee;
 
 class User extends Authenticatable
 {
@@ -27,6 +28,8 @@ class User extends Authenticatable
         'email',
         'password',
         'avatar',
+        'company_id',
+        'employee_id',
     ];
 
     /**
@@ -54,6 +57,8 @@ class User extends Authenticatable
 
  
     public function contact(){ return $this->belongsTo(Contact::class); }
+
+    public function employee(){ return $this->belongsTo(Employee::class); }
 
     public function partyUserAccesses(){ return $this->hasMany(PartyUserAccess::class); }
 

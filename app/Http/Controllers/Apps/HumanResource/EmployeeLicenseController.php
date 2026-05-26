@@ -1,0 +1,6 @@
+<?php
+namespace App\Http\Controllers\Apps\HumanResource;
+use App\Http\Controllers\Controller;use App\Models\{Employee,EmployeeLicense,LicenseType};use Illuminate\Http\Request;
+class EmployeeLicenseController extends Controller {
+ public function store(Request $r, Employee $employee){$cid=(int)($r->user()->company_id??1);abort_unless((int)$employee->company_id===$cid,404);$d=$r->validate(['license_type_id'=>'required|exists:license_types,id','license_number'=>"required|unique:employee_licenses,license_number,NULL,id,company_id,$cid,license_type_id,".$r->license_type_id,'issued_by'=>'nullable','issued_date'=>'nullable|date','expired_date'=>'nullable|date','status'=>'nullable|in:active,expiring_soon,expired,suspended,revoked','document_path'=>'nullable','notes'=>'nullable','is_primary'=>'boolean']);$t=LicenseType::findOrFail($d['license_type_id']);if($t->expiry_required&&empty($d['expired_date'])) return back()->withErrors(['expired_date'=>'required']);if($t->document_required&&empty($d['document_path'])) return back()->withErrors(['document_path'=>'required']);$d['company_id']=$cid;$d['employee_id']=$employee->id;EmployeeLicense::create($d);return back()->with('success','License added');}
+}

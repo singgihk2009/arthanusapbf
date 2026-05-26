@@ -90,6 +90,13 @@ export default function Menu() {
             ],
         },
         {
+            title: 'HUMAN RESOURCE',
+            permissions: true,
+            details: [
+                { title: 'Employee', href: '/apps/human-resource/employees', icon: <IconUsers size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/human-resource/employees'), permissions: true },
+            ],
+        },
+        {
             title: 'SALES',
             permissions: true,
             details: [
