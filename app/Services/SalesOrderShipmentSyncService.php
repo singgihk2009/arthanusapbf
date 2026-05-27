@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class SalesOrderShipmentSyncService
 {
@@ -12,7 +14,10 @@ class SalesOrderShipmentSyncService
             $dispatch = is_object($internalUsage)
                 ? DB::table('internal_usages')->lockForUpdate()->where('id', (int) $internalUsage->id)->first()
                 : DB::table('internal_usages')->lockForUpdate()->where('id', (int) $internalUsage)->first();
-            abort_unless($dispatch, 404, 'Dispatch not found.');
+
+            if (! $dispatch) {
+                throw new RuntimeException('Dispatch not found.');
+            }
 
             $status = strtolower((string) ($dispatch->status ?? ''));
             $hasSalesReference = strtolower((string) ($dispatch->source_type ?? '')) === 'sales_order' || ! empty($dispatch->sale_id);
@@ -24,41 +29,47 @@ class SalesOrderShipmentSyncService
                 return false;
             }
 
-            $saleId = (int) ($dispatch->sale_id ?? $dispatch->source_id ?? 0);
-            abort_if($saleId <= 0, 422, 'Sales Order dispatch reference is invalid.');
-            $dispatchId = (int) $dispatch->id;
+            $saleId = (int) ($dispatch->sale_id ?: (strtolower((string) ($dispatch->source_type ?? '')) === 'sales_order' ? $dispatch->source_id : 0));
+            if ($saleId <= 0) {
+                throw new RuntimeException('Sales Order dispatch reference is invalid.');
+            }
 
             $sale = DB::table('sales')->lockForUpdate()->where('id', $saleId)->first();
-            abort_unless($sale, 422, 'Referenced Sales Order not found.');
+            if (! $sale) {
+                throw new RuntimeException('Referenced Sales Order not found.');
+            }
 
-            $lines = DB::table('internal_usage_lines')->where('internal_usage_id', $dispatchId)->get();
+            $dispatchId = (int) $dispatch->id;
+            $dispatchLines = DB::table('internal_usage_lines')->where('internal_usage_id', $dispatchId)->get();
+            $saleLines = DB::table('sales_lines')->lockForUpdate()->where('sale_id', $saleId)->get();
 
-            foreach ($lines as $line) {
-                $saleLineId = (int) ($line->sale_line_id ?? $line->source_line_id ?? 0);
-                abort_if($saleLineId <= 0, 422, 'Sales Order line reference is required for shipment.');
+            foreach ($dispatchLines as $line) {
+                $qty = $this->resolveLineQty($line);
+                if ($qty <= 0) {
+                    continue;
+                }
 
-                $saleLine = DB::table('sales_lines')->lockForUpdate()->where('id', $saleLineId)->first();
-                abort_if(! $saleLine || (int) $saleLine->sale_id !== $saleId, 422, 'Sales Order line does not belong to the Sales Order.');
+                $saleLine = $this->resolveSaleLine($line, $saleId, $saleLines);
+                $newShipped = (float) $saleLine->qty_shipped + $qty;
+                if ($newShipped - (float) $saleLine->qty_sold > 0.0001) {
+                    throw new RuntimeException(sprintf('Dispatch %s skipped: shipment qty would exceed SO remaining qty.', (string) ($dispatch->number ?? $dispatchId)));
+                }
 
-                $lineQty = (float) ($line->qty ?? $line->quantity ?? $line->qty_used ?? $line->qty_out ?? $line->issued_qty ?? 0);
-                abort_if($lineQty <= 0, 422, 'Shipment quantity must be greater than zero.');
-
-                $newShipped = (float) $saleLine->qty_shipped + $lineQty;
-                abort_if($newShipped - (float) $saleLine->qty_sold > 0.0001, 422, 'Shipment quantity cannot exceed remaining Sales Order quantity.');
-
-                DB::table('sales_lines')->where('id', $saleLineId)->update([
+                DB::table('sales_lines')->where('id', $saleLine->id)->update([
                     'qty_shipped' => $newShipped,
                     'updated_at' => now(),
                 ]);
+
+                $saleLines = $saleLines->map(function ($existing) use ($saleLine, $newShipped) {
+                    if ((int) $existing->id === (int) $saleLine->id) {
+                        $existing->qty_shipped = $newShipped;
+                    }
+                    return $existing;
+                });
             }
 
-            $totals = DB::table('sales_lines')
-                ->where('sale_id', $saleId)
-                ->selectRaw('COALESCE(SUM(qty_sold),0) as ordered_total, COALESCE(SUM(qty_shipped),0) as shipped_total')
-                ->first();
-
-            $ordered = (float) ($totals->ordered_total ?? 0);
-            $shipped = (float) ($totals->shipped_total ?? 0);
+            $ordered = (float) $saleLines->sum(fn ($line) => (float) $line->qty_sold);
+            $shipped = (float) $saleLines->sum(fn ($line) => (float) $line->qty_shipped);
             $nextStatus = $shipped <= 0 ? 'approved' : ($shipped + 0.0001 >= $ordered ? 'fully_shipped' : 'partially_shipped');
 
             DB::table('sales')->where('id', $saleId)->update([
@@ -74,5 +85,46 @@ class SalesOrderShipmentSyncService
 
             return true;
         });
+    }
+
+    private function resolveLineQty(object $line): float
+    {
+        foreach (['qty_used', 'qty', 'quantity', 'qty_out'] as $field) {
+            $value = $line->{$field} ?? null;
+            if ($value !== null) {
+                return (float) $value;
+            }
+        }
+
+        return (float) ($line->qty_base ?? 0);
+    }
+
+    private function resolveSaleLine(object $line, int $saleId, Collection $saleLines): object
+    {
+        $saleLineId = (int) ($line->sale_line_id ?? 0);
+        if ($saleLineId > 0) {
+            $saleLine = $saleLines->firstWhere('id', $saleLineId);
+            if (! $saleLine) {
+                throw new RuntimeException('Sales Order line does not belong to the Sales Order.');
+            }
+            return $saleLine;
+        }
+
+        $itemId = (int) ($line->item_id ?? 0);
+        $matched = $saleLines
+            ->filter(fn ($saleLine) => (int) $saleLine->item_id === $itemId && ((float) $saleLine->qty_sold - (float) $saleLine->qty_shipped) > 0.0001)
+            ->values();
+
+        if ($matched->count() !== 1) {
+            throw new RuntimeException("Cannot infer sale_line_id for item_id {$itemId}; please repair manually.");
+        }
+
+        DB::table('internal_usage_lines')->where('id', $line->id)->update([
+            'sale_line_id' => $matched[0]->id,
+            'source_line_id' => $matched[0]->id,
+            'updated_at' => now(),
+        ]);
+
+        return $matched[0];
     }
 }
