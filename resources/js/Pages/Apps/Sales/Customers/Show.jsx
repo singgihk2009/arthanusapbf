@@ -45,29 +45,29 @@ export default function Page({ customer, summary, salesOrders = [], documentType
     if (!customFileInput.current?.files?.[0]) return setNotice({ type: 'error', text: 'Upload gagal: pilih file terlebih dahulu.' });
 
     setNotice({ type: 'info', text: 'Sedang upload dokumen...' });
-    router.post(route('apps.document-center.documents.store'), {
-      business_id: auth?.user?.business_id ?? auth?.user?.company_id ?? 1,
-      owner_type: 'customer',
-      owner_id: customer.id,
-      document_type_id: customForm.document_type_id,
-      document_number: customForm.document_number || null,
-      issue_date: customForm.issue_date || null,
-      expiry_date: customForm.expiry_date || null,
-      file: customFileInput.current.files[0],
-    }, {
-      forceFormData: true,
-      preserveScroll: true,
-      onSuccess: () => {
+
+    const formData = new FormData();
+    formData.append('business_id', String(auth?.user?.business_id ?? auth?.user?.company_id ?? 1));
+    formData.append('owner_type', 'customer');
+    formData.append('owner_id', String(customer.id));
+    formData.append('document_type_id', String(customForm.document_type_id));
+    if (customForm.document_number) formData.append('document_number', customForm.document_number);
+    if (customForm.issue_date) formData.append('issue_date', customForm.issue_date);
+    if (customForm.expiry_date) formData.append('expiry_date', customForm.expiry_date);
+    formData.append('file', customFileInput.current.files[0]);
+
+    window.axios.post(route('apps.document-center.documents.store'), formData)
+      .then(() => {
         customFileInput.current.value = '';
         setCustomForm({ document_type_id: '', document_number: '', issue_date: '', expiry_date: '' });
         setNotice({ type: 'success', text: 'Dokumen berhasil diupload.' });
-        router.reload({ only: ['customer'] });
-      },
-      onError: (errorsBag) => {
+        router.reload({ only: ['customer'], preserveScroll: true });
+      })
+      .catch((error) => {
+        const errorsBag = error?.response?.data?.errors ?? null;
         const firstError = Object.values(errorsBag ?? {}).flat().find(Boolean);
         setNotice({ type: 'error', text: `Upload gagal${firstError ? `: ${firstError}` : '.'}` });
-      },
-    });
+      });
   };
 
   const statusBadge = (status) => ({ draft: 'bg-gray-100 text-gray-700', pending_review: 'bg-yellow-100 text-yellow-800', verified: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700', expired: 'bg-orange-100 text-orange-700', archived: 'bg-gray-300 text-gray-800' }[status] || 'bg-gray-100 text-gray-600');
