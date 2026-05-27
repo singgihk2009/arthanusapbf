@@ -70,6 +70,57 @@ export default function Page({ customer, summary, salesOrders = [], documentType
       });
   };
 
+
+  const doVerify = (docId) => {
+    if (!confirm('Are you sure you want to verify this document?')) return;
+    setNotice({ type: 'info', text: 'Sedang memproses verifikasi dokumen...' });
+    window.axios.post(route('apps.document-center.documents.verify', docId))
+      .then(() => {
+        setNotice({ type: 'success', text: 'Document verified successfully.' });
+        router.reload({ only: ['customer'], preserveScroll: true });
+      })
+      .catch((error) => {
+        const errorsBag = error?.response?.data?.errors ?? null;
+        const firstError = Object.values(errorsBag ?? {}).flat().find(Boolean) || error?.response?.data?.message;
+        setNotice({ type: 'error', text: `Verify gagal${firstError ? `: ${firstError}` : '.'}` });
+      });
+  };
+
+  const doReject = (docId) => {
+    const reason = prompt('Masukkan alasan reject (minimal 5 karakter)');
+    const normalizedReason = reason?.trim();
+    if (!normalizedReason) return;
+    if (normalizedReason.length < 5) return setNotice({ type: 'error', text: 'Alasan reject minimal 5 karakter.' });
+
+    setNotice({ type: 'info', text: 'Sedang memproses reject dokumen...' });
+    window.axios.post(route('apps.document-center.documents.reject', docId), { rejected_reason: normalizedReason })
+      .then(() => {
+        setNotice({ type: 'success', text: 'Document rejected successfully.' });
+        router.reload({ only: ['customer'], preserveScroll: true });
+      })
+      .catch((error) => {
+        const errorsBag = error?.response?.data?.errors ?? null;
+        const firstError = Object.values(errorsBag ?? {}).flat().find(Boolean) || error?.response?.data?.message;
+        setNotice({ type: 'error', text: `Reject gagal${firstError ? `: ${firstError}` : '.'}` });
+      });
+  };
+
+  const doDelete = (docId) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus dokumen ini?')) return;
+
+    setNotice({ type: 'info', text: 'Sedang menghapus dokumen...' });
+    window.axios.delete(route('apps.document-center.documents.destroy', docId))
+      .then(() => {
+        setNotice({ type: 'success', text: 'Dokumen berhasil dihapus.' });
+        router.reload({ only: ['customer'], preserveScroll: true });
+      })
+      .catch((error) => {
+        const errorsBag = error?.response?.data?.errors ?? null;
+        const firstError = Object.values(errorsBag ?? {}).flat().find(Boolean) || error?.response?.data?.message;
+        setNotice({ type: 'error', text: `Hapus gagal${firstError ? `: ${firstError}` : '.'}` });
+      });
+  };
+
   const statusBadge = (status) => ({ draft: 'bg-gray-100 text-gray-700', pending_review: 'bg-yellow-100 text-yellow-800', verified: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700', expired: 'bg-orange-100 text-orange-700', archived: 'bg-gray-300 text-gray-800' }[status] || 'bg-gray-100 text-gray-600');
   const documentTypeLabel = (doc) => doc?.document_type?.name || doc?.document_type_label || (doc?.document_type_id ? `TYPE #${doc.document_type_id}` : '-');
 
@@ -216,7 +267,7 @@ export default function Page({ customer, summary, salesOrders = [], documentType
 
               <div className='overflow-auto rounded border p-3'>
                 <table className='min-w-full text-sm border'><thead><tr className='bg-gray-100'><th className='px-3 py-2 border text-left' colSpan={8}>Daftar Dokumen Customer</th></tr><tr className='bg-gray-50'><th className='border px-3 py-2 text-left font-medium'>Document Type</th><th className='border px-3 py-2 text-left font-medium'>Document Number</th><th className='border px-3 py-2 text-left font-medium'>Issue Date</th><th className='border px-3 py-2 text-left font-medium'>Expiry Date</th><th className='border px-3 py-2 text-left font-medium'>Status</th><th className='border px-3 py-2 text-left font-medium'>Reject Reason</th><th className='border px-3 py-2 text-left font-medium'>File</th><th className='border px-3 py-2 text-left font-medium'>Action</th></tr></thead>
-                  <tbody>{docs.length ? docs.map((d) => <tr key={d.id}><td className='border px-3 py-2'>{documentTypeLabel(d)}</td><td className='border px-3 py-2'>{d.document_number || '-'}</td><td className='border px-3 py-2'>{formatDate(d.issue_date)}</td><td className='border px-3 py-2'>{formatDate(d.expiry_date)}</td><td className='border px-3 py-2'><span className={`inline-flex rounded px-2 py-1 text-xs font-medium ${statusBadge(d.status)}`}>{d.status || 'draft'}</span></td><td className='border px-3 py-2'>{d.rejected_reason ? <span className='text-xs text-red-700'>{d.rejected_reason}</span> : '-'}</td><td className='border px-3 py-2'><a href={route('apps.document-center.documents.download', d.id)} target='_blank' className='rounded border border-gray-300 px-2 py-1 text-xs'>View</a></td><td className='border px-3 py-2'>-</td></tr>) : <tr><td className='border px-2 py-3 text-center text-gray-500' colSpan={8}>Belum ada dokumen tersimpan.</td></tr>}</tbody>
+                  <tbody>{docs.length ? docs.map((d) => <tr key={d.id}><td className='border px-3 py-2'>{documentTypeLabel(d)}</td><td className='border px-3 py-2'>{d.document_number || '-'}</td><td className='border px-3 py-2'>{formatDate(d.issue_date)}</td><td className='border px-3 py-2'>{formatDate(d.expiry_date)}</td><td className='border px-3 py-2'><span className={`inline-flex rounded px-2 py-1 text-xs font-medium ${statusBadge(d.status)}`}>{d.status || 'draft'}</span></td><td className='border px-3 py-2'>{d.rejected_reason ? <span className='text-xs text-red-700'>{d.rejected_reason}</span> : '-'}</td><td className='border px-3 py-2'><a href={route('apps.document-center.documents.download', d.id)} target='_blank' className='rounded border border-gray-300 px-2 py-1 text-xs'>View</a></td><td className='border px-3 py-2 space-x-2'>{d.status === 'pending_review' && <><button type='button' onClick={() => doVerify(d.id)} className='rounded border border-green-300 px-2 py-1 text-xs text-green-700'>Accept</button><button type='button' onClick={() => doReject(d.id)} className='rounded border border-red-300 px-2 py-1 text-xs text-red-700'>Reject</button></>}<button type='button' onClick={() => doDelete(d.id)} className='rounded border border-gray-300 px-2 py-1 text-xs text-gray-700'>Delete</button></td></tr>) : <tr><td className='border px-2 py-3 text-center text-gray-500' colSpan={8}>Belum ada dokumen tersimpan.</td></tr>}</tbody>
                 </table>
               </div>
             </div>
