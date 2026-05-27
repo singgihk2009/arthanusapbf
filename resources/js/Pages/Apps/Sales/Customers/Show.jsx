@@ -156,7 +156,8 @@ export default function Page({ customer, summary, salesOrders = [], documentType
       try {
         const status = String(salesOrder.status || '').toLowerCase();
         if (status === 'draft') {
-          await window.axios.post(route('apps.sales-orders.submit', salesOrder.id));
+          failedOrders.push(`${salesOrder.number || salesOrder.id}: Draft belum bisa auto-approve. Silakan Submit dulu dari baris SO.`);
+          continue;
         }
         await window.axios.post(route('apps.sales-orders.approve', salesOrder.id));
       } catch (error) {
