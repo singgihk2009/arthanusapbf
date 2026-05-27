@@ -453,66 +453,68 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
     public function postInternalUsage(Request $request, int $usageId): JsonResponse
     {
-        $header = DB::table('internal_usages')->where('id', $usageId)->first();
-        abort_unless($header, 404, 'Internal usage not found');
-        abort_if($header->status === 'POSTED', 422, 'Internal usage already posted');
+        return DB::transaction(function () use ($request, $usageId): JsonResponse {
+            $header = DB::table('internal_usages')->lockForUpdate()->where('id', $usageId)->first();
+            abort_unless($header, 404, 'Internal usage not found');
+            abort_if($header->status === 'POSTED', 422, 'Internal usage already posted');
 
-        $lines = DB::table('internal_usage_lines')->where('internal_usage_id', $usageId)->get();
+            $lines = DB::table('internal_usage_lines')->where('internal_usage_id', $usageId)->get();
 
-        foreach ($lines as $line) {
-            $qtyBase = $this->resolveQtyBase((int) $line->item_id, (int) $line->uom_id, (float) $line->qty_used, (float) $line->qty_base);
-            $batchId = isset($line->batch_id) && $line->batch_id ? (int) $line->batch_id : null;
+            foreach ($lines as $line) {
+                $qtyBase = $this->resolveQtyBase((int) $line->item_id, (int) $line->uom_id, (float) $line->qty_used, (float) $line->qty_base);
+                $batchId = isset($line->batch_id) && $line->batch_id ? (int) $line->batch_id : null;
 
-            if ($batchId) {
-                $isValidBatch = DB::table('item_batches')
-                    ->where('id', $batchId)
-                    ->where('item_id', $line->item_id)
-                    ->exists();
+                if ($batchId) {
+                    $isValidBatch = DB::table('item_batches')
+                        ->where('id', $batchId)
+                        ->where('item_id', $line->item_id)
+                        ->exists();
 
-                abort_if(! $isValidBatch, 422, 'Batch number tidak valid untuk item ini.');
-            }
+                    abort_if(! $isValidBatch, 422, 'Batch number tidak valid untuk item ini.');
+                }
 
-            $unitCost = $batchId
-                ? $this->resolveBatchCost((int) $header->warehouse_id, (int) $line->item_id, $batchId)
-                : $this->resolveAverageCost((int) $header->warehouse_id, (int) $line->item_id);
+                $unitCost = $batchId
+                    ? $this->resolveBatchCost((int) $header->warehouse_id, (int) $line->item_id, $batchId)
+                    : $this->resolveAverageCost((int) $header->warehouse_id, (int) $line->item_id);
 
-            $this->stockService->postMutation([
-                'trx_type' => 'USAGE_OUT',
-                'trx_id' => $usageId,
-                'trx_line_id' => $line->id,
-                'warehouse_id' => $header->warehouse_id,
-                'item_id' => $line->item_id,
-                'batch_id' => $batchId,
-                'qty_base' => -1 * $qtyBase,
-                'uom_id' => $line->uom_id,
-                'qty_input' => $line->qty_used,
-                'unit_cost' => $unitCost,
-                'created_by' => $request->user()?->id,
-                'facility_scheme_id' => $line->facility_scheme_id ?? $this->resolveRegularFacilitySchemeId(),
-            ]);
-        }
-
-        DB::table('internal_usages')->where('id', $usageId)->update([
-            'status' => 'POSTED',
-            'posted_at' => now(),
-            'posted_by' => $request->user()?->id,
-            'updated_at' => now(),
-        ]);
-
-        $this->createIntegrationSnapshotForInternalUsage($usageId, $request->user()?->id);
-
-        if ($this->shouldSyncSalesOrderDispatch($header)) {
-            if (($header->source_type ?? null) !== 'sales_order') {
-                DB::table('internal_usages')->where('id', $usageId)->update([
-                    'source_type' => 'sales_order',
-                    'updated_at' => now(),
+                $this->stockService->postMutation([
+                    'trx_type' => 'USAGE_OUT',
+                    'trx_id' => $usageId,
+                    'trx_line_id' => $line->id,
+                    'warehouse_id' => $header->warehouse_id,
+                    'item_id' => $line->item_id,
+                    'batch_id' => $batchId,
+                    'qty_base' => -1 * $qtyBase,
+                    'uom_id' => $line->uom_id,
+                    'qty_input' => $line->qty_used,
+                    'unit_cost' => $unitCost,
+                    'created_by' => $request->user()?->id,
+                    'facility_scheme_id' => $line->facility_scheme_id ?? $this->resolveRegularFacilitySchemeId(),
                 ]);
             }
 
-            $this->salesOrderShipmentSyncService->syncFromInternalUsage($usageId, $request->user()?->id);
-        }
+            DB::table('internal_usages')->where('id', $usageId)->update([
+                'status' => 'POSTED',
+                'posted_at' => now(),
+                'posted_by' => $request->user()?->id,
+                'updated_at' => now(),
+            ]);
 
-        return response()->json(['message' => 'Internal usage posted', 'id' => $usageId]);
+            $this->createIntegrationSnapshotForInternalUsage($usageId, $request->user()?->id);
+
+            if ($this->shouldSyncSalesOrderDispatch($header)) {
+                if (($header->source_type ?? null) !== 'sales_order') {
+                    DB::table('internal_usages')->where('id', $usageId)->update([
+                        'source_type' => 'sales_order',
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                $this->salesOrderShipmentSyncService->syncFromInternalUsage($usageId, $request->user()?->id);
+            }
+
+            return response()->json(['message' => 'Internal usage posted', 'id' => $usageId]);
+        });
     }
 
     public function unpostInternalUsage(Request $request, int $usageId): JsonResponse
