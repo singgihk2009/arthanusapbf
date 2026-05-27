@@ -51,7 +51,7 @@ export default function Page({ salesOrders, filters = {} }) {
     };
 
     const toggleSelectAllApprovable = () => {
-        const approvableIds = rows.filter((so) => ['draft', 'submitted'].includes(String(so.status || '').toLowerCase())).map((so) => so.id);
+        const approvableIds = rows.filter((so) => String(so.status || '').toLowerCase() === 'submitted').map((so) => so.id);
         if (!approvableIds.length) return;
         const isAllSelected = approvableIds.every((id) => selectedIds.includes(id));
         setSelectedIds(isAllSelected ? selectedIds.filter((id) => !approvableIds.includes(id)) : Array.from(new Set([...selectedIds, ...approvableIds])));
@@ -65,9 +65,6 @@ export default function Page({ salesOrders, filters = {} }) {
         for (const salesOrder of selectedOrders) {
             try {
                 const status = String(salesOrder.status || '').toLowerCase();
-                if (status === 'draft') {
-                    await window.axios.post(route('apps.sales-orders.submit', salesOrder.id));
-                }
                 await window.axios.post(route('apps.sales-orders.approve', salesOrder.id));
             } catch (error) {
                 const serverError = error?.response?.data?.errors ?? {};
@@ -80,7 +77,7 @@ export default function Page({ salesOrders, filters = {} }) {
         router.reload({ only: ['salesOrders'] });
     };
 
-    const approvableIds = rows.filter((so) => ['draft', 'submitted'].includes(String(so.status || '').toLowerCase())).map((so) => so.id);
+    const approvableIds = rows.filter((so) => String(so.status || '').toLowerCase() === 'submitted').map((so) => so.id);
     const allApprovableSelected = approvableIds.length > 0 && approvableIds.every((id) => selectedIds.includes(id));
 
     return <>
@@ -144,7 +141,7 @@ export default function Page({ salesOrders, filters = {} }) {
                 <Table.Tbody>
                     {rows.length ? rows.map((so, i) => {
                         const status = String(so.status || '').toLowerCase();
-                        const selectable = status === 'draft' || status === 'submitted';
+                        const selectable = status === 'submitted';
 
                         return <tr key={so.id} className='hover:bg-gray-100 dark:hover:bg-gray-900'>
                             <Table.Td className='text-center'>{selectable ? <input type='checkbox' checked={selectedIds.includes(so.id)} onChange={() => toggleSelection(so.id)} /> : '-'}</Table.Td>
