@@ -509,7 +509,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 ]);
             }
 
-            $this->salesOrderShipmentSyncService->syncFromDispatch($usageId);
+            $this->salesOrderShipmentSyncService->syncFromInternalUsage($usageId, $request->user()?->id);
         }
 
         return response()->json(['message' => 'Internal usage posted', 'id' => $usageId]);
