@@ -150,15 +150,30 @@ export default function Page({ customer, summary, salesOrders = [], documentType
     if (!confirm(`Approve ${selectedSalesOrderIds.length} Sales Order terpilih?`)) return;
 
     const selectedOrders = salesOrders.filter((salesOrder) => selectedSalesOrderIds.includes(salesOrder.id));
+    const failedOrders = [];
+
     for (const salesOrder of selectedOrders) {
-      const status = String(salesOrder.status || '').toLowerCase();
-      if (status === 'draft') {
-        await window.axios.post(route('apps.sales-orders.submit', salesOrder.id));
+      try {
+        const status = String(salesOrder.status || '').toLowerCase();
+        if (status === 'draft') {
+          await window.axios.post(route('apps.sales-orders.submit', salesOrder.id));
+        }
+        await window.axios.post(route('apps.sales-orders.approve', salesOrder.id));
+      } catch (error) {
+        const serverError = error?.response?.data?.errors ?? {};
+        const firstError = Object.values(serverError).flat().find(Boolean) || error?.response?.data?.message || 'Unknown error';
+        failedOrders.push(`${salesOrder.number || salesOrder.id}: ${firstError}`);
       }
-      await window.axios.post(route('apps.sales-orders.approve', salesOrder.id));
     }
+
+    if (failedOrders.length) {
+      setNotice({ type: 'error', text: `Sebagian approval gagal. ${failedOrders.join(' | ')}` });
+    } else {
+      setNotice({ type: 'success', text: 'Approval sales order berhasil diproses.' });
+    }
+
     setSelectedSalesOrderIds([]);
-    router.reload({ only: ['salesOrders'], preserveScroll: true });
+    router.reload({ only: ['salesOrders', 'customer'], preserveScroll: true });
   };
 
   const statusBadge = (status) => ({ draft: 'bg-gray-100 text-gray-700', pending_review: 'bg-yellow-100 text-yellow-800', verified: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700', expired: 'bg-orange-100 text-orange-700', archived: 'bg-gray-300 text-gray-800' }[status] || 'bg-gray-100 text-gray-600');

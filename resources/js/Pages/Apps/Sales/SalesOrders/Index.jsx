@@ -61,13 +61,21 @@ export default function Page({ salesOrders, filters = {} }) {
         if (!selectedIds.length) return;
         if (!window.confirm(`Approve ${selectedIds.length} sales order terpilih?`)) return;
         const selectedOrders = rows.filter((so) => selectedIds.includes(so.id));
+        const failedOrders = [];
         for (const salesOrder of selectedOrders) {
-            const status = String(salesOrder.status || '').toLowerCase();
-            if (status === 'draft') {
-                await window.axios.post(route('apps.sales-orders.submit', salesOrder.id));
+            try {
+                const status = String(salesOrder.status || '').toLowerCase();
+                if (status === 'draft') {
+                    await window.axios.post(route('apps.sales-orders.submit', salesOrder.id));
+                }
+                await window.axios.post(route('apps.sales-orders.approve', salesOrder.id));
+            } catch (error) {
+                const serverError = error?.response?.data?.errors ?? {};
+                const firstError = Object.values(serverError).flat().find(Boolean) || error?.response?.data?.message || 'Unknown error';
+                failedOrders.push(`${salesOrder.number || salesOrder.id}: ${firstError}`);
             }
-            await window.axios.post(route('apps.sales-orders.approve', salesOrder.id));
         }
+        if (failedOrders.length) window.alert(`Sebagian approval gagal:\n${failedOrders.join('\n')}`);
         setSelectedIds([]);
         router.reload({ only: ['salesOrders'] });
     };
