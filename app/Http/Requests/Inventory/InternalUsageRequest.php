@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Inventory;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class InternalUsageRequest extends FormRequest
@@ -63,5 +64,65 @@ class InternalUsageRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            $sourceType = strtolower((string) $this->input('source_type', ''));
+            $saleId = (int) $this->input('sale_id', 0);
+
+            if ($sourceType !== 'sales_order' || $saleId <= 0) {
+                return;
+            }
+
+            $sale = DB::table('sales')->where('id', $saleId)->first();
+            if (! $sale) {
+                $validator->errors()->add('sale_id', 'Sales Order tidak ditemukan.');
+
+                return;
+            }
+
+            $lines = collect($this->input('lines', []));
+            $saleLineIds = $lines
+                ->pluck('sale_line_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            if ($saleLineIds->isEmpty()) {
+                $validator->errors()->add('lines', 'Line shipment wajib mereferensi line Sales Order.');
+
+                return;
+            }
+
+            $saleLines = DB::table('sales_lines')
+                ->where('sale_id', $saleId)
+                ->whereIn('id', $saleLineIds)
+                ->get()
+                ->keyBy('id');
+
+            foreach ($lines as $index => $line) {
+                $saleLineId = (int) ($line['sale_line_id'] ?? 0);
+                $qtyUsed = (float) ($line['qty_used'] ?? 0);
+
+                if ($saleLineId <= 0) {
+                    $validator->errors()->add("lines.$index.sale_line_id", 'Sales Order line wajib diisi.');
+                    continue;
+                }
+
+                $saleLine = $saleLines->get($saleLineId);
+                if (! $saleLine) {
+                    $validator->errors()->add("lines.$index.sale_line_id", 'Sales Order line tidak valid untuk SO ini.');
+                    continue;
+                }
+
+                $remaining = max(0, (float) $saleLine->qty_sold - (float) $saleLine->qty_shipped);
+                if ($qtyUsed - $remaining > 0.0001) {
+                    $validator->errors()->add("lines.$index.qty_used", 'Shipment quantity cannot exceed remaining Sales Order quantity.');
+                }
+            }
+        });
     }
 }
