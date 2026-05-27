@@ -1,3 +1,2 @@
-import React from 'react';
-import AppLayout from '@/Layouts/AppLayout';
-export default function Page(props){return <AppLayout><div className='p-6'><h1 className='text-xl font-semibold'>Sales Module</h1><pre className='text-xs mt-2 bg-gray-100 p-3 rounded'>{JSON.stringify(props,null,2)}</pre></div></AppLayout>}
+import {Head,Link} from '@inertiajs/react';import AppLayout from '@/Layouts/AppLayout';
+export default function Page({shipments}){return <AppLayout><Head title='Shipments'/><div className='p-6'><h1 className='text-xl font-semibold mb-3'>Shipments</h1><table className='w-full border text-sm'><thead><tr><th>No</th><th>SO</th><th>Customer</th><th>Warehouse</th><th>Date</th><th>Status</th><th>Dispatch</th><th></th></tr></thead><tbody>{shipments.data.map(s=><tr key={s.id}><td>{s.number}</td><td>{s.sale?.number}</td><td>{s.customer?.customer_name}</td><td>{s.warehouse?.name}</td><td>{s.shipment_date}</td><td>{s.status}</td><td>{s.dispatch_id||'-'}</td><td><Link href={route('apps.shipments.show',s.id)} className='text-indigo-600'>View</Link></td></tr>)}</tbody></table></div></AppLayout>}
