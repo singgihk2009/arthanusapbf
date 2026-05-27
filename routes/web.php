@@ -254,10 +254,12 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::post('/sales-orders/{salesOrder}/approve', [SalesOrderController::class, 'approve'])->name('sales-orders.approve');
     Route::post('/sales-orders/{salesOrder}/cancel', [SalesOrderController::class, 'cancel'])->name('sales-orders.cancel');
     
-    Route::resource('/shipments', ShipmentController::class);
-    Route::get('/shipments/create-from-sale/{saleId}', [ShipmentController::class, 'createFromSale'])->name('shipments.create-from-sale');
-    Route::post('/shipments/{id}/post', [ShipmentController::class, 'post'])->name('shipments.post');
-    Route::post('/shipments/{id}/cancel', [ShipmentController::class, 'cancel'])->name('shipments.cancel');
+    Route::get('/sales-orders/{salesOrder}/shipments/create', [ShipmentController::class, 'createFromSale'])->name('sales-orders.shipments.create')->middleware('can:shipment.create');
+    Route::post('/sales-orders/{salesOrder}/shipments', [ShipmentController::class, 'storeFromSale'])->name('sales-orders.shipments.store')->middleware('can:shipment.create');
+    Route::get('/shipments', [ShipmentController::class, 'index'])->name('shipments.index')->middleware('can:shipment.view');
+    Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])->name('shipments.show')->middleware('can:shipment.view');
+    Route::post('/shipments/{shipment}/post', [ShipmentController::class, 'post'])->name('shipments.post')->middleware('can:shipment.post');
+    Route::post('/shipments/{shipment}/cancel', [ShipmentController::class, 'cancel'])->name('shipments.cancel')->middleware('can:shipment.cancel');
 
     Route::resource('/customer-invoices', CustomerInvoiceController::class);
     Route::get('/customer-invoices/create-from-shipment/{shipmentId}', [CustomerInvoiceController::class, 'create'])->name('customer-invoices.create-from-shipment');
