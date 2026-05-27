@@ -34,20 +34,6 @@ export default function Index() {
         }
     };
 
-    const handleUnpost = async (id) => {
-        if (!window.confirm('Batalkan posting dokumen ini? Stok akan dikembalikan.')) {
-            return;
-        }
-
-        setProcessingId(id);
-        try {
-            await window.axios.post(route('apps.inventory.unposting.usage', id));
-            window.location.reload();
-        } finally {
-            setProcessingId(null);
-        }
-    };
-
     return (
         <>
             <Head title="Dispatch" />
@@ -74,29 +60,47 @@ export default function Index() {
                                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Warehouse</th>
                                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Department</th>
                                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Cost Center</th>
+                                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Referensi</th>
                                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">Status</th>
                                     <th className="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-200">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                {entries.data.length === 0 && <tr><td colSpan={8} className="px-3 py-4 text-center text-gray-500">Belum ada data dispatch.</td></tr>}
+                                {entries.data.length === 0 && <tr><td colSpan={9} className="px-3 py-4 text-center text-gray-500">Belum ada data dispatch.</td></tr>}
                                 {entries.data.map((entry, idx) => (
                                     <tr key={entry.id} className="text-gray-800 dark:text-gray-100">
+                                        {(() => {
+                                            const posted = String(entry.status || '').toUpperCase() === 'POSTED';
+                                            const salesOrderId = entry.sale_id ?? (String(entry.source_type || '').toLowerCase() === 'sales_order' ? entry.source_id : null);
+                                            const salesOrderNumber = entry.source_number || '-';
+                                            return (
+                                                <>
                                         <td className="px-3 py-2">{entries.from ? entries.from + idx : idx + 1}</td>
                                         <td className="px-3 py-2">{entry.number}</td>
                                         <td className="px-3 py-2">{entry.document_date}</td>
                                         <td className="px-3 py-2">{entry.warehouse_label}</td>
                                         <td className="px-3 py-2">{entry.department || '-'}</td>
                                         <td className="px-3 py-2">{entry.cost_center || '-'}</td>
+                                        <td className="px-3 py-2">
+                                            {salesOrderId ? <Link href={route('apps.sales-orders.show', salesOrderId)} className="text-blue-600 hover:underline">{salesOrderNumber}</Link> : '-'}
+                                        </td>
                                         <td className="px-3 py-2"><span className="rounded border border-gray-300 px-2 py-1 text-xs">{entry.status}</span></td>
                                         <td className="px-3 py-2">
                                             <div className="flex justify-center gap-2">
-                                                <Link href={route('apps.outbound.internal-usage.edit', entry.id)} className="rounded border border-gray-300 px-2 py-1 text-xs">Edit</Link>
-                                                {entry.status !== 'POSTED' && <button type="button" onClick={() => handlePost(entry.id)} disabled={processingId === entry.id} className="rounded border border-blue-300 px-2 py-1 text-xs text-blue-700 disabled:opacity-50">Post</button>}
-                                                {entry.status === 'POSTED' && <button type="button" onClick={() => handleUnpost(entry.id)} disabled={processingId === entry.id} className="rounded border border-amber-300 px-2 py-1 text-xs text-amber-700 disabled:opacity-50">Unpost</button>}
-                                                <button type="button" onClick={() => handleDelete(entry.id)} disabled={processingId === entry.id} className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 disabled:opacity-50">Hapus</button>
+                                                {posted ? (
+                                                    <Link href={route('apps.outbound.internal-usage.edit', { internalUsage: entry.id, view: 1 })} className="rounded border border-gray-300 px-2 py-1 text-xs">View</Link>
+                                                ) : (
+                                                    <>
+                                                        <Link href={route('apps.outbound.internal-usage.edit', entry.id)} className="rounded border border-gray-300 px-2 py-1 text-xs">Edit</Link>
+                                                        <button type="button" onClick={() => handlePost(entry.id)} disabled={processingId === entry.id} className="rounded border border-blue-300 px-2 py-1 text-xs text-blue-700 disabled:opacity-50">Post</button>
+                                                        <button type="button" onClick={() => handleDelete(entry.id)} disabled={processingId === entry.id} className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 disabled:opacity-50">Hapus</button>
+                                                    </>
+                                                )}
                                             </div>
                                         </td>
+                                                </>
+                                            );
+                                        })()}
                                     </tr>
                                 ))}
                             </tbody>

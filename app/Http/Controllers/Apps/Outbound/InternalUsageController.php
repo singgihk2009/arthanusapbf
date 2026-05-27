@@ -9,6 +9,7 @@ use App\Models\Sales\Sale;
 use App\Services\Inventory\UomConversionService;
 use App\Models\Inventory\FacilityScheme;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -161,7 +162,7 @@ class InternalUsageController extends Controller
         return to_route('apps.outbound.internal-usage.index')->with('success', 'Dispatch berhasil disimpan.');
     }
 
-    public function edit(int $internalUsage): Response
+    public function edit(Request $request, int $internalUsage): Response
     {
         $user = auth()->user();
         abort_if(! $user, 401);
@@ -182,6 +183,9 @@ class InternalUsageController extends Controller
                 'notes' => (string) ($line->notes ?? ''),
             ]);
 
+        $isPosted = strtoupper((string) $entry->status) === 'POSTED';
+        $viewOnly = $isPosted || $request->boolean('view');
+
         return Inertia::render('Apps/Outbound/InternalUsage/Edit', [
             'entry' => [
                 'id' => $entry->id,
@@ -195,6 +199,11 @@ class InternalUsageController extends Controller
                 'transaction_code' => (string) ($entry->transaction_code ?? ''),
                 'notes' => (string) ($entry->notes ?? ''),
                 'status' => (string) $entry->status,
+                'sale_id' => $entry->sale_id ? (int) $entry->sale_id : null,
+                'source_id' => $entry->source_id ? (int) $entry->source_id : null,
+                'source_type' => (string) ($entry->source_type ?? ''),
+                'source_number' => (string) ($entry->source_number ?? ''),
+                'view_only' => $viewOnly,
             ],
             'lines' => $lines,
             'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
