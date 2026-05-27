@@ -11,7 +11,14 @@ return new class extends Migration {
             return;
         }
 
-        DB::statement("ALTER TABLE sales MODIFY COLUMN status ENUM('DRAFT','SUBMITTED','APPROVED','POSTED','CANCELLED','draft','submitted','approved','cancelled','partially_shipped','fully_shipped','fully_invoiced','closed') NOT NULL DEFAULT 'draft'");
+        // Normalize legacy uppercase statuses before changing enum.
+        DB::table('sales')->where('status', 'DRAFT')->update(['status' => 'draft']);
+        DB::table('sales')->where('status', 'SUBMITTED')->update(['status' => 'submitted']);
+        DB::table('sales')->where('status', 'APPROVED')->update(['status' => 'approved']);
+        DB::table('sales')->where('status', 'POSTED')->update(['status' => 'posted']);
+        DB::table('sales')->where('status', 'CANCELLED')->update(['status' => 'cancelled']);
+
+        DB::statement("ALTER TABLE sales MODIFY COLUMN status ENUM('draft','submitted','approved','posted','cancelled','partially_shipped','fully_shipped','fully_invoiced','closed') NOT NULL DEFAULT 'draft'");
     }
 
     public function down(): void
@@ -20,6 +27,6 @@ return new class extends Migration {
             return;
         }
 
-        DB::statement("ALTER TABLE sales MODIFY COLUMN status ENUM('DRAFT','SUBMITTED','APPROVED','POSTED','CANCELLED','draft','submitted','approved','cancelled') NOT NULL DEFAULT 'draft'");
+        DB::statement("ALTER TABLE sales MODIFY COLUMN status ENUM('draft','submitted','approved','posted','cancelled') NOT NULL DEFAULT 'draft'");
     }
 };
