@@ -165,10 +165,30 @@ class CustomerController extends Controller
         $customer->load(['documents.documentType']);
 
         $salesOrders = Schema::hasTable('sales') ? $customer->salesOrders()?->with('warehouse:id,name','priceList:id,name')->withCount('lines')->latest()->get() : collect();
+        $dispatches = Schema::hasTable('internal_usages')
+            ? DB::table('internal_usages as iu')
+                ->leftJoin('warehouses as w', 'w.id', '=', 'iu.warehouse_id')
+                ->where('iu.customer_id', $customer->id)
+                ->orderByDesc('iu.id')
+                ->get([
+                    'iu.id',
+                    'iu.number',
+                    'iu.document_date',
+                    'iu.department',
+                    'iu.cost_center',
+                    'iu.status',
+                    'iu.sale_id',
+                    'iu.source_type',
+                    'iu.source_id',
+                    'iu.source_number',
+                    DB::raw('COALESCE(w.name, "-") as warehouse_label'),
+                ])
+            : collect();
 
         return Inertia::render('Apps/Sales/Customers/Show', [
             'customer' => $customer,
             'salesOrders' => $salesOrders,
+            'dispatches' => $dispatches,
             'summary' => [
                 'total_sales_orders' => Schema::hasTable('sales') ? $customer->salesOrders()?->count() ?? 0 : 0,
                 'total_invoices' => Schema::hasTable('customer_invoices') ? $customer->invoices()?->count() ?? 0 : 0,

@@ -4,9 +4,9 @@ import AppLayout from '@/Layouts/AppLayout';
 import Button from '@/Components/Button';
 import Input from '@/Components/Input';
 
-const tabs = ['Overview', 'Profile', 'Documents', 'Sales Orders', 'Shipments', 'Invoices', 'Payments', 'Ledger Placeholder'];
+const tabs = ['Overview', 'Profile', 'Documents', 'Sales Orders', 'Dispatch', 'Shipments', 'Invoices', 'Payments', 'Ledger Placeholder'];
 
-export default function Page({ customer, summary, salesOrders = [], documentTypes = [] }) {
+export default function Page({ customer, summary, salesOrders = [], dispatches = [], documentTypes = [] }) {
   const [activeTab, setActiveTab] = useState('Overview');
   const { auth } = usePage().props;
 
@@ -331,8 +331,50 @@ export default function Page({ customer, summary, salesOrders = [], documentType
           )}
 
           {activeTab === 'Sales Orders' && (<div className='space-y-3'><div className='grid grid-cols-2 md:grid-cols-4 gap-2 text-sm'><div className='border rounded p-2'>Total SO<br/><b>{salesOrders.length}</b></div><div className='border rounded p-2'>Draft SO<br/><b>{salesOrders.filter(x=>x.status==='draft').length}</b></div><div className='border rounded p-2'>Approved SO<br/><b>{salesOrders.filter(x=>x.status==='approved').length}</b></div><div className='border rounded p-2'>Grand Total SO<br/><b>{Number(salesOrders.reduce((a,b)=>a+Number(b.grand_total||0),0)).toLocaleString('id-ID')}</b></div></div><div className='flex items-center gap-2'><Link href={route('apps.customers.sales-orders.create', customer.id)} className='inline-block rounded border px-3 py-1 text-sm'>Create Sales Order</Link><button type='button' onClick={bulkApproveSalesOrders} disabled={!selectedSalesOrderIds.length} className='inline-block rounded border border-blue-500 px-3 py-1 text-sm text-blue-600 disabled:cursor-not-allowed disabled:opacity-50'>Approve Selected ({selectedSalesOrderIds.length})</button></div><table className='w-full text-sm border'><thead><tr><th className='w-10 text-center'><input type='checkbox' checked={allApprovableChecked} onChange={toggleAllApprovableSalesOrders} disabled={!approvableSalesOrderIds.length} /></th><th>SO Number</th><th>Document Date</th><th>Expected Delivery</th><th>Price List</th><th>Status</th><th>Subtotal</th><th>Discount</th><th>Tax</th><th>Grand Total</th><th>Actions</th></tr></thead><tbody>{salesOrders.map((so)=><tr key={so.id}><td className='text-center'>{(String(so.status || '').toLowerCase()==='submitted' || (String(so.status || '').toLowerCase()==='draft' && Number(so.lines_count || 0) > 0)) ? <input type='checkbox' checked={selectedSalesOrderIds.includes(so.id)} onChange={() => toggleSalesOrderSelection(so.id)} /> : '-'}</td><td>{so.number}</td><td>{so.document_date}</td><td>{so.expected_delivery_date||'-'}</td><td>{so.price_list?.name||'-'}</td><td>{so.status}</td><td>{Number(so.subtotal||0).toLocaleString('id-ID')}</td><td>{Number(so.discount_total||0).toLocaleString('id-ID')}</td><td>{Number(so.tax_total||0).toLocaleString('id-ID')}</td><td>{Number(so.grand_total||0).toLocaleString('id-ID')}</td><td className='space-x-2'><Link href={route('apps.sales-orders.show', so.id)} className='text-blue-600'>View</Link>{so.status==='draft' && <><Link href={route('apps.sales-orders.edit', so.id)} className='text-amber-600'>Edit</Link><button className='text-indigo-600' onClick={()=>window.axios?.post(route('apps.sales-orders.submit',so.id)).then(()=>window.location.reload()).catch((error)=>setNotice({ type:'error', text: error?.response?.data?.message || 'Submit gagal diproses.' }))}>Submit</button></>}{['approved','partially_shipped'].includes(String(so.status||'').toLowerCase()) && <Link href={route('apps.sales-orders.dispatch.create', so.id)} className='text-emerald-600'>Create Shipment</Link>} {so.status==='submitted' && <button className='text-emerald-600' onClick={()=>window.axios?.post(route('apps.sales-orders.approve',so.id)).then(()=>window.location.reload()).catch((error)=>setNotice({ type:'error', text: error?.response?.data?.message || 'Approve gagal diproses.' }))}>Approve</button>}</td></tr>)}</tbody></table></div>)}
+          {activeTab === 'Dispatch' && (
+            <div className='overflow-x-auto rounded border border-gray-200'>
+              <table className='min-w-full divide-y divide-gray-200 text-sm'>
+                <thead className='bg-gray-50'>
+                  <tr>
+                    <th className='px-3 py-2 text-left font-semibold text-gray-700'>No</th>
+                    <th className='px-3 py-2 text-left font-semibold text-gray-700'>Number</th>
+                    <th className='px-3 py-2 text-left font-semibold text-gray-700'>Tanggal</th>
+                    <th className='px-3 py-2 text-left font-semibold text-gray-700'>Warehouse</th>
+                    <th className='px-3 py-2 text-left font-semibold text-gray-700'>Department</th>
+                    <th className='px-3 py-2 text-left font-semibold text-gray-700'>Cost Center</th>
+                    <th className='px-3 py-2 text-left font-semibold text-gray-700'>Referensi</th>
+                    <th className='px-3 py-2 text-left font-semibold text-gray-700'>Status</th>
+                    <th className='px-3 py-2 text-center font-semibold text-gray-700'>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className='divide-y divide-gray-100'>
+                  {dispatches.length === 0 && <tr><td colSpan={9} className='px-3 py-4 text-center text-gray-500'>Belum ada data dispatch.</td></tr>}
+                  {dispatches.map((entry, idx) => {
+                    const posted = String(entry.status || '').toUpperCase() === 'POSTED';
+                    const salesOrderId = entry.sale_id ?? (String(entry.source_type || '').toLowerCase() === 'sales_order' ? entry.source_id : null);
+                    const salesOrderNumber = entry.source_number || '-';
+                    return (
+                      <tr key={entry.id} className='text-gray-800'>
+                        <td className='px-3 py-2'>{idx + 1}</td>
+                        <td className='px-3 py-2'>{entry.number}</td>
+                        <td className='px-3 py-2'>{entry.document_date}</td>
+                        <td className='px-3 py-2'>{entry.warehouse_label}</td>
+                        <td className='px-3 py-2'>{entry.department || '-'}</td>
+                        <td className='px-3 py-2'>{entry.cost_center || '-'}</td>
+                        <td className='px-3 py-2'>{salesOrderId ? <Link href={route('apps.sales-orders.show', salesOrderId)} className='text-blue-600 hover:underline'>{salesOrderNumber}</Link> : '-'}</td>
+                        <td className='px-3 py-2'><span className='rounded border border-gray-300 px-2 py-1 text-xs'>{entry.status}</span></td>
+                        <td className='px-3 py-2 text-center'>
+                          <Link href={route('apps.outbound.internal-usage.edit', posted ? { internalUsage: entry.id, view: 1 } : entry.id)} className='rounded border border-gray-300 px-2 py-1 text-xs'>{posted ? 'View' : 'Edit'}</Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-          {activeTab !== 'Overview' && activeTab !== 'Profile' && activeTab !== 'Documents' && activeTab !== 'Sales Orders' && (
+          {activeTab !== 'Overview' && activeTab !== 'Profile' && activeTab !== 'Documents' && activeTab !== 'Sales Orders' && activeTab !== 'Dispatch' && (
             <p className='text-gray-600 text-sm'>No data available yet.</p>
           )}
         </div>
