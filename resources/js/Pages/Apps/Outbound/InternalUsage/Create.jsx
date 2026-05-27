@@ -7,18 +7,25 @@ const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 p
 const lineInputClassName = 'rounded border border-gray-300 bg-white px-2 py-1 text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 
 export default function Create() {
-    const { items, uoms, warehouses, batches, facilitySchemes, transactionCodes } = usePage().props;
+    const { items, uoms, warehouses, batches, facilitySchemes, transactionCodes, mode, source, customer, dispatchDefaults, prefilledLines } = usePage().props;
+    const isSalesShipment = mode === 'sales_shipment';
     const [form, setForm] = useState({
-        warehouse_id: '',
+        warehouse_id: dispatchDefaults?.warehouse_id ?? '',
         facility_scheme_id: '',
-        document_date: new Date().toISOString().slice(0, 10),
-        transaction_code: 'PENJUALAN',
+        document_date: dispatchDefaults?.document_date ?? new Date().toISOString().slice(0, 10),
+        transaction_code: dispatchDefaults?.transaction_code ?? 'PENJUALAN',
         outbound_number: '',
-        sender_receiver_name: '',
-        department: '',
-        cost_center: '',
-        notes: '',
-        lines: [{ ...emptyLine }],
+        sender_receiver_name: dispatchDefaults?.sender_receiver_name ?? '',
+        department: dispatchDefaults?.department ?? '',
+        cost_center: dispatchDefaults?.cost_center ?? '',
+        notes: dispatchDefaults?.notes ?? '',
+        source_type: dispatchDefaults?.source_type ?? '',
+        source_id: dispatchDefaults?.source_id ?? null,
+        source_number: dispatchDefaults?.source_number ?? '',
+        customer_id: dispatchDefaults?.customer_id ?? null,
+        sale_id: dispatchDefaults?.sale_id ?? null,
+        mode: mode ?? null,
+        lines: prefilledLines?.length ? prefilledLines : [{ ...emptyLine }],
     });
     const [errors, setErrors] = useState({});
     const [message, setMessage] = useState(null);
@@ -62,20 +69,35 @@ export default function Create() {
             return;
         }
 
+        if (isSalesShipment) {
+            const invalidLine = form.lines.find((line) => Number(line.qty_used || 0) <= 0 || Number(line.qty_used || 0) > Number(line.qty_remaining || 0));
+            if (invalidLine) {
+                setMessage({ type: 'error', text: 'Shipment quantity cannot exceed remaining Sales Order quantity.' });
+                setLoading(false);
+                return;
+            }
+        }
+
         try {
             await window.axios.post(route('apps.outbound.internal-usage.store'), form);
             setMessage({ type: 'success', text: 'Dispatch berhasil disimpan.' });
             setForm((prev) => ({
                 ...prev,
-                warehouse_id: '',
+                warehouse_id: dispatchDefaults?.warehouse_id ?? '',
                 facility_scheme_id: '',
-                transaction_code: 'PENJUALAN',
+                transaction_code: dispatchDefaults?.transaction_code ?? 'PENJUALAN',
                 outbound_number: '',
-                sender_receiver_name: '',
-                department: '',
-                cost_center: '',
-                notes: '',
-                lines: [{ ...emptyLine }],
+                sender_receiver_name: dispatchDefaults?.sender_receiver_name ?? '',
+                department: dispatchDefaults?.department ?? '',
+                cost_center: dispatchDefaults?.cost_center ?? '',
+                notes: dispatchDefaults?.notes ?? '',
+                source_type: dispatchDefaults?.source_type ?? '',
+        source_id: dispatchDefaults?.source_id ?? null,
+        source_number: dispatchDefaults?.source_number ?? '',
+        customer_id: dispatchDefaults?.customer_id ?? null,
+        sale_id: dispatchDefaults?.sale_id ?? null,
+        mode: mode ?? null,
+        lines: prefilledLines?.length ? prefilledLines : [{ ...emptyLine }],
             }));
         } catch (error) {
             if (error.response?.status === 422) {
@@ -96,7 +118,7 @@ export default function Create() {
             <div className="space-y-4">
                 <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-900 dark:bg-gray-950">
                     <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Form Dispatch</h2>
-                    <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Catat pengeluaran inventory untuk kebutuhan dispatch.</p>
+                    <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Catat pengeluaran inventory untuk kebutuhan dispatch.</p>{isSalesShipment && <div className='mb-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700'>Sales Shipment from SO {source?.number}</div>}
 
                     <form onSubmit={submit} className="space-y-4">
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -112,13 +134,13 @@ export default function Create() {
 
                         <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
                             <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-                                <thead className="bg-gray-50 dark:bg-gray-900"><tr><th className="px-2 py-2 text-left">Item</th><th className="px-2 py-2 text-left">Batch</th><th className="px-2 py-2 text-left">Qty</th><th className="px-2 py-2 text-left">UOM</th><th className="px-2 py-2 text-left">Keterangan</th><th className="px-2 py-2 text-left">Aksi</th></tr></thead>
+                                <thead className="bg-gray-50 dark:bg-gray-900"><tr><th className="px-2 py-2 text-left">Item</th><th className="px-2 py-2 text-left">Batch</th>{isSalesShipment && <th className='px-2 py-2 text-left'>Qty Ordered</th>}{isSalesShipment && <th className='px-2 py-2 text-left'>Already Shipped</th>}{isSalesShipment && <th className='px-2 py-2 text-left'>Remaining</th>}<th className="px-2 py-2 text-left">Qty</th><th className="px-2 py-2 text-left">UOM</th><th className="px-2 py-2 text-left">Keterangan</th><th className="px-2 py-2 text-left">Aksi</th></tr></thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                     {form.lines.map((line, index) => (
                                         <tr key={index}>
                                             <td className="p-2"><select value={line.item_id} onChange={(e) => { updateLine(index, 'item_id', e.target.value); updateLine(index, 'batch_id', ''); }} className={`w-56 ${lineInputClassName}`}><option value="">Pilih Item</option>{items.map((item) => <option key={item.id} value={item.id}>{item.sku} - {item.name}</option>)}</select>{errors[`lines.${index}.item_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.item_id`][0]}</p>}</td>
                                             <td className="p-2"><select value={line.batch_id} onChange={(e) => updateLine(index, 'batch_id', e.target.value)} className={`w-44 ${lineInputClassName}`} disabled={!line.item_id}><option value="">Tanpa batch (AVG)</option>{availableBatches(line.item_id).map((batch) => <option key={batch.id} value={batch.id}>{batch.batch_no}{batch.expired_date ? ` (EXP ${batch.expired_date})` : ''}</option>)}</select>{errors[`lines.${index}.batch_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.batch_id`][0]}</p>}</td>
-                                            <td className="p-2"><input type="number" min="0" step="0.000001" value={line.qty_used} onChange={(e) => updateLine(index, 'qty_used', e.target.value)} className={`w-28 ${lineInputClassName}`} />{errors[`lines.${index}.qty_used`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.qty_used`][0]}</p>}</td>
+                                            {isSalesShipment && <td className='p-2'>{line.qty_ordered ?? '-'}</td>}{isSalesShipment && <td className='p-2'>{line.qty_already_shipped ?? '-'}</td>}{isSalesShipment && <td className='p-2'>{line.qty_remaining ?? '-'}</td>}<td className="p-2"><input type="number" min="0" step="0.000001" value={line.qty_used} onChange={(e) => updateLine(index, 'qty_used', e.target.value)} className={`w-28 ${lineInputClassName}`} />{errors[`lines.${index}.qty_used`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.qty_used`][0]}</p>}</td>
                                             <td className="p-2"><select value={line.uom_id} onChange={(e) => updateLine(index, 'uom_id', e.target.value)} className={`w-36 ${lineInputClassName}`}><option value="">UOM</option>{uoms.map((uom) => <option key={uom.id} value={uom.id}>{uom.code}</option>)}</select>{errors[`lines.${index}.uom_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.uom_id`][0]}</p>}</td>
                                             <td className="p-2"><input value={line.notes} onChange={(e) => updateLine(index, 'notes', e.target.value)} className={`w-44 ${lineInputClassName}`} /></td>
                                             <td className="p-2"><button type="button" onClick={() => removeLine(index)} className="rounded border border-red-300 px-2 py-1 text-red-600">Hapus</button></td>
