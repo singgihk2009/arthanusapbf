@@ -501,7 +501,14 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
         $this->createIntegrationSnapshotForInternalUsage($usageId, $request->user()?->id);
 
-        if (($header->source_type ?? null) === 'sales_order') {
+        if ($this->shouldSyncSalesOrderDispatch($header)) {
+            if (($header->source_type ?? null) !== 'sales_order') {
+                DB::table('internal_usages')->where('id', $usageId)->update([
+                    'source_type' => 'sales_order',
+                    'updated_at' => now(),
+                ]);
+            }
+
             $this->salesOrderShipmentSyncService->syncFromDispatch($usageId);
         }
 
@@ -615,6 +622,18 @@ class InventoryPostingController extends Controller implements HasMiddleware
         $this->persistIntegrationTransaction('internal_usages', $usageId, (string) $header->number, 'USAGE', (string) $header->document_date, (int) $header->warehouse_id, $lines, $userId);
     }
 
+
+    private function shouldSyncSalesOrderDispatch(object $header): bool
+    {
+        if (($header->source_type ?? null) === 'sales_order') {
+            return true;
+        }
+
+        $transactionCode = strtoupper((string) ($header->transaction_code ?? ''));
+        $hasSalesReference = ! empty($header->sale_id) || ! empty($header->source_id);
+
+        return $transactionCode === 'PENJUALAN' && $hasSalesReference;
+    }
     private function createIntegrationSnapshotForStockAdjustment(int $adjustmentId, ?int $userId): void
     {
         $header = DB::table('stock_adjustments')->where('id', $adjustmentId)->first();
