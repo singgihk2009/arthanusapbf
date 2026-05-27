@@ -164,7 +164,7 @@ class CustomerController extends Controller
     {
         $customer->load(['documents.documentType']);
 
-        $salesOrders = Schema::hasTable('sales') ? $customer->salesOrders()?->with('warehouse:id,name','priceList:id,name')->latest()->get() : collect();
+        $salesOrders = Schema::hasTable('sales') ? $customer->salesOrders()?->with('warehouse:id,name','priceList:id,name')->withCount('lines')->latest()->get() : collect();
 
         return Inertia::render('Apps/Sales/Customers/Show', [
             'customer' => $customer,
