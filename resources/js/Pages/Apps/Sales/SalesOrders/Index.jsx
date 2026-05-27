@@ -70,13 +70,6 @@ export default function Page({ salesOrders, filters = {} }) {
         for (const salesOrder of selectedOrders) {
             try {
                 const status = String(salesOrder.status || '').toLowerCase();
-                if (status === 'draft') {
-                    if (Number(salesOrder.lines_count || 0) <= 0) {
-                        failedOrders.push(`${salesOrder.number || salesOrder.id}: Draft belum punya item. Tambahkan minimal 1 item.`);
-                        continue;
-                    }
-                    await window.axios.post(route('apps.sales-orders.submit', salesOrder.id));
-                }
                 await window.axios.post(route('apps.sales-orders.approve', salesOrder.id));
             } catch (error) {
                 const serverError = error?.response?.data?.errors ?? {};
