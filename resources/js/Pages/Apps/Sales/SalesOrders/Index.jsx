@@ -50,23 +50,30 @@ export default function Page({ salesOrders, filters = {} }) {
             : [...previous, id]);
     };
 
-    const toggleSelectAllSubmitted = () => {
-        const submittedIds = rows.filter((so) => String(so.status || '').toLowerCase() === 'submitted').map((so) => so.id);
-        if (!submittedIds.length) return;
-        const isAllSelected = submittedIds.every((id) => selectedIds.includes(id));
-        setSelectedIds(isAllSelected ? selectedIds.filter((id) => !submittedIds.includes(id)) : Array.from(new Set([...selectedIds, ...submittedIds])));
+    const toggleSelectAllApprovable = () => {
+        const approvableIds = rows.filter((so) => ['draft', 'submitted'].includes(String(so.status || '').toLowerCase())).map((so) => so.id);
+        if (!approvableIds.length) return;
+        const isAllSelected = approvableIds.every((id) => selectedIds.includes(id));
+        setSelectedIds(isAllSelected ? selectedIds.filter((id) => !approvableIds.includes(id)) : Array.from(new Set([...selectedIds, ...approvableIds])));
     };
 
     const approveSelected = async () => {
         if (!selectedIds.length) return;
         if (!window.confirm(`Approve ${selectedIds.length} sales order terpilih?`)) return;
-        await Promise.all(selectedIds.map((id) => window.axios.post(route('apps.sales-orders.approve', id))));
+        const selectedOrders = rows.filter((so) => selectedIds.includes(so.id));
+        for (const salesOrder of selectedOrders) {
+            const status = String(salesOrder.status || '').toLowerCase();
+            if (status === 'draft') {
+                await window.axios.post(route('apps.sales-orders.submit', salesOrder.id));
+            }
+            await window.axios.post(route('apps.sales-orders.approve', salesOrder.id));
+        }
         setSelectedIds([]);
         router.reload({ only: ['salesOrders'] });
     };
 
-    const submittedIds = rows.filter((so) => String(so.status || '').toLowerCase() === 'submitted').map((so) => so.id);
-    const allSubmittedSelected = submittedIds.length > 0 && submittedIds.every((id) => selectedIds.includes(id));
+    const approvableIds = rows.filter((so) => ['draft', 'submitted'].includes(String(so.status || '').toLowerCase())).map((so) => so.id);
+    const allApprovableSelected = approvableIds.length > 0 && approvableIds.every((id) => selectedIds.includes(id));
 
     return <>
         <Head title='Sales Orders' />
@@ -116,7 +123,7 @@ export default function Page({ salesOrders, filters = {} }) {
                 <Table.Thead>
                     <tr>
                         <Table.Th className='w-10 text-center'>
-                            <input type='checkbox' checked={allSubmittedSelected} onChange={toggleSelectAllSubmitted} disabled={!submittedIds.length} />
+                            <input type='checkbox' checked={allApprovableSelected} onChange={toggleSelectAllApprovable} disabled={!approvableIds.length} />
                         </Table.Th>
                         <Table.Th>No</Table.Th>
                         <Table.Th>SO Number</Table.Th>
@@ -129,7 +136,7 @@ export default function Page({ salesOrders, filters = {} }) {
                 <Table.Tbody>
                     {rows.length ? rows.map((so, i) => {
                         const status = String(so.status || '').toLowerCase();
-                        const selectable = status === 'submitted';
+                        const selectable = status === 'draft' || status === 'submitted';
 
                         return <tr key={so.id} className='hover:bg-gray-100 dark:hover:bg-gray-900'>
                             <Table.Td className='text-center'>{selectable ? <input type='checkbox' checked={selectedIds.includes(so.id)} onChange={() => toggleSelection(so.id)} /> : '-'}</Table.Td>
