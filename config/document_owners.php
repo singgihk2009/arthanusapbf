@@ -13,11 +13,11 @@ return array_filter([
         'route_prefix' => 'vendor-invoices',
         'name_column' => 'invoice_no_internal',
     ],
-    'customer' => class_exists(App\Models\Customer::class) ? [
-        'model' => App\Models\Customer::class,
+    'customer' => class_exists(App\Models\Sales\Customer::class) ? [
+        'model' => App\Models\Sales\Customer::class,
         'label' => 'Customer',
         'route_prefix' => 'customers',
-        'name_column' => 'name',
+        'name_column' => 'customer_name',
     ] : null,
     'employee' => class_exists(App\Models\Employee::class) ? [
         'model' => App\Models\Employee::class,
