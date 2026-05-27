@@ -121,6 +121,7 @@ class SalesOrderShipmentSyncService
 
         DB::table('internal_usage_lines')->where('id', $line->id)->update([
             'sale_line_id' => $matched[0]->id,
+            'source_line_id' => $matched[0]->id,
             'updated_at' => now(),
         ]);
 
