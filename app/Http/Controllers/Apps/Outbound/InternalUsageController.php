@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Apps\Outbound;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\InternalUsageRequest;
 use App\Services\WarehouseAccessService;
+use App\Models\Sales\Sale;
 use App\Services\Inventory\UomConversionService;
 use App\Models\Inventory\FacilityScheme;
 use Illuminate\Http\RedirectResponse;
@@ -69,6 +70,62 @@ class InternalUsageController extends Controller
         ]);
     }
 
+
+    public function createFromSalesOrder(Sale $salesOrder): Response
+    {
+        $user = auth()->user();
+        abort_if(! $user, 401);
+
+        $status = strtolower((string) $salesOrder->status);
+        abort_if(! in_array($status, ['approved', 'partially_shipped'], true), 422, 'Sales Order must be approved before shipment.');
+
+        $salesOrder->load(['customer', 'lines.item', 'lines.uom', 'lines.facilityScheme']);
+        $lines = $salesOrder->lines->map(function ($line) {
+            $remaining = max(0, (float) $line->qty_sold - (float) $line->qty_shipped);
+            if ($remaining <= 0) return null;
+            return [
+                'sale_line_id' => $line->id,
+                'source_line_id' => $line->id,
+                'item_id' => (string) $line->item_id,
+                'batch_id' => '',
+                'qty_used' => (string) $remaining,
+                'uom_id' => (string) $line->uom_id,
+                'notes' => '',
+                'qty_ordered' => (float) $line->qty_sold,
+                'qty_already_shipped' => (float) $line->qty_shipped,
+                'qty_remaining' => $remaining,
+            ];
+        })->filter()->values();
+
+        abort_if($lines->isEmpty(), 422, 'All items in this Sales Order have already been shipped.');
+
+        $allowedWarehouseIds = $this->warehouseAccessService->getAllowedWarehouseIds($user);
+        $customer = $salesOrder->customer;
+
+        return Inertia::render('Apps/Outbound/InternalUsage/Create', [
+            'mode' => 'sales_shipment',
+            'source' => ['type' => 'sales_order', 'id' => $salesOrder->id, 'number' => $salesOrder->number],
+            'customer' => $customer ? ['id'=>$customer->id,'customer_code'=>$customer->customer_code,'customer_name'=>$customer->customer_name,'address'=>$customer->address,'phone'=>$customer->phone,'npwp'=>$customer->npwp] : null,
+            'dispatchDefaults' => [
+                'warehouse_id' => (string) $salesOrder->warehouse_id,
+                'document_date' => now()->toDateString(),
+                'transaction_code' => 'PENJUALAN',
+                'sender_receiver_name' => (string) ($customer->customer_name ?? ''),
+                'department' => 'Sales',
+                'cost_center' => '',
+                'notes' => 'Shipment for Sales Order '.$salesOrder->number.' - '.($customer->customer_name ?? ''),
+                'source_type' => 'sales_order','source_id' => $salesOrder->id,'source_number' => $salesOrder->number,'customer_id' => $customer->id ?? null,'sale_id' => $salesOrder->id,
+            ],
+            'prefilledLines' => $lines,
+            'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
+            'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
+            'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
+            'batches' => DB::table('item_batches')->select('id', 'item_id', 'batch_no', 'expired_date')->orderBy('batch_no')->get(),
+            'facilitySchemes' => $this->getFacilitySchemes(),
+            'transactionCodes' => self::TRANSACTION_CODE_OPTIONS,
+        ]);
+    }
+
     public function store(InternalUsageRequest $request): RedirectResponse
     {
         $validated = $request->validated();
@@ -89,6 +146,11 @@ class InternalUsageController extends Controller
                 'notes' => $validated['notes'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
+                'source_type' => $validated['source_type'] ?? null,
+                'source_id' => $validated['source_id'] ?? null,
+                'source_number' => $validated['source_number'] ?? null,
+                'customer_id' => $validated['customer_id'] ?? null,
+                'sale_id' => $validated['sale_id'] ?? null,
             ];
             $entryPayload = $this->appendDispatchHeaderPayload($entryPayload, $validated);
             $entryId = DB::table('internal_usages')->insertGetId($entryPayload);
@@ -168,6 +230,11 @@ class InternalUsageController extends Controller
                 'document_date' => $validated['document_date'],
                 'notes' => $validated['notes'] ?? null,
                 'updated_at' => now(),
+                'source_type' => $validated['source_type'] ?? null,
+                'source_id' => $validated['source_id'] ?? null,
+                'source_number' => $validated['source_number'] ?? null,
+                'customer_id' => $validated['customer_id'] ?? null,
+                'sale_id' => $validated['sale_id'] ?? null,
             ];
             $entryPayload = $this->appendDispatchHeaderPayload($entryPayload, $validated);
             DB::table('internal_usages')->where('id', $internalUsage)->update($entryPayload);
@@ -218,6 +285,11 @@ class InternalUsageController extends Controller
                 'uom_id' => $line['uom_id'],
                 'qty_base' => $qtyBase,
                 'notes' => $line['notes'] ?? null,
+                'sale_line_id' => $line['sale_line_id'] ?? null,
+                'source_line_id' => $line['source_line_id'] ?? null,
+                'qty_ordered' => $line['qty_ordered'] ?? null,
+                'qty_already_shipped' => $line['qty_already_shipped'] ?? 0,
+                'qty_remaining' => $line['qty_remaining'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

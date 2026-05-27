@@ -9,6 +9,7 @@ use App\Models\Inventory\Item;
 use App\Services\Inventory\BatchAllocationService;
 use App\Services\Inventory\StockService;
 use App\Services\Inventory\UomConversionService;
+use App\Services\SalesOrderShipmentSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -26,6 +27,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
         private readonly StockService $stockService,
         private readonly UomConversionService $uomConversionService,
         private readonly BatchAllocationService $batchAllocationService,
+        private readonly SalesOrderShipmentSyncService $salesOrderShipmentSyncService,
     ) {
     }
 
@@ -498,6 +500,10 @@ class InventoryPostingController extends Controller implements HasMiddleware
         ]);
 
         $this->createIntegrationSnapshotForInternalUsage($usageId, $request->user()?->id);
+
+        if (($header->source_type ?? null) === 'sales_order') {
+            $this->salesOrderShipmentSyncService->syncFromDispatch($usageId);
+        }
 
         return response()->json(['message' => 'Internal usage posted', 'id' => $usageId]);
     }
