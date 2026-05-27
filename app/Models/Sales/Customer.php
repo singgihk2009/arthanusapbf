@@ -2,13 +2,17 @@
 
 namespace App\Models\Sales;
 
+use App\Models\Concerns\HasDocuments;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Customer extends Model
 {
+    use HasDocuments;
     use SoftDeletes;
+
+    protected string $documentOwnerType = 'customer';
 
     protected $fillable = [
         'code','name','customer_code','customer_name','customer_type','contact_person','phone','email','address','city','province','postal_code','country','npwp',

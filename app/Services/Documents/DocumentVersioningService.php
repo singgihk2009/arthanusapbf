@@ -6,6 +6,7 @@ use App\Models\Document;
 use App\Models\DocumentAuditLog;
 use App\Models\DocumentRequirement;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class DocumentVersioningService
@@ -72,7 +73,7 @@ class DocumentVersioningService
         $status = ($req?->requires_verification ?? true) ? 'pending_review' : 'verified';
         $rootId = $base?->getRootDocumentId();
 
-        return Document::query()->create(array_merge($data, [
+        return Document::query()->create(array_merge(Arr::except($data, ['file']), [
             'title' => $data['title'] ?? pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
             'file_path' => $path,
             'original_file_name' => $file->getClientOriginalName(),
