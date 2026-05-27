@@ -23,6 +23,7 @@ export default function Page({ customer, summary, salesOrders = [], documentType
 
 
   const docs = customer?.documents ?? [];
+  const [selectedSalesOrderIds, setSelectedSalesOrderIds] = useState([]);
   const [notice, setNotice] = useState(null);
   const [completion, setCompletion] = useState(null);
   const [customForm, setCustomForm] = useState({ document_type_id: '', document_number: '', issue_date: '', expiry_date: '' });
@@ -119,6 +120,38 @@ export default function Page({ customer, summary, salesOrders = [], documentType
         const firstError = Object.values(errorsBag ?? {}).flat().find(Boolean) || error?.response?.data?.message;
         setNotice({ type: 'error', text: `Hapus gagal${firstError ? `: ${firstError}` : '.'}` });
       });
+  };
+
+  const submittedSalesOrderIds = useMemo(
+    () => salesOrders.filter((salesOrder) => salesOrder.status === 'submitted').map((salesOrder) => salesOrder.id),
+    [salesOrders],
+  );
+  const allSubmittedChecked = submittedSalesOrderIds.length > 0 && submittedSalesOrderIds.every((id) => selectedSalesOrderIds.includes(id));
+
+  const toggleSalesOrderSelection = (id) => {
+    setSelectedSalesOrderIds((previous) => previous.includes(id)
+      ? previous.filter((item) => item !== id)
+      : [...previous, id]);
+  };
+
+  const toggleAllSubmittedSalesOrders = () => {
+    if (!submittedSalesOrderIds.length) return;
+    setSelectedSalesOrderIds((previous) => {
+      if (allSubmittedChecked) {
+        return previous.filter((id) => !submittedSalesOrderIds.includes(id));
+      }
+
+      return Array.from(new Set([...previous, ...submittedSalesOrderIds]));
+    });
+  };
+
+  const bulkApproveSalesOrders = async () => {
+    if (!selectedSalesOrderIds.length) return;
+    if (!confirm(`Approve ${selectedSalesOrderIds.length} Sales Order terpilih?`)) return;
+
+    await Promise.all(selectedSalesOrderIds.map((id) => window.axios.post(route('apps.sales-orders.approve', id))));
+    setSelectedSalesOrderIds([]);
+    router.reload({ only: ['salesOrders'], preserveScroll: true });
   };
 
   const statusBadge = (status) => ({ draft: 'bg-gray-100 text-gray-700', pending_review: 'bg-yellow-100 text-yellow-800', verified: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700', expired: 'bg-orange-100 text-orange-700', archived: 'bg-gray-300 text-gray-800' }[status] || 'bg-gray-100 text-gray-600');
@@ -273,7 +306,7 @@ export default function Page({ customer, summary, salesOrders = [], documentType
             </div>
           )}
 
-          {activeTab === 'Sales Orders' && (<div className='space-y-3'><div className='grid grid-cols-2 md:grid-cols-4 gap-2 text-sm'><div className='border rounded p-2'>Total SO<br/><b>{salesOrders.length}</b></div><div className='border rounded p-2'>Draft SO<br/><b>{salesOrders.filter(x=>x.status==='draft').length}</b></div><div className='border rounded p-2'>Approved SO<br/><b>{salesOrders.filter(x=>x.status==='approved').length}</b></div><div className='border rounded p-2'>Grand Total SO<br/><b>{Number(salesOrders.reduce((a,b)=>a+Number(b.grand_total||0),0)).toLocaleString('id-ID')}</b></div></div><Link href={route('apps.customers.sales-orders.create', customer.id)} className='inline-block rounded border px-3 py-1 text-sm'>Create Sales Order</Link><table className='w-full text-sm border'><thead><tr><th>SO Number</th><th>Document Date</th><th>Expected Delivery</th><th>Price List</th><th>Status</th><th>Subtotal</th><th>Discount</th><th>Tax</th><th>Grand Total</th><th>Actions</th></tr></thead><tbody>{salesOrders.map((so)=><tr key={so.id}><td>{so.number}</td><td>{so.document_date}</td><td>{so.expected_delivery_date||'-'}</td><td>{so.price_list?.name||'-'}</td><td>{so.status}</td><td>{Number(so.subtotal||0).toLocaleString('id-ID')}</td><td>{Number(so.discount_total||0).toLocaleString('id-ID')}</td><td>{Number(so.tax_total||0).toLocaleString('id-ID')}</td><td>{Number(so.grand_total||0).toLocaleString('id-ID')}</td><td className='space-x-2'><Link href={route('apps.sales-orders.show', so.id)} className='text-blue-600'>View</Link>{so.status==='draft' && <><Link href={route('apps.sales-orders.edit', so.id)} className='text-amber-600'>Edit</Link><button className='text-indigo-600' onClick={()=>window.axios?.post(route('apps.sales-orders.submit',so.id)).then(()=>window.location.reload())}>Submit</button></>}{so.status==='submitted' && <button className='text-emerald-600' onClick={()=>window.axios?.post(route('apps.sales-orders.approve',so.id)).then(()=>window.location.reload())}>Approve</button>}</td></tr>)}</tbody></table></div>)}
+          {activeTab === 'Sales Orders' && (<div className='space-y-3'><div className='grid grid-cols-2 md:grid-cols-4 gap-2 text-sm'><div className='border rounded p-2'>Total SO<br/><b>{salesOrders.length}</b></div><div className='border rounded p-2'>Draft SO<br/><b>{salesOrders.filter(x=>x.status==='draft').length}</b></div><div className='border rounded p-2'>Approved SO<br/><b>{salesOrders.filter(x=>x.status==='approved').length}</b></div><div className='border rounded p-2'>Grand Total SO<br/><b>{Number(salesOrders.reduce((a,b)=>a+Number(b.grand_total||0),0)).toLocaleString('id-ID')}</b></div></div><div className='flex items-center gap-2'><Link href={route('apps.customers.sales-orders.create', customer.id)} className='inline-block rounded border px-3 py-1 text-sm'>Create Sales Order</Link><button type='button' onClick={bulkApproveSalesOrders} disabled={!selectedSalesOrderIds.length} className='inline-block rounded border border-blue-500 px-3 py-1 text-sm text-blue-600 disabled:cursor-not-allowed disabled:opacity-50'>Approve Selected ({selectedSalesOrderIds.length})</button></div><table className='w-full text-sm border'><thead><tr><th className='w-10 text-center'><input type='checkbox' checked={allSubmittedChecked} onChange={toggleAllSubmittedSalesOrders} disabled={!submittedSalesOrderIds.length} /></th><th>SO Number</th><th>Document Date</th><th>Expected Delivery</th><th>Price List</th><th>Status</th><th>Subtotal</th><th>Discount</th><th>Tax</th><th>Grand Total</th><th>Actions</th></tr></thead><tbody>{salesOrders.map((so)=><tr key={so.id}><td className='text-center'>{so.status==='submitted' ? <input type='checkbox' checked={selectedSalesOrderIds.includes(so.id)} onChange={() => toggleSalesOrderSelection(so.id)} /> : '-'}</td><td>{so.number}</td><td>{so.document_date}</td><td>{so.expected_delivery_date||'-'}</td><td>{so.price_list?.name||'-'}</td><td>{so.status}</td><td>{Number(so.subtotal||0).toLocaleString('id-ID')}</td><td>{Number(so.discount_total||0).toLocaleString('id-ID')}</td><td>{Number(so.tax_total||0).toLocaleString('id-ID')}</td><td>{Number(so.grand_total||0).toLocaleString('id-ID')}</td><td className='space-x-2'><Link href={route('apps.sales-orders.show', so.id)} className='text-blue-600'>View</Link>{so.status==='draft' && <><Link href={route('apps.sales-orders.edit', so.id)} className='text-amber-600'>Edit</Link><button className='text-indigo-600' onClick={()=>window.axios?.post(route('apps.sales-orders.submit',so.id)).then(()=>window.location.reload())}>Submit</button></>}{so.status==='submitted' && <button className='text-emerald-600' onClick={()=>window.axios?.post(route('apps.sales-orders.approve',so.id)).then(()=>window.location.reload())}>Approve</button>}</td></tr>)}</tbody></table></div>)}
 
           {activeTab !== 'Overview' && activeTab !== 'Profile' && activeTab !== 'Documents' && activeTab !== 'Sales Orders' && (
             <p className='text-gray-600 text-sm'>No data available yet.</p>
