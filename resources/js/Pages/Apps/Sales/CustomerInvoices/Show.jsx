@@ -22,6 +22,7 @@ export default function Page({ invoice, lines = [], dispatches = [] }) {
             </div>
             <div className='flex gap-2'>
               {invoice.status === 'draft' && <button type='button' onClick={postInvoice} className='rounded bg-indigo-600 px-3 py-2 text-sm text-white'>Post Invoice</button>}
+              {['posted', 'partially_paid', 'overdue'].includes(String(invoice.status || '').toLowerCase()) && Number(invoice.balance_due || 0) > 0 && <Link href={`/apps/customer-payments/create?invoice_ids=${invoice.id}`} className='rounded bg-emerald-600 px-3 py-2 text-sm text-white'>Collect Payment</Link>}
               <Link href={route('apps.customer-invoices.index')} className='rounded border px-3 py-2 text-sm'>Back to List</Link>
             </div>
           </div>
