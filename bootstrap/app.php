@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use App\Services\AuthHomeRouteService;
 
@@ -28,13 +29,27 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->respond(function ($response, $exception, $request) {
-            if ($request->expectsJson()) {
-                return $response;
-            }
-
             $statusCode = $exception instanceof HttpExceptionInterface
                 ? $exception->getStatusCode()
                 : null;
+
+            if ($exception instanceof TokenMismatchException || $statusCode === 419) {
+                if ($request->expectsJson() && ! $request->header('X-Inertia')) {
+                    return $response;
+                }
+
+                $message = 'Sesi halaman sudah kedaluwarsa. Silakan muat ulang halaman lalu coba login kembali.';
+
+                if ($request->is('login')) {
+                    return redirect()->route('login')->with('error', $message);
+                }
+
+                return back()->with('error', $message);
+            }
+
+            if ($request->expectsJson()) {
+                return $response;
+            }
 
             if ($statusCode === 403 && $request->user()) {
                 return redirect(app(AuthHomeRouteService::class)->resolve($request->user()))
