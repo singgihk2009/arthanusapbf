@@ -168,7 +168,14 @@ class CustomerController extends Controller
         $dispatches = Schema::hasTable('internal_usages')
             ? DB::table('internal_usages as iu')
                 ->leftJoin('warehouses as w', 'w.id', '=', 'iu.warehouse_id')
+                ->when(Schema::hasTable('customer_invoice_dispatches'), function ($query): void {
+                    $query->leftJoin('customer_invoice_dispatches as cid', 'cid.internal_usage_id', '=', 'iu.id')
+                        ->leftJoin('customer_invoices as ci', function ($join): void {
+                            $join->on('ci.id', '=', 'cid.customer_invoice_id')->where('ci.status', '!=', 'cancelled');
+                        });
+                })
                 ->where('iu.customer_id', $customer->id)
+                ->groupBy('iu.id', 'iu.number', 'iu.document_date', 'iu.department', 'iu.cost_center', 'iu.status', 'iu.sale_id', 'iu.source_type', 'iu.source_id', 'iu.source_number', 'w.name')
                 ->orderByDesc('iu.id')
                 ->get([
                     'iu.id',
@@ -182,6 +189,8 @@ class CustomerController extends Controller
                     'iu.source_id',
                     'iu.source_number',
                     DB::raw('COALESCE(w.name, "-") as warehouse_label'),
+                    DB::raw(Schema::hasTable('customer_invoice_dispatches') ? 'MAX(ci.id) as invoice_id' : 'NULL as invoice_id'),
+                    DB::raw(Schema::hasTable('customer_invoice_dispatches') ? 'MAX(ci.number) as invoice_number' : 'NULL as invoice_number'),
                 ])
             : collect();
 

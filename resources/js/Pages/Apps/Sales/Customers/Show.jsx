@@ -4,7 +4,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import Button from '@/Components/Button';
 import Input from '@/Components/Input';
 
-const tabs = ['Overview', 'Profile', 'Documents', 'Sales Orders', 'Dispatch', 'Shipments', 'Invoices', 'Payments', 'Ledger Placeholder'];
+const tabs = ['Overview', 'Profile', 'Documents', 'Sales Orders', 'Fulfillment', 'Invoices', 'Payments', 'Ledger Placeholder'];
 
 export default function Page({ customer, summary, salesOrders = [], dispatches = [], documentTypes = [] }) {
   const [activeTab, setActiveTab] = useState('Overview');
@@ -24,6 +24,7 @@ export default function Page({ customer, summary, salesOrders = [], dispatches =
 
   const docs = customer?.documents ?? [];
   const [selectedSalesOrderIds, setSelectedSalesOrderIds] = useState([]);
+  const [selectedDispatchIds, setSelectedDispatchIds] = useState([]);
   const [notice, setNotice] = useState(null);
   const [completion, setCompletion] = useState(null);
   const [customForm, setCustomForm] = useState({ document_type_id: '', document_number: '', issue_date: '', expiry_date: '' });
@@ -178,6 +179,34 @@ export default function Page({ customer, summary, salesOrders = [], dispatches =
     router.reload({ only: ['salesOrders', 'customer'], preserveScroll: true });
   };
 
+
+  const invoiceableDispatchIds = useMemo(
+    () => dispatches
+      .filter((entry) => String(entry.status || '').toUpperCase() === 'POSTED' && !entry.invoice_id)
+      .map((entry) => entry.id),
+    [dispatches],
+  );
+  const allInvoiceableDispatchesChecked = invoiceableDispatchIds.length > 0 && invoiceableDispatchIds.every((id) => selectedDispatchIds.includes(id));
+  const selectedDispatches = dispatches.filter((entry) => selectedDispatchIds.includes(entry.id));
+  const createInvoiceUrl = selectedDispatchIds.length ? `/apps/customer-invoices/create?dispatch_ids=${selectedDispatchIds.join(',')}` : '#';
+
+  const toggleDispatchSelection = (id) => {
+    setSelectedDispatchIds((previous) => previous.includes(id)
+      ? previous.filter((item) => item !== id)
+      : [...previous, id]);
+  };
+
+  const toggleAllInvoiceableDispatches = () => {
+    if (!invoiceableDispatchIds.length) return;
+    setSelectedDispatchIds((previous) => {
+      if (allInvoiceableDispatchesChecked) {
+        return previous.filter((id) => !invoiceableDispatchIds.includes(id));
+      }
+
+      return Array.from(new Set([...previous, ...invoiceableDispatchIds]));
+    });
+  };
+
   const statusBadge = (status) => ({ draft: 'bg-gray-100 text-gray-700', pending_review: 'bg-yellow-100 text-yellow-800', verified: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700', expired: 'bg-orange-100 text-orange-700', archived: 'bg-gray-300 text-gray-800' }[status] || 'bg-gray-100 text-gray-600');
   const documentTypeLabel = (doc) => doc?.document_type?.name || doc?.document_type_label || (doc?.document_type_id ? `TYPE #${doc.document_type_id}` : '-');
 
@@ -330,38 +359,67 @@ export default function Page({ customer, summary, salesOrders = [], dispatches =
             </div>
           )}
 
-          {activeTab === 'Sales Orders' && (<div className='space-y-3'><div className='grid grid-cols-2 md:grid-cols-4 gap-2 text-sm'><div className='border rounded p-2'>Total SO<br/><b>{salesOrders.length}</b></div><div className='border rounded p-2'>Draft SO<br/><b>{salesOrders.filter(x=>x.status==='draft').length}</b></div><div className='border rounded p-2'>Approved SO<br/><b>{salesOrders.filter(x=>x.status==='approved').length}</b></div><div className='border rounded p-2'>Grand Total SO<br/><b>{Number(salesOrders.reduce((a,b)=>a+Number(b.grand_total||0),0)).toLocaleString('id-ID')}</b></div></div><div className='flex items-center gap-2'><Link href={route('apps.customers.sales-orders.create', customer.id)} className='inline-block rounded border px-3 py-1 text-sm'>Create Sales Order</Link><button type='button' onClick={bulkApproveSalesOrders} disabled={!selectedSalesOrderIds.length} className='inline-block rounded border border-blue-500 px-3 py-1 text-sm text-blue-600 disabled:cursor-not-allowed disabled:opacity-50'>Approve Selected ({selectedSalesOrderIds.length})</button></div><table className='w-full text-sm border'><thead><tr><th className='w-10 text-center'><input type='checkbox' checked={allApprovableChecked} onChange={toggleAllApprovableSalesOrders} disabled={!approvableSalesOrderIds.length} /></th><th>SO Number</th><th>Document Date</th><th>Expected Delivery</th><th>Price List</th><th>Status</th><th>Subtotal</th><th>Discount</th><th>Tax</th><th>Grand Total</th><th>Actions</th></tr></thead><tbody>{salesOrders.map((so)=><tr key={so.id}><td className='text-center'>{(String(so.status || '').toLowerCase()==='submitted' || (String(so.status || '').toLowerCase()==='draft' && Number(so.lines_count || 0) > 0)) ? <input type='checkbox' checked={selectedSalesOrderIds.includes(so.id)} onChange={() => toggleSalesOrderSelection(so.id)} /> : '-'}</td><td>{so.number}</td><td>{so.document_date}</td><td>{so.expected_delivery_date||'-'}</td><td>{so.price_list?.name||'-'}</td><td>{so.status}</td><td>{Number(so.subtotal||0).toLocaleString('id-ID')}</td><td>{Number(so.discount_total||0).toLocaleString('id-ID')}</td><td>{Number(so.tax_total||0).toLocaleString('id-ID')}</td><td>{Number(so.grand_total||0).toLocaleString('id-ID')}</td><td className='space-x-2'><Link href={route('apps.sales-orders.show', so.id)} className='text-blue-600'>View</Link>{so.status==='draft' && <><Link href={route('apps.sales-orders.edit', so.id)} className='text-amber-600'>Edit</Link><button className='text-indigo-600' onClick={()=>window.axios?.post(route('apps.sales-orders.submit',so.id)).then(()=>window.location.reload()).catch((error)=>setNotice({ type:'error', text: error?.response?.data?.message || 'Submit gagal diproses.' }))}>Submit</button></>}{['approved','partially_shipped'].includes(String(so.status||'').toLowerCase()) && <Link href={route('apps.sales-orders.dispatch.create', so.id)} className='text-emerald-600'>Create Shipment</Link>} {so.status==='submitted' && <button className='text-emerald-600' onClick={()=>window.axios?.post(route('apps.sales-orders.approve',so.id)).then(()=>window.location.reload()).catch((error)=>setNotice({ type:'error', text: error?.response?.data?.message || 'Approve gagal diproses.' }))}>Approve</button>}</td></tr>)}</tbody></table></div>)}
-          {activeTab === 'Dispatch' && (
-            <div className='overflow-x-auto rounded border border-gray-200'>
+          {activeTab === 'Sales Orders' && (<div className='space-y-3'><div className='grid grid-cols-2 md:grid-cols-4 gap-2 text-sm'><div className='border rounded p-2'>Total SO<br/><b>{salesOrders.length}</b></div><div className='border rounded p-2'>Draft SO<br/><b>{salesOrders.filter(x=>x.status==='draft').length}</b></div><div className='border rounded p-2'>Approved SO<br/><b>{salesOrders.filter(x=>x.status==='approved').length}</b></div><div className='border rounded p-2'>Grand Total SO<br/><b>{Number(salesOrders.reduce((a,b)=>a+Number(b.grand_total||0),0)).toLocaleString('id-ID')}</b></div></div><div className='flex items-center gap-2'><Link href={route('apps.customers.sales-orders.create', customer.id)} className='inline-block rounded border px-3 py-1 text-sm'>Create Sales Order</Link><button type='button' onClick={bulkApproveSalesOrders} disabled={!selectedSalesOrderIds.length} className='inline-block rounded border border-blue-500 px-3 py-1 text-sm text-blue-600 disabled:cursor-not-allowed disabled:opacity-50'>Approve Selected ({selectedSalesOrderIds.length})</button></div><table className='w-full text-sm border'><thead><tr><th className='w-10 text-center'><input type='checkbox' checked={allApprovableChecked} onChange={toggleAllApprovableSalesOrders} disabled={!approvableSalesOrderIds.length} /></th><th>SO Number</th><th>Document Date</th><th>Expected Delivery</th><th>Price List</th><th>Status</th><th>Subtotal</th><th>Discount</th><th>Tax</th><th>Grand Total</th><th>Actions</th></tr></thead><tbody>{salesOrders.map((so)=><tr key={so.id}><td className='text-center'>{(String(so.status || '').toLowerCase()==='submitted' || (String(so.status || '').toLowerCase()==='draft' && Number(so.lines_count || 0) > 0)) ? <input type='checkbox' checked={selectedSalesOrderIds.includes(so.id)} onChange={() => toggleSalesOrderSelection(so.id)} /> : '-'}</td><td>{so.number}</td><td>{so.document_date}</td><td>{so.expected_delivery_date||'-'}</td><td>{so.price_list?.name||'-'}</td><td>{so.status}</td><td>{Number(so.subtotal||0).toLocaleString('id-ID')}</td><td>{Number(so.discount_total||0).toLocaleString('id-ID')}</td><td>{Number(so.tax_total||0).toLocaleString('id-ID')}</td><td>{Number(so.grand_total||0).toLocaleString('id-ID')}</td><td className='space-x-2'><Link href={route('apps.sales-orders.show', so.id)} className='text-blue-600'>View</Link>{so.status==='draft' && <><Link href={route('apps.sales-orders.edit', so.id)} className='text-amber-600'>Edit</Link><button className='text-indigo-600' onClick={()=>window.axios?.post(route('apps.sales-orders.submit',so.id)).then(()=>window.location.reload()).catch((error)=>setNotice({ type:'error', text: error?.response?.data?.message || 'Submit gagal diproses.' }))}>Submit</button></>}{['approved','partially_shipped'].includes(String(so.status||'').toLowerCase()) && <Link href={route('apps.sales-orders.dispatch.create', so.id)} className='text-emerald-600'>Create Dispatch</Link>} {so.status==='submitted' && <button className='text-emerald-600' onClick={()=>window.axios?.post(route('apps.sales-orders.approve',so.id)).then(()=>window.location.reload()).catch((error)=>setNotice({ type:'error', text: error?.response?.data?.message || 'Approve gagal diproses.' }))}>Approve</button>}</td></tr>)}</tbody></table></div>)}
+          {activeTab === 'Fulfillment' && (
+            <div className='space-y-3'>
+              <div className='rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800'>
+                <div className='font-semibold'>Rekomendasi flow invoice setelah dispatch POSTED</div>
+                <ol className='mt-2 list-decimal space-y-1 pl-5'>
+                  <li>Pilih satu atau beberapa dispatch yang statusnya POSTED dan belum masuk invoice.</li>
+                  <li>Klik <b>Create Invoice</b> untuk membuat draft tagihan dari dispatch terpilih.</li>
+                  <li>Di draft invoice, finance dapat mengatur diskon header, PPN, dan biaya kirim sebelum invoice diposting.</li>
+                  <li>Setelah invoice diposting, dispatch terkunci sebagai sudah ditagihkan agar tidak double invoice.</li>
+                </ol>
+              </div>
+
+              <div className='flex flex-wrap items-center justify-between gap-2 rounded border border-gray-200 bg-gray-50 p-3 text-sm'>
+                <div>
+                  <div className='font-semibold text-gray-800'>Dispatch siap ditagihkan: {invoiceableDispatchIds.length}</div>
+                  <div className='text-gray-600'>Terpilih: {selectedDispatchIds.length}{selectedDispatches.length ? ` (${selectedDispatches.map((entry) => entry.number).join(', ')})` : ''}</div>
+                </div>
+                <Link
+                  href={createInvoiceUrl}
+                  className={`rounded px-3 py-2 text-sm font-medium ${selectedDispatchIds.length ? 'bg-indigo-600 text-white' : 'pointer-events-none bg-gray-200 text-gray-500'}`}
+                >
+                  Create Invoice
+                </Link>
+              </div>
+
+              <div className='overflow-x-auto rounded border border-gray-200'>
               <table className='min-w-full divide-y divide-gray-200 text-sm'>
                 <thead className='bg-gray-50'>
                   <tr>
+                    <th className='px-3 py-2 text-center font-semibold text-gray-700'>
+                      <input type='checkbox' checked={allInvoiceableDispatchesChecked} onChange={toggleAllInvoiceableDispatches} disabled={!invoiceableDispatchIds.length} />
+                    </th>
                     <th className='px-3 py-2 text-left font-semibold text-gray-700'>No</th>
                     <th className='px-3 py-2 text-left font-semibold text-gray-700'>Number</th>
                     <th className='px-3 py-2 text-left font-semibold text-gray-700'>Tanggal</th>
                     <th className='px-3 py-2 text-left font-semibold text-gray-700'>Warehouse</th>
                     <th className='px-3 py-2 text-left font-semibold text-gray-700'>Department</th>
-                    <th className='px-3 py-2 text-left font-semibold text-gray-700'>Cost Center</th>
                     <th className='px-3 py-2 text-left font-semibold text-gray-700'>Referensi</th>
+                    <th className='px-3 py-2 text-left font-semibold text-gray-700'>Invoice</th>
                     <th className='px-3 py-2 text-left font-semibold text-gray-700'>Status</th>
                     <th className='px-3 py-2 text-center font-semibold text-gray-700'>Aksi</th>
                   </tr>
                 </thead>
                 <tbody className='divide-y divide-gray-100'>
-                  {dispatches.length === 0 && <tr><td colSpan={9} className='px-3 py-4 text-center text-gray-500'>Belum ada data dispatch.</td></tr>}
+                  {dispatches.length === 0 && <tr><td colSpan={10} className='px-3 py-4 text-center text-gray-500'>Belum ada data dispatch.</td></tr>}
                   {dispatches.map((entry, idx) => {
                     const posted = String(entry.status || '').toUpperCase() === 'POSTED';
+                    const invoiceable = posted && !entry.invoice_id;
                     const salesOrderId = entry.sale_id ?? (String(entry.source_type || '').toLowerCase() === 'sales_order' ? entry.source_id : null);
                     const salesOrderNumber = entry.source_number || '-';
                     return (
                       <tr key={entry.id} className='text-gray-800'>
+                        <td className='px-3 py-2 text-center'>{invoiceable ? <input type='checkbox' checked={selectedDispatchIds.includes(entry.id)} onChange={() => toggleDispatchSelection(entry.id)} /> : '-'}</td>
                         <td className='px-3 py-2'>{idx + 1}</td>
                         <td className='px-3 py-2'>{entry.number}</td>
                         <td className='px-3 py-2'>{entry.document_date}</td>
                         <td className='px-3 py-2'>{entry.warehouse_label}</td>
                         <td className='px-3 py-2'>{entry.department || '-'}</td>
-                        <td className='px-3 py-2'>{entry.cost_center || '-'}</td>
                         <td className='px-3 py-2'>{salesOrderId ? <Link href={route('apps.sales-orders.show', salesOrderId)} className='text-blue-600 hover:underline'>{salesOrderNumber}</Link> : '-'}</td>
+                        <td className='px-3 py-2'>{entry.invoice_id ? <Link href={route('apps.customer-invoices.show', entry.invoice_id)} className='text-blue-600 hover:underline'>{entry.invoice_number}</Link> : <span className='text-gray-500'>Belum ditagihkan</span>}</td>
                         <td className='px-3 py-2'><span className='rounded border border-gray-300 px-2 py-1 text-xs'>{entry.status}</span></td>
                         <td className='px-3 py-2 text-center'>
                           <Link href={route('apps.outbound.internal-usage.edit', posted ? { internalUsage: entry.id, view: 1 } : entry.id)} className='rounded border border-gray-300 px-2 py-1 text-xs'>{posted ? 'View' : 'Edit'}</Link>
@@ -371,10 +429,11 @@ export default function Page({ customer, summary, salesOrders = [], dispatches =
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
-          {activeTab !== 'Overview' && activeTab !== 'Profile' && activeTab !== 'Documents' && activeTab !== 'Sales Orders' && activeTab !== 'Dispatch' && (
+          {activeTab !== 'Overview' && activeTab !== 'Profile' && activeTab !== 'Documents' && activeTab !== 'Sales Orders' && activeTab !== 'Fulfillment' && (
             <p className='text-gray-600 text-sm'>No data available yet.</p>
           )}
         </div>
