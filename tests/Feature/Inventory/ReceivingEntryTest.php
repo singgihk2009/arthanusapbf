@@ -275,3 +275,68 @@ it('normalizes receiving unit cost to base uom when posting with converted uom',
         ->and((float) $ledger->qty_input)->toBe(5.0)
         ->and((float) $ledger->unit_cost)->toBe(1000.0);
 });
+
+it('sends posted receiving entry payload to finance hub and records integration history', function () {
+    config()->set('services.finance_hub.events_url', 'https://finance-hub.test/api/integrations/inventory/events');
+    config()->set('services.finance_hub.client_key', 'INVENTORY-WSPRYNF677FY');
+    config()->set('services.finance_hub.client_secret', 'secret-test');
+
+    \Illuminate\Support\Facades\Http::fake([
+        'finance-hub.test/*' => \Illuminate\Support\Facades\Http::response(['message' => 'ok'], 200),
+    ]);
+
+    post(route('apps.inbound.receiving.store'), [
+        'warehouse_id' => $this->warehouseId,
+        'transaction_date' => '2026-03-28',
+        'transaction_code' => 'PEMBELIAN',
+        'reference' => 'GRN-TEST-0011',
+        'vendor_name' => 'Vendor Finance Hub',
+        'notes' => 'Test Inventory Receipt',
+        'lines' => [[
+            'item_id' => $this->itemId,
+            'qty' => 20,
+            'uom_id' => $this->uomId,
+            'price' => 25000,
+        ]],
+    ])->assertRedirect();
+
+    $entryId = DB::table('receiving_entries')->value('id');
+
+    postJson(route('apps.inventory.posting.receiving', $entryId))
+        ->assertOk()
+        ->assertJsonPath('message', 'Receiving entry posted');
+
+    \Illuminate\Support\Facades\Http::assertSent(function (\Illuminate\Http\Client\Request $request): bool {
+        $payload = $request->data();
+
+        return $request->url() === 'https://finance-hub.test/api/integrations/inventory/events'
+            && $payload['client_key'] === 'INVENTORY-WSPRYNF677FY'
+            && $payload['client_secret'] === 'secret-test'
+            && $payload['event_name'] === 'inventory.receipt.posted'
+            && $payload['source_document_type'] === 'goods_receipt'
+            && $payload['payload']['transaction_type'] === 'inventory.receipt.posted'
+            && $payload['payload']['posting_date'] === '2026-03-28'
+            && $payload['payload']['currency_code'] === 'IDR'
+            && $payload['payload']['warehouse_code'] === 'WH-RCV'
+            && $payload['payload']['total_amount'] === 500000.0
+            && $payload['payload']['lines'][0]['item_code'] === 'ITEM-RCV-01'
+            && $payload['payload']['lines'][0]['qty'] === 20.0
+            && $payload['payload']['lines'][0]['unit_cost'] === 25000.0;
+    });
+
+    $transaction = DB::table('inv_transactions')
+        ->where('source_table', 'receiving_entries')
+        ->where('source_id', $entryId)
+        ->first();
+
+    expect($transaction)->not->toBeNull()
+        ->and($transaction->trx_type)->toBe('RECEIPT')
+        ->and($transaction->gl_status)->toBe('sent');
+
+    $outbox = DB::table('integration_outbox')->where('aggregate_id', $transaction->id)->first();
+
+    expect($outbox)->not->toBeNull()
+        ->and($outbox->event_type)->toBe('inventory.receipt.posted')
+        ->and($outbox->status)->toBe('sent')
+        ->and((int) $outbox->attempts)->toBe(1);
+});

@@ -17,6 +17,7 @@ use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Response;
 use ZipArchive;
@@ -204,6 +205,11 @@ class InventoryPostingController extends Controller implements HasMiddleware
             'updated_at' => now(),
         ]);
 
+        $integrationTransactionId = $this->createIntegrationSnapshotForGoodsReceipt($goodsReceipt, $request->user()?->id);
+        if ($integrationTransactionId) {
+            $this->sendFinanceHubEvent($integrationTransactionId);
+        }
+
         return response()->json(['message' => 'Goods receipt posted', 'id' => $goodsReceipt]);
     }
 
@@ -212,7 +218,9 @@ class InventoryPostingController extends Controller implements HasMiddleware
     {
         $lineForeignKey = $this->resolveColumn('receiving_entry_lines', ['receiving_entry_id', 'receiving_id', 'entry_id', 'header_id']) ?? 'receiving_entry_id';
         $batchColumn = $this->resolveColumn('receiving_entry_lines', ['batch_number', 'batch_no', 'no_batch']) ?? 'batch_number';
-        DB::transaction(function () use ($receivingEntry, $lineForeignKey, $batchColumn, $request): void {
+        $integrationTransactionId = null;
+
+        DB::transaction(function () use ($receivingEntry, $lineForeignKey, $batchColumn, $request, &$integrationTransactionId): void {
             $header = DB::table('receiving_entries')->where('id', $receivingEntry)->lockForUpdate()->first();
             abort_unless($header, 404, 'Receiving entry not found');
             abort_if(strtolower((string) ($header->status ?? '')) === 'posted', 422, 'Receiving sudah posted dan tidak bisa diposting ulang.');
@@ -298,7 +306,13 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'posted_by' => $request->user()?->id,
                 'updated_at' => now(),
             ]));
+
+            $integrationTransactionId = $this->createIntegrationSnapshotForReceivingEntry($receivingEntry, $request->user()?->id);
         });
+
+        if ($integrationTransactionId) {
+            $this->sendFinanceHubEvent($integrationTransactionId);
+        }
 
         return response()->json(['message' => 'Receiving entry posted', 'id' => $receivingEntry]);
     }
@@ -608,11 +622,116 @@ class InventoryPostingController extends Controller implements HasMiddleware
         ]);
     }
 
-    private function createIntegrationSnapshotForInternalUsage(int $usageId, ?int $userId): void
+
+    private function createIntegrationSnapshotForReceivingEntry(int $receivingEntryId, ?int $userId): ?int
+    {
+        $header = DB::table('receiving_entries')->where('id', $receivingEntryId)->first();
+        if (! $header) {
+            return null;
+        }
+
+        $lineForeignKey = $this->resolveColumn('receiving_entry_lines', ['receiving_entry_id', 'receiving_id', 'entry_id', 'header_id']) ?? 'receiving_entry_id';
+        $batchColumn = $this->resolveColumn('receiving_entry_lines', ['batch_number', 'batch_no', 'no_batch']) ?? 'batch_number';
+        $notesColumn = $this->resolveColumn('receiving_entry_lines', ['notes', 'note', 'description']);
+
+        $select = [
+            'l.id',
+            'l.item_id',
+            'l.uom_id',
+            'l.qty as qty_used',
+            'l.price as unit_cost',
+            'l.value as line_amount',
+            'i.track_expired',
+        ];
+
+        if (Schema::hasColumn('receiving_entry_lines', 'qty_base')) {
+            $select[] = 'l.qty_base';
+        }
+        if (Schema::hasColumn('receiving_entry_lines', 'batch_id')) {
+            $select[] = 'l.batch_id';
+        }
+        if ($batchColumn && Schema::hasColumn('receiving_entry_lines', $batchColumn)) {
+            $select[] = "l.{$batchColumn} as batch_no";
+        }
+        if (Schema::hasColumn('receiving_entry_lines', 'expired_date')) {
+            $select[] = 'l.expired_date';
+        }
+        if ($notesColumn && Schema::hasColumn('receiving_entry_lines', $notesColumn)) {
+            $select[] = "l.{$notesColumn} as notes";
+        }
+
+        $lines = DB::table('receiving_entry_lines as l')
+            ->join('items as i', 'i.id', '=', 'l.item_id')
+            ->where("l.{$lineForeignKey}", $receivingEntryId)
+            ->select($select)
+            ->get();
+
+        return $this->persistIntegrationTransaction(
+            'receiving_entries',
+            $receivingEntryId,
+            (string) $header->number,
+            'RECEIPT',
+            (string) $header->transaction_date,
+            (int) $this->resolveWarehouseId($header),
+            $lines,
+            $userId,
+            'inventory.receipt.posted',
+            'goods_receipt',
+            (string) $header->number,
+            (string) ($header->reference ?? $header->number),
+            (string) ($header->notes ?? 'Inventory receipt posted')
+        );
+    }
+
+    private function createIntegrationSnapshotForGoodsReceipt(int $goodsReceiptId, ?int $userId): ?int
+    {
+        $header = DB::table('goods_receipts')->where('id', $goodsReceiptId)->first();
+        if (! $header) {
+            return null;
+        }
+
+        $lines = DB::table('goods_receipt_lines as l')
+            ->join('items as i', 'i.id', '=', 'l.item_id')
+            ->where('l.goods_receipt_id', $goodsReceiptId)
+            ->select(
+                'l.id',
+                'l.item_id',
+                'l.batch_id',
+                'l.qty_received as qty_used',
+                'l.qty_base',
+                'l.uom_id',
+                'l.unit_price as unit_cost',
+                'l.line_total as line_amount',
+                'l.expired_date',
+                'i.track_expired'
+            )
+            ->get();
+
+        $trxNo = (string) ($header->receipt_no ?? $header->number);
+        $trxDate = (string) ($header->receipt_date ?? $header->document_date);
+
+        return $this->persistIntegrationTransaction(
+            'goods_receipts',
+            $goodsReceiptId,
+            $trxNo,
+            'RECEIPT',
+            $trxDate,
+            (int) $header->warehouse_id,
+            $lines,
+            $userId,
+            'inventory.receipt.posted',
+            'goods_receipt',
+            $trxNo,
+            $trxNo,
+            (string) ($header->notes ?? 'Goods receipt posted')
+        );
+    }
+
+    private function createIntegrationSnapshotForInternalUsage(int $usageId, ?int $userId): ?int
     {
         $header = DB::table('internal_usages')->where('id', $usageId)->first();
         if (! $header) {
-            return;
+            return null;
         }
 
         $lines = DB::table('internal_usage_lines as l')
@@ -621,7 +740,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
             ->select('l.id', 'l.item_id', 'l.batch_id', 'l.qty_used', 'l.uom_id', 'l.qty_base', 'l.notes', 'i.track_expired')
             ->get();
 
-        $this->persistIntegrationTransaction('internal_usages', $usageId, (string) $header->number, 'USAGE', (string) $header->document_date, (int) $header->warehouse_id, $lines, $userId);
+        return $this->persistIntegrationTransaction('internal_usages', $usageId, (string) $header->number, 'USAGE', (string) $header->document_date, (int) $header->warehouse_id, $lines, $userId);
     }
 
 
@@ -636,11 +755,11 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
         return $transactionCode === 'PENJUALAN' && $hasSalesReference;
     }
-    private function createIntegrationSnapshotForStockAdjustment(int $adjustmentId, ?int $userId): void
+    private function createIntegrationSnapshotForStockAdjustment(int $adjustmentId, ?int $userId): ?int
     {
         $header = DB::table('stock_adjustments')->where('id', $adjustmentId)->first();
         if (! $header) {
-            return;
+            return null;
         }
 
         $lines = DB::table('stock_adjustment_lines as l')
@@ -650,10 +769,10 @@ class InventoryPostingController extends Controller implements HasMiddleware
             ->select('l.id', 'l.item_id', 'l.batch_id', 'l.qty_adjusted as qty_used', 'l.uom_id', 'l.qty_base', 'l.notes', 'i.track_expired', 'b.batch_no', 'b.expired_date')
             ->get();
 
-        $this->persistIntegrationTransaction('stock_adjustments', $adjustmentId, (string) $header->number, 'ADJUSTMENT', (string) $header->document_date, (int) $header->warehouse_id, $lines, $userId);
+        return $this->persistIntegrationTransaction('stock_adjustments', $adjustmentId, (string) $header->number, 'ADJUSTMENT', (string) $header->document_date, (int) $header->warehouse_id, $lines, $userId);
     }
 
-    private function persistIntegrationTransaction(string $sourceTable, int $sourceId, string $trxNo, string $trxType, string $trxDate, int $warehouseId, Collection $lines, ?int $userId): void
+    private function persistIntegrationTransaction(string $sourceTable, int $sourceId, string $trxNo, string $trxType, string $trxDate, int $warehouseId, Collection $lines, ?int $userId, string $eventName = 'inventory.transaction.finalized', ?string $sourceDocumentType = null, ?string $sourceDocumentId = null, ?string $sourceDocumentNo = null, ?string $description = null): ?int
     {
         $lockDate = DB::table('inventory_period_locks')->where('company_id', 1)->value('lock_date');
         if ($lockDate && $trxDate <= $lockDate) {
@@ -666,18 +785,26 @@ class InventoryPostingController extends Controller implements HasMiddleware
         $itemsPayload = [];
 
         foreach ($lines as $line) {
-            $qty = abs((float) $line->qty_base);
+            $inputQty = (float) ($line->qty_used ?? $line->qty_base ?? 0);
+            $qtyBase = isset($line->qty_base) && (float) $line->qty_base !== 0.0
+                ? (float) $line->qty_base
+                : $this->resolveQtyBase((int) $line->item_id, (int) $line->uom_id, $inputQty, 0);
+            $qty = abs($qtyBase);
             if ($qty <= 0) {
                 continue;
             }
 
-            $batchId = $line->batch_id ? (int) $line->batch_id : null;
+            $batchId = isset($line->batch_id) && $line->batch_id ? (int) $line->batch_id : null;
             $valuation = $batchId ? 'BATCH' : 'AVG';
-            $unitCost = $batchId
-                ? $this->resolveBatchCost($warehouseId, (int) $line->item_id, $batchId)
-                : $this->resolveAverageCost($warehouseId, (int) $line->item_id);
+            $unitCost = isset($line->unit_cost) && (float) $line->unit_cost > 0
+                ? (float) $line->unit_cost
+                : ($batchId
+                    ? $this->resolveBatchCost($warehouseId, (int) $line->item_id, $batchId)
+                    : $this->resolveAverageCost($warehouseId, (int) $line->item_id));
 
-            $amount = round($qty * $unitCost, 6);
+            $amount = isset($line->line_amount) && (float) $line->line_amount > 0
+                ? (float) $line->line_amount
+                : round($qty * $unitCost, 6);
             $totalQty += $qty;
             $totalAmount += $amount;
             $methods[$valuation] = true;
@@ -693,13 +820,13 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'uom_id' => (int) $line->uom_id,
                 'qty' => $qty,
                 'batch_id' => $line->batch_id ?? null,
-                'batch_no' => $batch?->batch_no,
-                'expired_date' => $batch?->expired_date,
+                'batch_no' => $batch?->batch_no ?? ($line->batch_no ?? null),
+                'expired_date' => $batch?->expired_date ?? ($line->expired_date ?? null),
                 'valuation_method' => $valuation,
                 'unit_cost_snapshot' => $unitCost,
                 'amount_snapshot' => $amount,
                 'cost_source' => $valuation === 'BATCH' ? 'BATCH_LAYER' : 'AVG_RATE',
-                'note' => $line->notes,
+                'note' => $line->notes ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
@@ -707,7 +834,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
         $valuationMethod = count($methods) > 1 ? 'MIXED' : (array_key_first($methods) ?? 'AVG');
 
-        DB::transaction(function () use ($sourceTable, $sourceId, $trxNo, $trxType, $trxDate, $totalQty, $totalAmount, $valuationMethod, $itemsPayload, $userId, $warehouseId): void {
+        return DB::transaction(function () use ($sourceTable, $sourceId, $trxNo, $trxType, $trxDate, $totalQty, $totalAmount, $valuationMethod, $itemsPayload, $userId, $warehouseId, $eventName, $sourceDocumentType, $sourceDocumentId, $sourceDocumentNo, $description): ?int {
             DB::table('inv_transactions')->updateOrInsert(
                 ['source_table' => $sourceTable, 'source_id' => $sourceId],
                 [
@@ -728,7 +855,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
             $transaction = DB::table('inv_transactions')->where('source_table', $sourceTable)->where('source_id', $sourceId)->first();
             if (! $transaction) {
-                return;
+                return null;
             }
 
             DB::table('inv_transaction_items')->where('inv_transaction_id', $transaction->id)->delete();
@@ -737,8 +864,30 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 DB::table('inv_transaction_items')->insert($row);
             }
 
+            $items = DB::table('inv_transaction_items')
+                ->join('items', 'items.id', '=', 'inv_transaction_items.product_id')
+                ->where('inv_transaction_id', $transaction->id)
+                ->get([
+                    'items.sku as item_code',
+                    'inv_transaction_items.product_id',
+                    'inv_transaction_items.qty',
+                    'inv_transaction_items.uom_id',
+                    'inv_transaction_items.valuation_method',
+                    'inv_transaction_items.unit_cost_snapshot as unit_cost',
+                    'inv_transaction_items.amount_snapshot as amount',
+                    'inv_transaction_items.batch_id',
+                    'inv_transaction_items.batch_no',
+                    'inv_transaction_items.expired_date',
+                ]);
+
             $payload = [
+                'event_name' => $eventName,
+                'event_datetime' => now()->toIso8601String(),
                 'idempotency_key' => "INV:TX:{$transaction->id}:v{$transaction->version}",
+                'source_document_type' => $sourceDocumentType ?? $sourceTable,
+                'source_document_id' => $sourceDocumentId ?? (string) $sourceId,
+                'source_document_no' => $sourceDocumentNo ?? $transaction->trx_no,
+                'schema_version' => 'v1',
                 'source_app' => 'inventory',
                 'source_type' => 'inv_transaction',
                 'source_id' => $transaction->id,
@@ -748,8 +897,25 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'warehouse_id' => $warehouseId,
                 'posted_at' => $transaction->posted_at,
                 'posted_by' => $transaction->posted_by,
+                'payload' => [
+                    'transaction_type' => $eventName,
+                    'posting_date' => $transaction->trx_date,
+                    'entry_date' => $transaction->trx_date,
+                    'currency_code' => 'IDR',
+                    'exchange_rate' => 1,
+                    'reference_no' => $sourceDocumentNo ?? $transaction->trx_no,
+                    'description' => $description ?? $transaction->trx_no,
+                    'total_amount' => (float) $transaction->total_amount,
+                    'branch_code' => 'MAIN',
+                    'warehouse_code' => (string) (DB::table('warehouses')->where('id', $warehouseId)->value('code') ?? $warehouseId),
+                    'lines' => $items->map(fn (object $item): array => [
+                        'item_code' => (string) ($item->item_code ?? $item->product_id),
+                        'qty' => (float) $item->qty,
+                        'unit_cost' => (float) $item->unit_cost,
+                    ])->values()->all(),
+                ],
                 'totals' => ['total_qty' => (float) $transaction->total_qty, 'total_amount' => (float) $transaction->total_amount],
-                'items' => DB::table('inv_transaction_items')->where('inv_transaction_id', $transaction->id)->get(['product_id', 'qty', 'uom_id', 'valuation_method', 'unit_cost_snapshot as unit_cost', 'amount_snapshot as amount', 'batch_id', 'batch_no', 'expired_date']),
+                'items' => $items,
             ];
 
             $encoded = json_encode($payload);
@@ -759,7 +925,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
             DB::table('integration_outbox')->updateOrInsert(
                 ['idempotency_key' => $payload['idempotency_key']],
                 [
-                    'event_type' => 'INV_TX_FINAL',
+                    'event_type' => $eventName,
                     'aggregate_type' => 'inv_transaction',
                     'aggregate_id' => $transaction->id,
                     'payload_json' => $encoded,
@@ -770,7 +936,72 @@ class InventoryPostingController extends Controller implements HasMiddleware
                     'created_at' => now(),
                 ]
             );
+
+            return (int) $transaction->id;
         });
+    }
+
+    private function sendFinanceHubEvent(int $transactionId): void
+    {
+        $eventsUrl = config('services.finance_hub.events_url');
+        $clientKey = config('services.finance_hub.client_key');
+        $clientSecret = config('services.finance_hub.client_secret');
+
+        if (! $eventsUrl || ! $clientKey || ! $clientSecret) {
+            return;
+        }
+
+        $outbox = DB::table('integration_outbox')
+            ->where('aggregate_type', 'inv_transaction')
+            ->where('aggregate_id', $transactionId)
+            ->first();
+
+        if (! $outbox) {
+            return;
+        }
+
+        $payload = json_decode((string) $outbox->payload_json, true) ?: [];
+        $payload['client_key'] = $clientKey;
+        $payload['client_secret'] = $clientSecret;
+
+        try {
+            $response = Http::acceptJson()
+                ->asJson()
+                ->timeout((int) config('services.finance_hub.timeout', 10))
+                ->post($eventsUrl, $payload);
+
+            if ($response->successful()) {
+                DB::table('integration_outbox')->where('id', $outbox->id)->update([
+                    'status' => 'sent',
+                    'attempts' => DB::raw('attempts + 1'),
+                    'last_error' => null,
+                    'updated_at' => now(),
+                ]);
+                DB::table('inv_transactions')->where('id', $transactionId)->update([
+                    'gl_status' => 'sent',
+                    'gl_error_message' => null,
+                    'updated_at' => now(),
+                ]);
+
+                return;
+            }
+
+            $message = sprintf('Finance Hub HTTP %s: %s', $response->status(), mb_strimwidth($response->body(), 0, 500));
+        } catch (\Throwable $exception) {
+            $message = $exception->getMessage();
+        }
+
+        DB::table('integration_outbox')->where('id', $outbox->id)->update([
+            'status' => 'failed',
+            'attempts' => DB::raw('attempts + 1'),
+            'last_error' => $message,
+            'updated_at' => now(),
+        ]);
+        DB::table('inv_transactions')->where('id', $transactionId)->update([
+            'gl_status' => 'error',
+            'gl_error_message' => $message,
+            'updated_at' => now(),
+        ]);
     }
 
     private function resolveAverageCost(int $warehouseId, int $itemId): float

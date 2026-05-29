@@ -24,6 +24,14 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+
+    'finance_hub' => [
+        'events_url' => env('FINANCE_HUB_EVENTS_URL'),
+        'client_key' => env('FINANCE_HUB_CLIENT_KEY'),
+        'client_secret' => env('FINANCE_HUB_CLIENT_SECRET'),
+        'timeout' => (int) env('FINANCE_HUB_TIMEOUT', 10),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
