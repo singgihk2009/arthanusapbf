@@ -41,6 +41,8 @@ export default function IntegrationIndex({ stats, transactions }) {
                                 <th className="px-3 py-2">Trx No</th>
                                 <th className="px-3 py-2">Type</th>
                                 <th className="px-3 py-2">Status</th>
+                                <th className="px-3 py-2">Event</th>
+                                <th className="px-3 py-2">Outbox</th>
                                 <th className="px-3 py-2">GL Ref</th>
                                 <th className="px-3 py-2">Error</th>
                                 <th className="px-3 py-2">Action</th>
@@ -52,8 +54,13 @@ export default function IntegrationIndex({ stats, transactions }) {
                                     <td className="px-3 py-2">{row.trx_no}</td>
                                     <td className="px-3 py-2">{row.trx_type}</td>
                                     <td className="px-3 py-2">{row.gl_status}</td>
+                                    <td className="px-3 py-2">{row.event_type || '-'}</td>
+                                    <td className="px-3 py-2">
+                                        <div>{row.outbox_status || '-'}</div>
+                                        <div className="text-xs text-gray-500">Attempt: {row.outbox_attempts ?? 0}</div>
+                                    </td>
                                     <td className="px-3 py-2">{row.gl_reference_no || '-'}</td>
-                                    <td className="px-3 py-2 text-red-500">{row.gl_error_message || '-'}</td>
+                                    <td className="px-3 py-2 text-red-500">{row.gl_error_message || row.outbox_last_error || '-'}</td>
                                     <td className="px-3 py-2">
                                         {row.gl_status === 'error' && <button className="text-blue-600" onClick={() => retry(row.id)}>Retry</button>}
                                     </td>
