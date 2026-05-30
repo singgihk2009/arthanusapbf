@@ -147,11 +147,27 @@ class CustomerInvoiceController extends Controller
     {
         $invoice = DB::table('customer_invoices as ci')
             ->leftJoin('customers as c', 'c.id', '=', 'ci.customer_id')
+            ->leftJoin('sales as s', 's.id', '=', 'ci.sale_id')
+            ->leftJoin('users as su', 'su.id', '=', 's.salesman_id')
+            ->leftJoin('users as cu', 'cu.id', '=', 'c.salesman_id')
+            ->leftJoin('users as pu', 'pu.id', '=', 'ci.posted_by')
             ->where('ci.id', $id)
             ->select([
                 'ci.*',
                 DB::raw('COALESCE(c.customer_name, "-") as customer_name'),
                 DB::raw('COALESCE(c.customer_code, "-") as customer_code'),
+                DB::raw('COALESCE(c.address, "-") as customer_address'),
+                DB::raw('COALESCE(c.city, "") as customer_city'),
+                DB::raw('COALESCE(c.province, "") as customer_province'),
+                DB::raw('COALESCE(c.phone, "") as customer_phone'),
+                DB::raw('COALESCE(c.npwp, "-") as customer_npwp'),
+                DB::raw('c.salesman_id as customer_salesman_id'),
+                DB::raw('COALESCE(cu.name, "") as customer_salesman_name'),
+                DB::raw('s.number as sales_order_number'),
+                DB::raw('s.document_date as sales_order_date'),
+                DB::raw('s.salesman_id as salesman_id'),
+                DB::raw('COALESCE(su.name, "") as salesman_name'),
+                DB::raw('COALESCE(pu.name, "") as posted_by_name'),
             ])
             ->first();
 
@@ -161,6 +177,8 @@ class CustomerInvoiceController extends Controller
             ->leftJoin('items as i', 'i.id', '=', 'cil.item_id')
             ->leftJoin('uoms as u', 'u.id', '=', 'cil.uom_id')
             ->leftJoin('internal_usages as iu', 'iu.id', '=', 'cil.dispatch_id')
+            ->leftJoin('internal_usage_lines as iul', 'iul.id', '=', 'cil.internal_usage_line_id')
+            ->leftJoin('item_batches as ib', 'ib.id', '=', 'iul.batch_id')
             ->where('cil.customer_invoice_id', $id)
             ->orderBy('cil.id')
             ->get([
@@ -169,6 +187,8 @@ class CustomerInvoiceController extends Controller
                 DB::raw('COALESCE(i.name, "-") as item_name'),
                 DB::raw('COALESCE(u.code, "-") as uom_code'),
                 DB::raw('COALESCE(iu.number, "-") as dispatch_number'),
+                DB::raw('COALESCE(ib.batch_no, "-") as batch_no'),
+                DB::raw('ib.expired_date as expired_date'),
             ]);
 
         $dispatches = DB::table('customer_invoice_dispatches as cid')
@@ -177,10 +197,15 @@ class CustomerInvoiceController extends Controller
             ->orderBy('iu.document_date')
             ->get(['iu.id', 'iu.number', 'iu.document_date', 'iu.source_number', 'iu.status']);
 
+        $company = Schema::hasTable('company_profiles')
+            ? DB::table('company_profiles')->orderBy('id')->first()
+            : null;
+
         return Inertia::render('Apps/Sales/CustomerInvoices/Show', [
             'invoice' => $invoice,
             'lines' => $lines,
             'dispatches' => $dispatches,
+            'company' => $company,
         ]);
     }
 
