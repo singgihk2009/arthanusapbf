@@ -107,7 +107,7 @@ class ReceivingEntryController extends Controller
             'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
-            'transactionCodes' => ['PEMBELIAN', 'RETUR', 'ADJUSTMENT'],
+            'transactionCodes' => ['PEMBELIAN', 'RETUR'],
             'documentTypes' => DocumentType::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
             'prefill' => $prefill,
         ]);
@@ -201,7 +201,7 @@ class ReceivingEntryController extends Controller
             'items' => DB::table('items')->select('id', 'sku', 'name', 'base_uom_id')->orderBy('name')->get(),
             'uoms' => DB::table('uoms')->select('id', 'code', 'name')->orderBy('name')->get(),
             'warehouses' => DB::table('warehouses')->select('id', 'code', 'name')->whereIn('id', $allowedWarehouseIds)->orderBy('name')->get(),
-            'transactionCodes' => ['PEMBELIAN', 'RETUR', 'ADJUSTMENT'],
+            'transactionCodes' => ['PEMBELIAN', 'RETUR'],
             'documentTypes' => DocumentType::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
             'documents' => Document::query()->with('documentType:id,name,code')->where('owner_type', 'receiving_entry')->where('owner_id', $receivingEntry)->latest('id')->get(),
         ]);
