@@ -148,6 +148,23 @@ it('generates next receiving number from max sequence even when there are gaps',
     expect($latestNumber)->toBe("RCV-PBL-$today-0003");
 });
 
+
+it('rejects adjustment transaction code for receiving entry', function () {
+    post(route('apps.inbound.receiving.store'), [
+        'warehouse_id' => $this->warehouseId,
+        'transaction_date' => now()->format('Y-m-d'),
+        'transaction_code' => 'ADJUSTMENT',
+        'reference' => 'ADJ-REJECT-001',
+        'vendor_name' => 'Vendor Adjustment',
+        'lines' => [[
+            'item_id' => $this->itemId,
+            'qty' => 1,
+            'uom_id' => $this->uomId,
+            'price' => 1000,
+        ]],
+    ])->assertSessionHasErrors('transaction_code');
+});
+
 it('posts receiving entry and increases stock balance', function () {
     post(route('apps.inbound.receiving.store'), [
         'warehouse_id' => $this->warehouseId,
@@ -314,7 +331,8 @@ it('sends posted receiving entry payload to finance hub and records integration 
             && $payload['client_secret'] === 'secret-test'
             && $payload['event_name'] === 'inventory.receipt.posted'
             && $payload['source_document_type'] === 'goods_receipt'
-            && $payload['payload']['transaction_type'] === 'inventory.receipt.posted'
+            && $payload['payload']['transaction_type'] === 'inventory.receipt.purchase'
+            && $payload['payload']['receipt_source'] === 'purchase'
             && $payload['payload']['posting_date'] === '2026-03-28'
             && $payload['payload']['currency_code'] === 'IDR'
             && $payload['payload']['warehouse_code'] === 'WH-RCV'
@@ -339,4 +357,55 @@ it('sends posted receiving entry payload to finance hub and records integration 
         ->and($outbox->event_type)->toBe('inventory.receipt.posted')
         ->and($outbox->status)->toBe('sent')
         ->and((int) $outbox->attempts)->toBe(1);
+});
+
+
+it('sends purchase return receiving entry payload to finance hub with latest format', function () {
+    config()->set('services.finance_hub.events_url', 'https://finance-hub.test/api/integrations/inventory/events');
+    config()->set('services.finance_hub.client_key', 'INVENTORY-WSPRYNF677FY');
+    config()->set('services.finance_hub.client_secret', 'secret-test');
+
+    \Illuminate\Support\Facades\Http::fake([
+        'finance-hub.test/*' => \Illuminate\Support\Facades\Http::response(['message' => 'ok'], 200),
+    ]);
+
+    post(route('apps.inbound.receiving.store'), [
+        'warehouse_id' => $this->warehouseId,
+        'transaction_date' => '2026-05-30',
+        'transaction_code' => 'RETUR',
+        'reference' => 'PRR-TEST-0001',
+        'vendor_name' => 'Vendor Return',
+        'notes' => 'Test receipt retur pembelian',
+        'lines' => [[
+            'item_id' => $this->itemId,
+            'qty' => 10,
+            'uom_id' => $this->uomId,
+            'price' => 25000,
+        ]],
+    ])->assertRedirect();
+
+    $entryId = DB::table('receiving_entries')->value('id');
+
+    postJson(route('apps.inventory.posting.receiving', $entryId))
+        ->assertOk()
+        ->assertJsonPath('message', 'Receiving entry posted');
+
+    \Illuminate\Support\Facades\Http::assertSent(function (\Illuminate\Http\Client\Request $request): bool {
+        $payload = $request->data();
+
+        return $request->url() === 'https://finance-hub.test/api/integrations/inventory/events'
+            && $payload['client_key'] === 'INVENTORY-WSPRYNF677FY'
+            && $payload['client_secret'] === 'secret-test'
+            && $payload['event_name'] === 'inventory.receipt.posted'
+            && $payload['source_document_type'] === 'purchase_return_receipt'
+            && $payload['source_document_no'] === 'PRR-TEST-0001'
+            && $payload['payload']['transaction_type'] === 'inventory.receipt.purchase_return'
+            && $payload['payload']['posting_date'] === '2026-05-30'
+            && $payload['payload']['entry_date'] === '2026-05-30'
+            && $payload['payload']['receipt_source'] === 'purchase_return'
+            && $payload['payload']['total_amount'] === 250000.0
+            && $payload['payload']['lines'][0]['item_code'] === 'ITEM-RCV-01'
+            && $payload['payload']['lines'][0]['qty'] === 10.0
+            && $payload['payload']['lines'][0]['unit_cost'] === 25000.0;
+    });
 });

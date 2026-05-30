@@ -666,6 +666,13 @@ class InventoryPostingController extends Controller implements HasMiddleware
             ->select($select)
             ->get();
 
+        $isPurchaseReturn = strtoupper((string) ($header->transaction_code ?? '')) === 'RETUR';
+        $sourceDocumentType = $isPurchaseReturn ? 'purchase_return_receipt' : 'goods_receipt';
+        $receiptSource = $isPurchaseReturn ? 'purchase_return' : 'purchase';
+        $payloadTransactionType = $isPurchaseReturn
+            ? 'inventory.receipt.purchase_return'
+            : 'inventory.receipt.purchase';
+
         return $this->persistIntegrationTransaction(
             'receiving_entries',
             $receivingEntryId,
@@ -676,10 +683,12 @@ class InventoryPostingController extends Controller implements HasMiddleware
             $lines,
             $userId,
             'inventory.receipt.posted',
-            'goods_receipt',
+            $sourceDocumentType,
             (string) $header->number,
-            (string) ($header->reference ?? $header->number),
-            (string) ($header->notes ?? 'Inventory receipt posted')
+            (string) ($header->reference ?: $header->number),
+            (string) ($header->notes ?: 'Inventory receipt posted'),
+            $payloadTransactionType,
+            $receiptSource
         );
     }
 
@@ -772,7 +781,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
         return $this->persistIntegrationTransaction('stock_adjustments', $adjustmentId, (string) $header->number, 'ADJUSTMENT', (string) $header->document_date, (int) $header->warehouse_id, $lines, $userId);
     }
 
-    private function persistIntegrationTransaction(string $sourceTable, int $sourceId, string $trxNo, string $trxType, string $trxDate, int $warehouseId, Collection $lines, ?int $userId, string $eventName = 'inventory.transaction.finalized', ?string $sourceDocumentType = null, ?string $sourceDocumentId = null, ?string $sourceDocumentNo = null, ?string $description = null): ?int
+    private function persistIntegrationTransaction(string $sourceTable, int $sourceId, string $trxNo, string $trxType, string $trxDate, int $warehouseId, Collection $lines, ?int $userId, string $eventName = 'inventory.transaction.finalized', ?string $sourceDocumentType = null, ?string $sourceDocumentId = null, ?string $sourceDocumentNo = null, ?string $description = null, ?string $payloadTransactionType = null, ?string $receiptSource = null): ?int
     {
         $lockDate = DB::table('inventory_period_locks')->where('company_id', 1)->value('lock_date');
         if ($lockDate && $trxDate <= $lockDate) {
@@ -834,7 +843,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
         $valuationMethod = count($methods) > 1 ? 'MIXED' : (array_key_first($methods) ?? 'AVG');
 
-        return DB::transaction(function () use ($sourceTable, $sourceId, $trxNo, $trxType, $trxDate, $totalQty, $totalAmount, $valuationMethod, $itemsPayload, $userId, $warehouseId, $eventName, $sourceDocumentType, $sourceDocumentId, $sourceDocumentNo, $description): ?int {
+        return DB::transaction(function () use ($sourceTable, $sourceId, $trxNo, $trxType, $trxDate, $totalQty, $totalAmount, $valuationMethod, $itemsPayload, $userId, $warehouseId, $eventName, $sourceDocumentType, $sourceDocumentId, $sourceDocumentNo, $description, $payloadTransactionType, $receiptSource): ?int {
             DB::table('inv_transactions')->updateOrInsert(
                 ['source_table' => $sourceTable, 'source_id' => $sourceId],
                 [
@@ -888,17 +897,8 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'source_document_id' => $sourceDocumentId ?? (string) $sourceId,
                 'source_document_no' => $sourceDocumentNo ?? $transaction->trx_no,
                 'schema_version' => 'v1',
-                'source_app' => 'inventory',
-                'source_type' => 'inv_transaction',
-                'source_id' => $transaction->id,
-                'trx_no' => $transaction->trx_no,
-                'trx_type' => $transaction->trx_type,
-                'trx_date' => $transaction->trx_date,
-                'warehouse_id' => $warehouseId,
-                'posted_at' => $transaction->posted_at,
-                'posted_by' => $transaction->posted_by,
                 'payload' => [
-                    'transaction_type' => $eventName,
+                    'transaction_type' => $payloadTransactionType ?? $eventName,
                     'posting_date' => $transaction->trx_date,
                     'entry_date' => $transaction->trx_date,
                     'currency_code' => 'IDR',
@@ -908,15 +908,30 @@ class InventoryPostingController extends Controller implements HasMiddleware
                     'total_amount' => (float) $transaction->total_amount,
                     'branch_code' => 'MAIN',
                     'warehouse_code' => (string) (DB::table('warehouses')->where('id', $warehouseId)->value('code') ?? $warehouseId),
+                    ...($receiptSource ? ['receipt_source' => $receiptSource] : []),
                     'lines' => $items->map(fn (object $item): array => [
                         'item_code' => (string) ($item->item_code ?? $item->product_id),
                         'qty' => (float) $item->qty,
                         'unit_cost' => (float) $item->unit_cost,
                     ])->values()->all(),
                 ],
-                'totals' => ['total_qty' => (float) $transaction->total_qty, 'total_amount' => (float) $transaction->total_amount],
-                'items' => $items,
             ];
+
+            if ($eventName !== 'inventory.receipt.posted') {
+                $payload += [
+                    'source_app' => 'inventory',
+                    'source_type' => 'inv_transaction',
+                    'source_id' => $transaction->id,
+                    'trx_no' => $transaction->trx_no,
+                    'trx_type' => $transaction->trx_type,
+                    'trx_date' => $transaction->trx_date,
+                    'warehouse_id' => $warehouseId,
+                    'posted_at' => $transaction->posted_at,
+                    'posted_by' => $transaction->posted_by,
+                    'totals' => ['total_qty' => (float) $transaction->total_qty, 'total_amount' => (float) $transaction->total_amount],
+                    'items' => $items,
+                ];
+            }
 
             $encoded = json_encode($payload);
             $hash = hash('sha256', (string) $encoded);
