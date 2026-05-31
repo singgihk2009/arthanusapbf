@@ -6,6 +6,8 @@ $financeHubEventsUrl = env('FINANCE_HUB_EVENTS_URL');
 $financeHubEventsUrl = is_string($financeHubEventsUrl) && $financeHubEventsUrl !== '' ? $financeHubEventsUrl : null;
 $financeHubVendorInvoiceEventsUrl = env('FINANCE_HUB_VENDOR_INVOICE_EVENTS_URL');
 $financeHubVendorInvoiceEventsUrl = is_string($financeHubVendorInvoiceEventsUrl) && $financeHubVendorInvoiceEventsUrl !== '' ? $financeHubVendorInvoiceEventsUrl : null;
+$financeHubVendorPaymentEventsUrl = env('FINANCE_HUB_VENDOR_PAYMENT_EVENTS_URL');
+$financeHubVendorPaymentEventsUrl = is_string($financeHubVendorPaymentEventsUrl) && $financeHubVendorPaymentEventsUrl !== '' ? $financeHubVendorPaymentEventsUrl : null;
 
 return [
 
@@ -36,6 +38,7 @@ return [
         'base_url' => $financeHubBaseUrl,
         'events_url' => $financeHubEventsUrl ?: ($financeHubBaseUrl ? $financeHubBaseUrl.'/api/integrations/inventory/events' : null),
         'vendor_invoice_events_url' => $financeHubVendorInvoiceEventsUrl ?: ($financeHubBaseUrl ? $financeHubBaseUrl.'/api/integrations/vendor-invoices/events' : null),
+        'vendor_payment_events_url' => $financeHubVendorPaymentEventsUrl ?: ($financeHubBaseUrl ? $financeHubBaseUrl.'/api/integrations/vendor-payments/events' : null),
         'client_key' => env('FINANCE_HUB_CLIENT_KEY'),
         'client_secret' => env('FINANCE_HUB_CLIENT_SECRET'),
         'timeout' => (int) env('FINANCE_HUB_TIMEOUT', 10),

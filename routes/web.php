@@ -16,6 +16,7 @@ use App\Http\Controllers\Apps\MasterData\ItemPictureController;
 use App\Http\Controllers\Apps\MasterData\RegulatoryProductController;
 use App\Http\Controllers\Apps\MasterData\RegulatorySourceController;
 use App\Http\Controllers\Apps\MasterData\RegulatoryDocumentController;
+use App\Http\Controllers\Apps\MasterData\CashAccountController;
 use App\Http\Controllers\Apps\Reports\InventoryReportPageController;
 use App\Http\Controllers\Apps\Inbound\ReceivingEntryController;
 use App\Http\Controllers\Apps\Outbound\InternalUsageController;
@@ -100,6 +101,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::prefix('master-data')->name('master-data.')->group(function () {
         Route::resource('/warehouses', WarehouseController::class);
         Route::resource('/categories', CategoryController::class);
+        Route::resource('/cash-accounts', CashAccountController::class)->except(['create', 'edit', 'show']);
         Route::resource('/uoms', UomController::class);
         Route::get('/items/export/excel', [ItemController::class, 'exportExcel'])->name('items.export.excel');
         Route::get('/items/template/excel', [ItemController::class, 'downloadTemplateExcel'])->name('items.template.excel');
