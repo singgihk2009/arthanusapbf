@@ -3,16 +3,32 @@
 namespace App\Http\Requests\Procurement;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class StoreVendorPaymentRequest extends FormRequest
 {
     public function authorize(): bool { return true; }
     public function rules(): array
     {
+        $companyId = (int) ($this->user()?->company_id ?? 1);
+
         return [
             'payment_date' => ['required','date'],
             'payment_method' => ['nullable','string','max:50'],
-            'cash_account_id' => ['required','integer','exists:cash_accounts,id'],
+            'cash_account_id' => [
+                'required',
+                'integer',
+                Rule::exists('cash_accounts', 'id')->where(function ($query) use ($companyId): void {
+                    $query->where('company_id', $companyId)
+                        ->where('is_active', true)
+                        ->whereNull('deleted_at')
+                        ->whereIn('chart_of_account_id', DB::table('chart_of_accounts')
+                            ->select('id')
+                            ->where('company_id', $companyId)
+                            ->where('is_active', true));
+                }),
+            ],
             'bank_account_id' => ['nullable','integer','exists:vendor_bank_accounts,id'],
             'stamp_duty_amount' => ['nullable','numeric','min:0'],
             'freight_amount' => ['nullable','numeric','min:0'],
@@ -40,7 +56,7 @@ class StoreVendorPaymentRequest extends FormRequest
             'payment_date.required' => 'Payment date wajib diisi.',
             'cash_account_id.required' => 'Cash account wajib dipilih.',
             'cash_account_id.integer' => 'Cash account harus dipilih dari daftar.',
-            'cash_account_id.exists' => 'Cash account tidak valid.',
+            'cash_account_id.exists' => 'Cash account tidak valid, tidak aktif, atau tidak terhubung ke Master COA company aktif.',
             'bank_account_id.integer' => 'Bank account harus dipilih dari daftar.',
             'bank_account_id.exists' => 'Bank account tidak valid.',
             'lines.required' => 'Pilih minimal 1 invoice.',

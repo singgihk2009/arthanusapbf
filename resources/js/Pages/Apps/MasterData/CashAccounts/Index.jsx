@@ -3,7 +3,7 @@ import Pagination from '@/Components/Pagination';
 import Search from '@/Components/Search';
 import Table from '@/Components/Table';
 import AppLayout from '@/Layouts/AppLayout';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { IconCirclePlus, IconDatabaseOff, IconPencilCog, IconTrash, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
 
@@ -141,7 +141,7 @@ export default function Index() {
                   {chartAccounts.map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}
                 </select>
                 {errors.chart_of_account_id && <div className='mt-1 text-xs text-red-600'>{errors.chart_of_account_id}</div>}
-                {!chartAccounts.length && <div className='mt-1 text-xs text-amber-600'>Belum ada COA active untuk company ini. Tambahkan data pada tabel chart_of_accounts terlebih dahulu.</div>}
+                {!chartAccounts.length && <div className='mt-1 text-xs text-amber-600'>Belum ada COA active untuk company ini. Import terlebih dahulu di <Link href={route('apps.master-data.chart-of-accounts.index')} className='font-medium underline'>Master COA</Link>.</div>}
               </div>
 
               <div className='grid grid-cols-2 gap-3'>

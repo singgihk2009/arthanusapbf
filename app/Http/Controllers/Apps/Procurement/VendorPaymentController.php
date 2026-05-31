@@ -141,6 +141,7 @@ class VendorPaymentController extends Controller
             ->with('chartOfAccount:id,account_code,account_name')
             ->where('company_id', $companyId)
             ->where('is_active', true)
+            ->whereHas('chartOfAccount', fn ($query) => $query->where('company_id', $companyId)->where('is_active', true))
             ->orderByDesc('is_default')
             ->orderBy('code')
             ->get()
@@ -224,6 +225,20 @@ class VendorPaymentController extends Controller
                 'reference_no' => $documentNo,
                 'description' => 'Vendor Payment '.$documentNo,
                 'cash_account_id' => $cashAccount?->id,
+                'cash_account' => $cashAccount ? [
+                    'id' => $cashAccount->id,
+                    'code' => $cashAccount->code,
+                    'name' => $cashAccount->name,
+                    'cash_type' => $cashAccount->cash_type,
+                    'currency_code' => $cashAccount->currency_code,
+                    'coa' => $cashAccount->chartOfAccount ? [
+                        'id' => $cashAccount->chartOfAccount->id,
+                        'account_code' => $cashAccount->chartOfAccount->account_code,
+                        'account_name' => $cashAccount->chartOfAccount->account_name,
+                        'account_type' => $cashAccount->chartOfAccount->account_type,
+                    ] : null,
+                ] : null,
+                'coa_account_code' => $cashAccount?->chartOfAccount?->account_code,
                 'amounts' => [
                     'invoice_payment_total' => (float) ($payment->total_invoice_amount ?? 0),
                     'withholding_tax_total' => (float) ($payment->total_wht_amount ?? 0),
