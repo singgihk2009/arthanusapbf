@@ -184,9 +184,8 @@ it('rejects vendor payment cash account outside active coa company and sends val
 
         return $request->url() === 'https://finance-hub.test/api/integrations/vendor-payments/events'
             && $payload['event_name'] === 'vendor.payment.posted'
-            && $payload['payload']['cash_account_id'] === $validCashAccountId
-            && $payload['payload']['cash_account']['code'] === 'BCA-IDR'
-            && $payload['payload']['cash_account']['coa']['account_code'] === '1120-010'
-            && $payload['payload']['coa_account_code'] === '1120-010';
+            && $payload['payload']['source_cash_account']['id'] === $validCashAccountId
+            && $payload['payload']['source_cash_account']['code'] === 'BCA-IDR'
+            && $payload['payload']['gl_account_code'] === '1120-010';
     });
 });

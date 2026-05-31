@@ -258,21 +258,14 @@ class VendorPaymentController extends Controller
                 'entry_date' => $eventAt->toDateString(),
                 'reference_no' => $documentNo,
                 'description' => 'Vendor Payment '.$documentNo,
-                'cash_account_id' => $cashAccount?->id,
-                'cash_account' => $cashAccount ? [
+                'source_cash_account' => $cashAccount ? [
                     'id' => $cashAccount->id,
                     'code' => $cashAccount->code,
                     'name' => $cashAccount->name,
                     'cash_type' => $cashAccount->cash_type,
                     'currency_code' => $cashAccount->currency_code,
-                    'coa' => $cashAccount->chartOfAccount ? [
-                        'id' => $cashAccount->chartOfAccount->id,
-                        'account_code' => $cashAccount->chartOfAccount->account_code,
-                        'account_name' => $cashAccount->chartOfAccount->account_name,
-                        'account_type' => $cashAccount->chartOfAccount->account_type,
-                    ] : null,
                 ] : null,
-                'coa_account_code' => $cashAccount?->chartOfAccount?->account_code,
+                'gl_account_code' => $cashAccount?->chartOfAccount?->account_code,
                 'amounts' => [
                     'invoice_payment_total' => (float) ($payment->total_invoice_amount ?? 0),
                     'withholding_tax_total' => (float) ($payment->total_wht_amount ?? 0),
@@ -309,9 +302,11 @@ class VendorPaymentController extends Controller
             return;
         }
 
-        $payload = json_decode((string) $outbox->payload_json, true) ?: [];
-        $payload['client_key'] = $clientKey;
-        $payload['client_secret'] = $clientSecret;
+        $eventPayload = json_decode((string) $outbox->payload_json, true) ?: [];
+        $payload = array_merge([
+            'client_key' => $clientKey,
+            'client_secret' => $clientSecret,
+        ], $eventPayload);
 
         try {
             $response = Http::acceptJson()
