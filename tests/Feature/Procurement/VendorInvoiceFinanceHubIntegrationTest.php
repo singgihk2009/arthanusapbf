@@ -154,3 +154,69 @@ it('falls back to finance hub base url when vendor invoice endpoint config is em
 
     expect(DB::table('integration_outbox')->where('aggregate_type', 'vendor_invoice')->where('aggregate_id', $invoiceId)->value('status'))->toBe('sent');
 });
+
+it('retries vendor invoice outbox using finance hub base url fallback when endpoint config is empty', function () {
+    config()->set('services.finance_hub.base_url', 'https://finance-hub.test');
+    config()->set('services.finance_hub.vendor_invoice_events_url', null);
+    config()->set('services.finance_hub.client_key', 'ALL-SRJHZSUQOHRP');
+    config()->set('services.finance_hub.client_secret', 'secret-test');
+
+    Http::fake([
+        'finance-hub.test/*' => Http::response(['message' => 'ok'], 200),
+    ]);
+
+    $payload = [
+        'event_name' => 'vendor.invoice.posted',
+        'event_datetime' => now()->utc()->toJSON(),
+        'idempotency_key' => 'VI-POSTED-RETRY-FALLBACK-0001',
+        'source_document_type' => 'vendor_invoice',
+        'source_document_id' => '9999',
+        'source_document_no' => 'RETRY-FALLBACK-0001',
+        'schema_version' => 'v1',
+        'payload' => [
+            'transaction_type' => 'vendor.invoice.standard',
+            'currency_code' => 'IDR',
+            'posting_date' => '2026-05-31',
+            'entry_date' => '2026-05-31',
+            'reference_no' => 'RETRY-FALLBACK-0001',
+            'description' => 'Vendor Invoice RETRY-FALLBACK-0001',
+            'amounts' => [
+                'invoice' => 1000000.0,
+                'tax' => 110000.0,
+                'freight' => 0.0,
+                'withholding_tax' => 0.0,
+                'purchase_discount' => 0.0,
+                'payable_total' => 1110000.0,
+            ],
+        ],
+    ];
+
+    $outboxId = DB::table('integration_outbox')->insertGetId([
+        'event_type' => 'vendor.invoice.posted',
+        'aggregate_type' => 'vendor_invoice',
+        'aggregate_id' => 9999,
+        'idempotency_key' => $payload['idempotency_key'],
+        'payload_json' => json_encode($payload),
+        'payload_hash' => hash('sha256', json_encode($payload)),
+        'status' => 'failed',
+        'attempts' => 1,
+        'last_error' => 'Konfigurasi Finance Hub belum lengkap untuk source vendor_invoice.',
+        'available_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    post(route('apps.integration.retry', $outboxId))->assertRedirect();
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://finance-hub.test/api/integrations/vendor-invoices/events'
+        && $request->data()['client_key'] === 'ALL-SRJHZSUQOHRP'
+        && $request->data()['client_secret'] === 'secret-test'
+        && $request->data()['event_name'] === 'vendor.invoice.posted'
+        && $request->data()['idempotency_key'] === 'VI-POSTED-RETRY-FALLBACK-0001');
+
+    $outbox = DB::table('integration_outbox')->where('id', $outboxId)->first();
+
+    expect($outbox->status)->toBe('sent')
+        ->and((int) $outbox->attempts)->toBe(2)
+        ->and($outbox->last_error)->toBeNull();
+});
