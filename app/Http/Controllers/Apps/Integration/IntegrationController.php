@@ -225,6 +225,16 @@ class IntegrationController extends Controller
             return;
         }
 
+        $eventsUrl = $outbox->aggregate_type === 'vendor_invoice'
+            ? config('services.finance_hub.vendor_invoice_events_url')
+            : config('services.finance_hub.events_url');
+        $clientKey = config('services.finance_hub.client_key');
+        $clientSecret = config('services.finance_hub.client_secret');
+
+        if (! $eventsUrl || ! $clientKey || ! $clientSecret) {
+            return;
+        }
+
         $payload = json_decode((string) $outbox->payload_json, true) ?: [];
         $payload['client_key'] = $clientKey;
         $payload['client_secret'] = $clientSecret;
