@@ -62,7 +62,11 @@ export default function IntegrationIndex({ stats, transactions }) {
                                     <td className="px-3 py-2">{row.gl_reference_no || '-'}</td>
                                     <td className="px-3 py-2 text-red-500">{row.gl_error_message || row.outbox_last_error || '-'}</td>
                                     <td className="px-3 py-2">
-                                        {(row.gl_status === 'error' || row.outbox_status === 'failed') && <button className="text-blue-600" onClick={() => retry(row.id)}>Retry</button>}
+                                        {['ready', 'failed'].includes(row.outbox_status) && (
+                                            <button className="text-blue-600" onClick={() => retry(row.id)}>
+                                                {row.outbox_status === 'ready' ? 'Send' : 'Retry'}
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

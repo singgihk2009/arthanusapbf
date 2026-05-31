@@ -535,20 +535,25 @@ class VendorInvoiceController extends Controller
 
     private function sendVendorInvoiceFinanceHubEvent(int $invoiceId): void
     {
-        $eventsUrl = config('services.finance_hub.vendor_invoice_events_url');
-        $clientKey = config('services.finance_hub.client_key');
-        $clientSecret = config('services.finance_hub.client_secret');
-
-        if (! $eventsUrl || ! $clientKey || ! $clientSecret) {
-            return;
-        }
-
         $outbox = DB::table('integration_outbox')
             ->where('aggregate_type', 'vendor_invoice')
             ->where('aggregate_id', $invoiceId)
             ->first();
 
         if (! $outbox) {
+            return;
+        }
+
+        $eventsUrl = $this->vendorInvoiceFinanceHubEventsUrl();
+        $clientKey = config('services.finance_hub.client_key');
+        $clientSecret = config('services.finance_hub.client_secret');
+
+        if (! $eventsUrl || ! $clientKey || ! $clientSecret) {
+            $this->markVendorInvoiceFinanceHubOutboxFailed(
+                (int) $outbox->id,
+                'Konfigurasi Finance Hub Vendor Invoice belum lengkap. Pastikan FINANCE_HUB_BASE_URL, FINANCE_HUB_CLIENT_KEY, dan FINANCE_HUB_CLIENT_SECRET tersedia.'
+            );
+
             return;
         }
 
@@ -578,7 +583,27 @@ class VendorInvoiceController extends Controller
             $message = $exception->getMessage();
         }
 
-        DB::table('integration_outbox')->where('id', $outbox->id)->update([
+        $this->markVendorInvoiceFinanceHubOutboxFailed((int) $outbox->id, $message);
+    }
+
+    private function vendorInvoiceFinanceHubEventsUrl(): ?string
+    {
+        $configuredUrl = config('services.finance_hub.vendor_invoice_events_url');
+        if (is_string($configuredUrl) && trim($configuredUrl) !== '') {
+            return trim($configuredUrl);
+        }
+
+        $baseUrl = config('services.finance_hub.base_url');
+        if (is_string($baseUrl) && trim($baseUrl) !== '') {
+            return rtrim(trim($baseUrl), '/').'/api/integrations/vendor-invoices/events';
+        }
+
+        return null;
+    }
+
+    private function markVendorInvoiceFinanceHubOutboxFailed(int $outboxId, string $message): void
+    {
+        DB::table('integration_outbox')->where('id', $outboxId)->update([
             'status' => 'failed',
             'attempts' => DB::raw('attempts + 1'),
             'last_error' => $message,

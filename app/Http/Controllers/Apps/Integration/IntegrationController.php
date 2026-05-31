@@ -203,6 +203,29 @@ class IntegrationController extends Controller
         }
 
         $eventsUrl = $outbox->aggregate_type === 'vendor_invoice'
+            ? $this->vendorInvoiceFinanceHubEventsUrl()
+            : config('services.finance_hub.events_url');
+        $clientKey = config('services.finance_hub.client_key');
+        $clientSecret = config('services.finance_hub.client_secret');
+
+        if (! $eventsUrl || ! $clientKey || ! $clientSecret) {
+            $this->markOutboxFailed(
+                (int) $outbox->id,
+                'Konfigurasi Finance Hub belum lengkap untuk source '.$outbox->aggregate_type.'. Pastikan endpoint, client key, dan client secret tersedia.'
+            );
+
+            if ($outbox->aggregate_type === 'inv_transaction') {
+                DB::table('inv_transactions')->where('id', $outbox->aggregate_id)->update([
+                    'gl_status' => 'error',
+                    'gl_error_message' => 'Konfigurasi Finance Hub belum lengkap.',
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return;
+        }
+
+        $eventsUrl = $outbox->aggregate_type === 'vendor_invoice'
             ? config('services.finance_hub.vendor_invoice_events_url')
             : config('services.finance_hub.events_url');
         $clientKey = config('services.finance_hub.client_key');
@@ -246,12 +269,7 @@ class IntegrationController extends Controller
             $message = $exception->getMessage();
         }
 
-        DB::table('integration_outbox')->where('id', $outbox->id)->update([
-            'status' => 'failed',
-            'attempts' => DB::raw('attempts + 1'),
-            'last_error' => $message,
-            'updated_at' => now(),
-        ]);
+        $this->markOutboxFailed((int) $outbox->id, $message);
 
         if ($outbox->aggregate_type === 'inv_transaction') {
             DB::table('inv_transactions')->where('id', $outbox->aggregate_id)->update([
@@ -260,5 +278,30 @@ class IntegrationController extends Controller
                 'updated_at' => now(),
             ]);
         }
+    }
+
+    private function vendorInvoiceFinanceHubEventsUrl(): ?string
+    {
+        $configuredUrl = config('services.finance_hub.vendor_invoice_events_url');
+        if (is_string($configuredUrl) && trim($configuredUrl) !== '') {
+            return trim($configuredUrl);
+        }
+
+        $baseUrl = config('services.finance_hub.base_url');
+        if (is_string($baseUrl) && trim($baseUrl) !== '') {
+            return rtrim(trim($baseUrl), '/').'/api/integrations/vendor-invoices/events';
+        }
+
+        return null;
+    }
+
+    private function markOutboxFailed(int $outboxId, string $message): void
+    {
+        DB::table('integration_outbox')->where('id', $outboxId)->update([
+            'status' => 'failed',
+            'attempts' => DB::raw('attempts + 1'),
+            'last_error' => $message,
+            'updated_at' => now(),
+        ]);
     }
 }
