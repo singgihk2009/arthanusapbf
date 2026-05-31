@@ -19,7 +19,6 @@ class InternalUsageController extends Controller
 {
     private const TRANSACTION_CODE_OPTIONS = [
         ['value' => 'PENJUALAN', 'label' => 'Penjualan'],
-        ['value' => 'RETUR', 'label' => 'Retur'],
         ['value' => 'DAMAGED', 'label' => 'Damaged'],
         ['value' => 'SAMPLE', 'label' => 'Sample'],
         ['value' => 'INTERNAL_USE', 'label' => 'Internal Use'],

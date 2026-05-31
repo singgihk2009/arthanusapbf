@@ -467,7 +467,9 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
     public function postInternalUsage(Request $request, int $usageId): JsonResponse
     {
-        return DB::transaction(function () use ($request, $usageId): JsonResponse {
+        $integrationTransactionId = null;
+
+        $response = DB::transaction(function () use ($request, $usageId, &$integrationTransactionId): JsonResponse {
             $header = DB::table('internal_usages')->lockForUpdate()->where('id', $usageId)->first();
             abort_unless($header, 404, 'Internal usage not found');
             abort_if($header->status === 'POSTED', 422, 'Internal usage already posted');
@@ -514,7 +516,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
                 'updated_at' => now(),
             ]);
 
-            $this->createIntegrationSnapshotForInternalUsage($usageId, $request->user()?->id);
+            $integrationTransactionId = $this->createIntegrationSnapshotForInternalUsage($usageId, $request->user()?->id);
 
             if ($this->shouldSyncSalesOrderDispatch($header)) {
                 if (($header->source_type ?? null) !== 'sales_order') {
@@ -529,6 +531,12 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
             return response()->json(['message' => 'Internal usage posted', 'id' => $usageId]);
         });
+
+        if ($integrationTransactionId) {
+            $this->sendFinanceHubEvent($integrationTransactionId);
+        }
+
+        return $response;
     }
 
     public function unpostInternalUsage(Request $request, int $usageId): JsonResponse
@@ -749,7 +757,84 @@ class InventoryPostingController extends Controller implements HasMiddleware
             ->select('l.id', 'l.item_id', 'l.batch_id', 'l.qty_used', 'l.uom_id', 'l.qty_base', 'l.notes', 'i.track_expired')
             ->get();
 
-        return $this->persistIntegrationTransaction('internal_usages', $usageId, (string) $header->number, 'USAGE', (string) $header->document_date, (int) $header->warehouse_id, $lines, $userId);
+        $issueContext = $this->resolveInternalUsageIssueContext($header);
+        $documentNo = (string) ($header->outbound_number ?: $header->number);
+
+        return $this->persistIntegrationTransaction(
+            'internal_usages',
+            $usageId,
+            (string) $header->number,
+            'USAGE',
+            (string) $header->document_date,
+            (int) $header->warehouse_id,
+            $lines,
+            $userId,
+            'inventory.issue.posted',
+            $issueContext['source_document_type'],
+            $documentNo,
+            $documentNo,
+            (string) ($header->notes ?: $issueContext['description']),
+            $issueContext['transaction_type'],
+            null,
+            $issueContext['payload_extra'],
+            $issueContext['idempotency_prefix']
+        );
+    }
+
+    private function resolveInternalUsageIssueContext(object $header): array
+    {
+        $transactionCode = strtoupper((string) ($header->transaction_code ?? 'INTERNAL_USE'));
+        $recipient = (string) ($header->sender_receiver_name ?? '');
+        $department = (string) ($header->department ?? '');
+        $costCenter = (string) ($header->cost_center ?? '');
+
+        return match ($transactionCode) {
+            'PENJUALAN' => [
+                'source_document_type' => 'sales_order_issue',
+                'transaction_type' => 'inventory.issue.sales',
+                'description' => 'Inventory out for sales order '.($header->source_number ?: $header->number),
+                'payload_extra' => array_filter([
+                    'customer_code' => $this->resolveCustomerCode($header),
+                ], fn ($value) => $value !== null && $value !== ''),
+                'idempotency_prefix' => 'INV-ISSUE-SALES',
+            ],
+            'DAMAGED' => [
+                'source_document_type' => 'inventory_write_off',
+                'transaction_type' => 'inventory.issue.damaged',
+                'description' => 'Inventory damaged write-off '.($header->outbound_number ?: $header->number),
+                'payload_extra' => array_filter([
+                    'damage_reason' => $header->notes ?? null,
+                ], fn ($value) => $value !== null && $value !== ''),
+                'idempotency_prefix' => 'INV-ISSUE-DAMAGED',
+            ],
+            'SAMPLE' => [
+                'source_document_type' => 'sample_issue',
+                'transaction_type' => 'inventory.issue.sample',
+                'description' => 'Inventory sample issued'.($recipient !== '' ? ' to '.$recipient : ''),
+                'payload_extra' => array_filter([
+                    'recipient_name' => $recipient,
+                ], fn ($value) => $value !== null && $value !== ''),
+                'idempotency_prefix' => 'INV-ISSUE-SAMPLE',
+            ],
+            default => [
+                'source_document_type' => 'internal_use_issue',
+                'transaction_type' => 'inventory.issue.internal_use',
+                'description' => 'Inventory issued for internal use',
+                'payload_extra' => array_filter([
+                    'department_code' => $costCenter !== '' ? $costCenter : $department,
+                ], fn ($value) => $value !== null && $value !== ''),
+                'idempotency_prefix' => 'INV-ISSUE-INTERNAL',
+            ],
+        };
+    }
+
+    private function resolveCustomerCode(object $header): ?string
+    {
+        if (! empty($header->customer_id) && Schema::hasTable('customers')) {
+            return DB::table('customers')->where('id', $header->customer_id)->value('customer_code');
+        }
+
+        return null;
     }
 
 
@@ -781,7 +866,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
         return $this->persistIntegrationTransaction('stock_adjustments', $adjustmentId, (string) $header->number, 'ADJUSTMENT', (string) $header->document_date, (int) $header->warehouse_id, $lines, $userId);
     }
 
-    private function persistIntegrationTransaction(string $sourceTable, int $sourceId, string $trxNo, string $trxType, string $trxDate, int $warehouseId, Collection $lines, ?int $userId, string $eventName = 'inventory.transaction.finalized', ?string $sourceDocumentType = null, ?string $sourceDocumentId = null, ?string $sourceDocumentNo = null, ?string $description = null, ?string $payloadTransactionType = null, ?string $receiptSource = null): ?int
+    private function persistIntegrationTransaction(string $sourceTable, int $sourceId, string $trxNo, string $trxType, string $trxDate, int $warehouseId, Collection $lines, ?int $userId, string $eventName = 'inventory.transaction.finalized', ?string $sourceDocumentType = null, ?string $sourceDocumentId = null, ?string $sourceDocumentNo = null, ?string $description = null, ?string $payloadTransactionType = null, ?string $receiptSource = null, array $payloadExtra = [], ?string $idempotencyPrefix = null): ?int
     {
         $lockDate = DB::table('inventory_period_locks')->where('company_id', 1)->value('lock_date');
         if ($lockDate && $trxDate <= $lockDate) {
@@ -843,7 +928,7 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
         $valuationMethod = count($methods) > 1 ? 'MIXED' : (array_key_first($methods) ?? 'AVG');
 
-        return DB::transaction(function () use ($sourceTable, $sourceId, $trxNo, $trxType, $trxDate, $totalQty, $totalAmount, $valuationMethod, $itemsPayload, $userId, $warehouseId, $eventName, $sourceDocumentType, $sourceDocumentId, $sourceDocumentNo, $description, $payloadTransactionType, $receiptSource): ?int {
+        return DB::transaction(function () use ($sourceTable, $sourceId, $trxNo, $trxType, $trxDate, $totalQty, $totalAmount, $valuationMethod, $itemsPayload, $userId, $warehouseId, $eventName, $sourceDocumentType, $sourceDocumentId, $sourceDocumentNo, $description, $payloadTransactionType, $receiptSource, $payloadExtra, $idempotencyPrefix): ?int {
             DB::table('inv_transactions')->updateOrInsert(
                 ['source_table' => $sourceTable, 'source_id' => $sourceId],
                 [
@@ -875,9 +960,12 @@ class InventoryPostingController extends Controller implements HasMiddleware
 
             $items = DB::table('inv_transaction_items')
                 ->join('items', 'items.id', '=', 'inv_transaction_items.product_id')
+                ->join('uoms', 'uoms.id', '=', 'inv_transaction_items.uom_id')
                 ->where('inv_transaction_id', $transaction->id)
                 ->get([
                     'items.sku as item_code',
+                    'items.name as item_name',
+                    'uoms.code as uom',
                     'inv_transaction_items.product_id',
                     'inv_transaction_items.qty',
                     'inv_transaction_items.uom_id',
@@ -889,10 +977,14 @@ class InventoryPostingController extends Controller implements HasMiddleware
                     'inv_transaction_items.expired_date',
                 ]);
 
+            $idempotencyKey = $idempotencyPrefix
+                ? $idempotencyPrefix.'-'.str_replace(['/', ' '], '-', (string) $transaction->trx_no).'-v'.$transaction->version
+                : "INV:TX:{$transaction->id}:v{$transaction->version}";
+
             $payload = [
                 'event_name' => $eventName,
                 'event_datetime' => now()->toIso8601String(),
-                'idempotency_key' => "INV:TX:{$transaction->id}:v{$transaction->version}",
+                'idempotency_key' => $idempotencyKey,
                 'source_document_type' => $sourceDocumentType ?? $sourceTable,
                 'source_document_id' => $sourceDocumentId ?? (string) $sourceId,
                 'source_document_no' => $sourceDocumentNo ?? $transaction->trx_no,
@@ -909,10 +1001,13 @@ class InventoryPostingController extends Controller implements HasMiddleware
                     'branch_code' => 'MAIN',
                     'warehouse_code' => (string) (DB::table('warehouses')->where('id', $warehouseId)->value('code') ?? $warehouseId),
                     ...($receiptSource ? ['receipt_source' => $receiptSource] : []),
+                    ...$payloadExtra,
                     'lines' => $items->map(fn (object $item): array => [
                         'item_code' => (string) ($item->item_code ?? $item->product_id),
+                        'item_name' => (string) ($item->item_name ?? ''),
                         'qty' => (float) $item->qty,
                         'unit_cost' => (float) $item->unit_cost,
+                        'uom' => (string) ($item->uom ?? ''),
                     ])->values()->all(),
                 ],
             ];
