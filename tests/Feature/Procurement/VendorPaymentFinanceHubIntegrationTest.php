@@ -130,8 +130,12 @@ it('creates and sends vendor payment finance hub outbox when approved', function
 
         return $request->url() === 'https://finance-hub.test/api/integrations/vendor-payments/events'
             && $payload['event_name'] === 'vendor.payment.posted'
+            && $payload['client_key'] === 'ALL-SRJHZSUQOHRP'
+            && $payload['client_secret'] === 'secret-test'
             && $payload['source_document_no'] === 'VPY-202605-00001'
-            && $payload['payload']['cash_account_id'] === $cashAccountId
+            && $payload['payload']['source_cash_account']['id'] === $cashAccountId
+            && $payload['payload']['source_cash_account']['code'] === 'BCA-IDR'
+            && $payload['payload']['gl_account_code'] === '1120-010'
             && $payload['payload']['amounts']['invoice_payment_total'] === 13875000.0;
     });
 
