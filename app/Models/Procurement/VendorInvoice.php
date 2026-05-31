@@ -8,6 +8,12 @@ class VendorInvoice extends Model
 {
     protected $guarded = [];
 
+    protected $casts = [
+        'invoice_date' => 'date:Y-m-d',
+        'due_date' => 'date:Y-m-d',
+        'posted_at' => 'datetime',
+    ];
+
     public function vendor()
     {
         return $this->belongsTo(Vendor::class);

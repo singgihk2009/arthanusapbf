@@ -11,6 +11,7 @@ use App\Models\Procurement\VendorInvoice;
 use App\Models\Procurement\VendorInvoiceLine;
 use App\Models\Procurement\VendorPaymentLine;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -440,10 +441,19 @@ class VendorInvoiceController extends Controller
             return back()->with('error', 'Hanya invoice draft yang bisa di-approve.');
         }
 
-        $invoice->status = 'POSTED';
-        $invoice->posted_at = now();
-        $invoice->posted_by = auth()->id();
-        $invoice->save();
+        $invoice = DB::transaction(function () use ($invoice): VendorInvoice {
+            $invoice->status = 'POSTED';
+            $invoice->posted_at = now();
+            $invoice->posted_by = auth()->id();
+            $invoice->save();
+
+            $invoice = $invoice->fresh(['vendor']);
+            $this->upsertVendorInvoiceFinanceHubOutbox($invoice);
+
+            return $invoice;
+        });
+
+        $this->sendVendorInvoiceFinanceHubEvent($invoice->id);
 
         return back()->with('success', 'Vendor invoice berhasil di-posting.');
     }
@@ -459,6 +469,121 @@ class VendorInvoiceController extends Controller
         $invoice->delete();
 
         return back()->with('success', 'Vendor invoice berhasil dihapus.');
+    }
+
+
+    private function upsertVendorInvoiceFinanceHubOutbox(VendorInvoice $invoice): void
+    {
+        $payload = $this->buildVendorInvoiceFinanceHubPayload($invoice);
+        $encoded = json_encode($payload);
+        $hash = hash('sha256', (string) $encoded);
+
+        DB::table('integration_outbox')->updateOrInsert(
+            ['idempotency_key' => $payload['idempotency_key']],
+            [
+                'event_type' => $payload['event_name'],
+                'aggregate_type' => 'vendor_invoice',
+                'aggregate_id' => $invoice->id,
+                'payload_json' => $encoded,
+                'payload_hash' => $hash,
+                'status' => 'ready',
+                'available_at' => now(),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+    }
+
+    private function buildVendorInvoiceFinanceHubPayload(VendorInvoice $invoice): array
+    {
+        $documentNo = (string) ($invoice->invoice_no_internal ?: $invoice->vendor_invoice_no ?: ('VI-'.$invoice->id));
+        $postingDate = $invoice->invoice_date ? $invoice->invoice_date->toDateString() : now()->toDateString();
+        $postedAt = $invoice->posted_at ? $invoice->posted_at : now();
+        $taxAmount = (float) ($invoice->tax_amount ?? 0);
+        $freightAmount = (float) ($invoice->freight_amount ?? 0);
+        $withholdingTaxAmount = (float) ($invoice->wht_tax_amount ?? 0);
+        $discountAmount = (float) ($invoice->discount_amount ?? 0);
+        $grandTotal = (float) ($invoice->grand_total ?? 0);
+        $payableTotal = (float) ($invoice->net_payable_amount ?? ($grandTotal - $withholdingTaxAmount));
+
+        return [
+            'event_name' => 'vendor.invoice.posted',
+            'event_datetime' => $postedAt->copy()->utc()->toJSON(),
+            'idempotency_key' => 'VI-POSTED-'.$documentNo,
+            'source_document_type' => 'vendor_invoice',
+            'source_document_id' => (string) $invoice->id,
+            'source_document_no' => $documentNo,
+            'schema_version' => 'v1',
+            'payload' => [
+                'transaction_type' => 'vendor.invoice.standard',
+                'currency_code' => (string) ($invoice->currency_code ?: 'IDR'),
+                'posting_date' => $postingDate,
+                'entry_date' => $postedAt->toDateString(),
+                'reference_no' => $documentNo,
+                'description' => 'Vendor Invoice '.$documentNo,
+                'amounts' => [
+                    'invoice' => (float) ($invoice->subtotal ?? 0),
+                    'tax' => $taxAmount,
+                    'freight' => $freightAmount,
+                    'withholding_tax' => $withholdingTaxAmount,
+                    'purchase_discount' => $discountAmount,
+                    'payable_total' => $payableTotal,
+                ],
+            ],
+        ];
+    }
+
+    private function sendVendorInvoiceFinanceHubEvent(int $invoiceId): void
+    {
+        $eventsUrl = config('services.finance_hub.vendor_invoice_events_url');
+        $clientKey = config('services.finance_hub.client_key');
+        $clientSecret = config('services.finance_hub.client_secret');
+
+        if (! $eventsUrl || ! $clientKey || ! $clientSecret) {
+            return;
+        }
+
+        $outbox = DB::table('integration_outbox')
+            ->where('aggregate_type', 'vendor_invoice')
+            ->where('aggregate_id', $invoiceId)
+            ->first();
+
+        if (! $outbox) {
+            return;
+        }
+
+        $payload = json_decode((string) $outbox->payload_json, true) ?: [];
+        $payload['client_key'] = $clientKey;
+        $payload['client_secret'] = $clientSecret;
+
+        try {
+            $response = Http::acceptJson()
+                ->asJson()
+                ->timeout((int) config('services.finance_hub.timeout', 10))
+                ->post($eventsUrl, $payload);
+
+            if ($response->successful()) {
+                DB::table('integration_outbox')->where('id', $outbox->id)->update([
+                    'status' => 'sent',
+                    'attempts' => DB::raw('attempts + 1'),
+                    'last_error' => null,
+                    'updated_at' => now(),
+                ]);
+
+                return;
+            }
+
+            $message = sprintf('Finance Hub HTTP %s: %s', $response->status(), mb_strimwidth($response->body(), 0, 500));
+        } catch (\Throwable $exception) {
+            $message = $exception->getMessage();
+        }
+
+        DB::table('integration_outbox')->where('id', $outbox->id)->update([
+            'status' => 'failed',
+            'attempts' => DB::raw('attempts + 1'),
+            'last_error' => $message,
+            'updated_at' => now(),
+        ]);
     }
 
     private function availableReceivingLines(int $vendorId, int $companyId): array
