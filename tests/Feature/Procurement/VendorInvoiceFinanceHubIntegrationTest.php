@@ -3,8 +3,10 @@
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Inertia\Testing\AssertableInertia as Assert;
 
 use function Pest\Laravel\actingAs;
+use function Pest\Laravel\get;
 use function Pest\Laravel\post;
 
 beforeEach(function () {
@@ -89,4 +91,13 @@ it('sends vendor invoice posted event to finance hub when approved', function ()
         ->and($outbox->event_type)->toBe('vendor.invoice.posted')
         ->and($outbox->idempotency_key)->toBe('VI-POSTED-VI-0001')
         ->and($outbox->status)->toBe('sent');
+
+    get(route('apps.integration.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('Apps/Integration/Index')
+        ->where('transactions.data.0.aggregate_type', 'vendor_invoice')
+        ->where('transactions.data.0.aggregate_id', $invoiceId)
+        ->where('transactions.data.0.trx_no', 'VI-0001')
+        ->where('transactions.data.0.event_type', 'vendor.invoice.posted')
+        ->where('transactions.data.0.outbox_status', 'sent')
+    );
 });
