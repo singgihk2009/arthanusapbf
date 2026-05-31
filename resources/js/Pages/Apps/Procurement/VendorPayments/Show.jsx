@@ -24,7 +24,10 @@ const escapeHtml = (text) => String(text ?? '-')
 
 export default function Show({ vendor, payment, uploadedDocuments = [] }) {
   const lines = payment?.lines || [];
-  const bankAccountLabel = payment.bank_account?.label || [payment.bank_account?.bank_name, payment.bank_account?.account_number, payment.bank_account?.account_name ? `a/n ${payment.bank_account.account_name}` : null].filter(Boolean).join(' - ') || '-';
+  const cashAccountLabel = payment.cash_account
+    ? [payment.cash_account.code, payment.cash_account.name, payment.cash_account.chart_of_account ? `COA ${payment.cash_account.chart_of_account.account_code} - ${payment.cash_account.chart_of_account.account_name}` : null].filter(Boolean).join(' - ')
+    : '-';
+  const bankAccountLabel = cashAccountLabel !== '-' ? cashAccountLabel : (payment.bank_account?.label || [payment.bank_account?.bank_name, payment.bank_account?.account_number, payment.bank_account?.account_name ? `a/n ${payment.bank_account.account_name}` : null].filter(Boolean).join(' - ') || '-');
 
   const summaryRows = [
     ['Total Invoice Payment', money(payment.total_invoice_amount)],
@@ -110,7 +113,7 @@ export default function Show({ vendor, payment, uploadedDocuments = [] }) {
           <div class="meta-row"><span class="label">Vendor</span>: ${escapeHtml(vendor.vendor_name || vendor.name || '-')}</div>
           <div class="meta-row"><span class="label">Payment Method</span>: ${escapeHtml(payment.payment_method || '-')}</div>
           <div class="meta-row"><span class="label">Currency</span>: ${escapeHtml(payment.currency || 'IDR')}</div>
-          <div class="meta-row"><span class="label">Bank Account</span>: ${escapeHtml(bankAccountLabel)}</div>
+          <div class="meta-row"><span class="label">Cash Account</span>: ${escapeHtml(bankAccountLabel)}</div>
         </div>
 
         <div class="section-title">Invoice Allocation</div>
@@ -183,7 +186,7 @@ export default function Show({ vendor, payment, uploadedDocuments = [] }) {
             <div><span className='font-semibold text-gray-600'>Payment Date:</span> {formatDate(payment.payment_date)}</div>
             <div><span className='font-semibold text-gray-600'>Payment Method:</span> {payment.payment_method || '-'}</div>
             <div><span className='font-semibold text-gray-600'>Currency:</span> {payment.currency || 'IDR'}</div>
-            <div className='md:col-span-2'><span className='font-semibold text-gray-600'>Bank Account:</span> {bankAccountLabel}</div>
+            <div className='md:col-span-2'><span className='font-semibold text-gray-600'>Cash Account:</span> {bankAccountLabel}</div>
           </div>
 
           <div className='overflow-x-auto'>

@@ -2,6 +2,7 @@
 
 namespace App\Models\Procurement;
 
+use App\Models\CashAccount;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -32,6 +33,7 @@ class VendorPayment extends Model
     public function postedBy(): BelongsTo { return $this->belongsTo(User::class, 'posted_by'); }
 
     public function bankAccount(): BelongsTo { return $this->belongsTo(VendorBankAccount::class, 'bank_account_id'); }
+    public function cashAccount(): BelongsTo { return $this->belongsTo(CashAccount::class, 'cash_account_id'); }
 
     public function getCanEditAttribute(): bool { return strtoupper((string) $this->status) === 'DRAFT'; }
     public function getCanSubmitAttribute(): bool { return strtoupper((string) $this->status) === 'DRAFT'; }

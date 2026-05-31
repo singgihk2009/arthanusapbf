@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 const n = (v) => Number(v || 0);
 
-export default function Form({ vendor, outstandingInvoices = [], payment = null, bankAccounts = [], documentTypes = [], uploadedDocuments = [] }) {
+export default function Form({ vendor, outstandingInvoices = [], payment = null, bankAccounts = [], cashAccounts = [], documentTypes = [], uploadedDocuments = [] }) {
   const editing = !!payment;
   const existingLines = payment?.lines || [];
 
@@ -14,6 +14,7 @@ export default function Form({ vendor, outstandingInvoices = [], payment = null,
   const { data, setData, post, put, transform, processing, errors } = useForm({
     payment_date: payment?.payment_date || '',
     payment_method: payment?.payment_method || 'BANK_TRANSFER',
+    cash_account_id: payment?.cash_account_id || '',
     bank_account_id: payment?.bank_account_id || '',
     notes: payment?.notes || '',
     stamp_duty_amount: payment?.stamp_duty_amount || 0,
@@ -92,11 +93,12 @@ export default function Form({ vendor, outstandingInvoices = [], payment = null,
         {errors.payment_method && <div className='text-xs text-red-600 mt-1'>{errors.payment_method}</div>}
       </div>
       <div>
-      <select value={data.bank_account_id} onChange={(e) => setData('bank_account_id', e.target.value)} className='rounded border p-2 w-full'>
-        <option value=''>Pilih Bank Account (opsional)</option>
-        {bankAccounts.map((acc) => <option key={acc.id} value={acc.id}>{acc.label}</option>)}
+      <select value={data.cash_account_id} onChange={(e) => setData('cash_account_id', e.target.value)} className='rounded border p-2 w-full'>
+        <option value=''>Pilih Cash Account / Bank / Cash Equivalent</option>
+        {cashAccounts.map((acc) => <option key={acc.id} value={acc.id}>{acc.label}</option>)}
       </select>
-        {errors.bank_account_id && <div className='text-xs text-red-600 mt-1'>{errors.bank_account_id}</div>}
+        {errors.cash_account_id && <div className='text-xs text-red-600 mt-1'>{errors.cash_account_id}</div>}
+        {!cashAccounts.length && <div className='text-xs text-amber-600 mt-1'>Belum ada Cash Account aktif. Tambahkan melalui Master &gt; Cash Account.</div>}
       </div>
       <div>
       <input value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder='Notes' className='rounded border p-2 w-full' />

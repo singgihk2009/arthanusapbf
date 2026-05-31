@@ -12,6 +12,7 @@ class StoreVendorPaymentRequest extends FormRequest
         return [
             'payment_date' => ['required','date'],
             'payment_method' => ['nullable','string','max:50'],
+            'cash_account_id' => ['required','integer','exists:cash_accounts,id'],
             'bank_account_id' => ['nullable','integer','exists:vendor_bank_accounts,id'],
             'stamp_duty_amount' => ['nullable','numeric','min:0'],
             'freight_amount' => ['nullable','numeric','min:0'],
@@ -37,6 +38,9 @@ class StoreVendorPaymentRequest extends FormRequest
     {
         return [
             'payment_date.required' => 'Payment date wajib diisi.',
+            'cash_account_id.required' => 'Cash account wajib dipilih.',
+            'cash_account_id.integer' => 'Cash account harus dipilih dari daftar.',
+            'cash_account_id.exists' => 'Cash account tidak valid.',
             'bank_account_id.integer' => 'Bank account harus dipilih dari daftar.',
             'bank_account_id.exists' => 'Bank account tidak valid.',
             'lines.required' => 'Pilih minimal 1 invoice.',
@@ -50,6 +54,7 @@ class StoreVendorPaymentRequest extends FormRequest
         return [
             'payment_date' => 'payment date',
             'payment_method' => 'payment method',
+            'cash_account_id' => 'cash account',
             'bank_account_id' => 'bank account',
             'lines' => 'invoice lines',
         ];

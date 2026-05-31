@@ -51,6 +51,7 @@ export default function Menu() {
             permissions: true,
             details: [
                 { title: 'Warehouse', href: '/apps/master-data/warehouses', icon: <IconBuildingWarehouse size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/warehouses'), permissions: true },
+                { title: 'Cash Account', href: '/apps/master-data/cash-accounts', icon: <IconBuilding size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/cash-accounts'), permissions: true },
                 { title: 'Kategory', href: '/apps/master-data/categories', icon: <IconCategory size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/categories'), permissions: true },
                 { title: 'UOM', href: '/apps/master-data/uoms', icon: <IconRulerMeasure size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/uoms'), permissions: true },
                 { title: 'Conversion', href: '/apps/master-data/conversions', icon: <IconExchange size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/conversions'), permissions: true },
