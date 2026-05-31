@@ -29,18 +29,18 @@ export default function IntegrationIndex({ stats, transactions }) {
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <Card title="Pending/Sent" value={stats.pending} />
-                    <Card title="Error" value={stats.error} />
-                    <Card title="Posted Hari Ini" value={stats.posted_today} />
+                    <Card title="Outbox Pending/Sent" value={stats.pending} />
+                    <Card title="Outbox Error" value={stats.error} />
+                    <Card title="Acked Hari Ini" value={stats.posted_today} />
                 </div>
 
                 <div className="overflow-x-auto bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
                     <table className="min-w-full text-sm">
                         <thead>
                             <tr className="text-left border-b border-gray-200 dark:border-gray-800">
-                                <th className="px-3 py-2">Trx No</th>
-                                <th className="px-3 py-2">Type</th>
-                                <th className="px-3 py-2">Status</th>
+                                <th className="px-3 py-2">Source No</th>
+                                <th className="px-3 py-2">Source Type</th>
+                                <th className="px-3 py-2">Source Status</th>
                                 <th className="px-3 py-2">Event</th>
                                 <th className="px-3 py-2">Outbox</th>
                                 <th className="px-3 py-2">GL Ref</th>
@@ -62,14 +62,18 @@ export default function IntegrationIndex({ stats, transactions }) {
                                     <td className="px-3 py-2">{row.gl_reference_no || '-'}</td>
                                     <td className="px-3 py-2 text-red-500">{row.gl_error_message || row.outbox_last_error || '-'}</td>
                                     <td className="px-3 py-2">
-                                        {row.gl_status === 'error' && <button className="text-blue-600" onClick={() => retry(row.id)}>Retry</button>}
+                                        {['ready', 'failed'].includes(row.outbox_status) && (
+                                            <button className="text-blue-600" onClick={() => retry(row.id)}>
+                                                {row.outbox_status === 'ready' ? 'Send' : 'Retry'}
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-                <div className="text-xs text-gray-500">Total: {transactions.total}</div>
+                <div className="text-xs text-gray-500">Total outbox: {transactions.total}</div>
             </div>
         </>
     );

@@ -3,8 +3,10 @@
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Inertia\Testing\AssertableInertia as Assert;
 
 use function Pest\Laravel\actingAs;
+use function Pest\Laravel\get;
 use function Pest\Laravel\post;
 
 beforeEach(function () {
@@ -89,4 +91,66 @@ it('sends vendor invoice posted event to finance hub when approved', function ()
         ->and($outbox->event_type)->toBe('vendor.invoice.posted')
         ->and($outbox->idempotency_key)->toBe('VI-POSTED-VI-0001')
         ->and($outbox->status)->toBe('sent');
+
+    get(route('apps.integration.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('Apps/Integration/Index')
+        ->where('transactions.data.0.aggregate_type', 'vendor_invoice')
+        ->where('transactions.data.0.aggregate_id', $invoiceId)
+        ->where('transactions.data.0.trx_no', 'VI-0001')
+        ->where('transactions.data.0.event_type', 'vendor.invoice.posted')
+        ->where('transactions.data.0.outbox_status', 'sent')
+    );
+});
+
+it('falls back to finance hub base url when vendor invoice endpoint config is empty', function () {
+    config()->set('services.finance_hub.base_url', 'https://finance-hub.test');
+    config()->set('services.finance_hub.vendor_invoice_events_url', null);
+    config()->set('services.finance_hub.client_key', 'ALL-SRJHZSUQOHRP');
+    config()->set('services.finance_hub.client_secret', 'secret-test');
+
+    Http::fake([
+        'finance-hub.test/*' => Http::response(['message' => 'ok'], 200),
+    ]);
+
+    $vendorId = DB::table('vendors')->insertGetId([
+        'company_id' => 1,
+        'vendor_code' => 'V-FIN-002',
+        'vendor_name' => 'Vendor Finance Fallback',
+        'name' => 'Vendor Finance Fallback',
+        'currency_code' => 'IDR',
+        'status' => 'ACTIVE',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $invoiceId = DB::table('vendor_invoices')->insertGetId([
+        'company_id' => 1,
+        'vendor_id' => $vendorId,
+        'invoice_no_internal' => 'VI-FALLBACK-0001',
+        'vendor_invoice_no' => 'SUP-FALLBACK-0001',
+        'invoice_date' => '2026-05-31',
+        'due_date' => '2026-06-30',
+        'currency_code' => 'IDR',
+        'exchange_rate' => 1,
+        'subtotal' => 1000000,
+        'tax_amount' => 110000,
+        'discount_amount' => 0,
+        'freight_amount' => 0,
+        'grand_total' => 1110000,
+        'wht_tax_amount' => 0,
+        'net_payable_amount' => 1110000,
+        'paid_amount' => 0,
+        'outstanding_amount' => 1110000,
+        'status' => 'DRAFT',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    post(route('apps.procurement.vendor-invoices.approve', $invoiceId))->assertRedirect();
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://finance-hub.test/api/integrations/vendor-invoices/events'
+        && $request->data()['event_name'] === 'vendor.invoice.posted'
+        && $request->data()['idempotency_key'] === 'VI-POSTED-VI-FALLBACK-0001');
+
+    expect(DB::table('integration_outbox')->where('aggregate_type', 'vendor_invoice')->where('aggregate_id', $invoiceId)->value('status'))->toBe('sent');
 });
