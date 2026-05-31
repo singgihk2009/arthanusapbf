@@ -26,7 +26,26 @@ class VendorPaymentController extends Controller
     public function store(StoreVendorPaymentRequest $request, Vendor $vendor){ $data = $request->validated(); $uploadedDocumentCount = 0; DB::transaction(function() use($data, $vendor, $request, &$uploadedDocumentCount){ $payment = $this->upsertPayment(new VendorPayment(),$vendor,$data); $uploadedDocumentCount = $this->attachDocumentsToPayment($payment, (array) ($data['documents'] ?? []), $request); }); $message = 'Payment draft berhasil disimpan.'; if ($uploadedDocumentCount > 0) { $message .= " {$uploadedDocumentCount} dokumen berhasil diupload."; } return back()->with('success',$message); }
     public function update(UpdateVendorPaymentRequest $request, Vendor $vendor, VendorPayment $payment){ abort_unless($payment->can_edit, 422); $data = $request->validated(); $uploadedDocumentCount = 0; DB::transaction(function() use($data, $vendor, $payment, $request, &$uploadedDocumentCount){ $savedPayment = $this->upsertPayment($payment,$vendor,$data); $uploadedDocumentCount = $this->attachDocumentsToPayment($savedPayment, (array) ($data['documents'] ?? []), $request); }); $message = 'Payment draft berhasil diperbarui.'; if ($uploadedDocumentCount > 0) { $message .= " {$uploadedDocumentCount} dokumen berhasil diupload."; } return back()->with('success',$message); }
     public function submit(Vendor $vendor, VendorPayment $payment){ return $this->changeStatus($payment,'DRAFT','SUBMITTED','payment_submitted'); }
-    public function approve(Vendor $vendor, VendorPayment $payment){ return $this->changeStatus($payment,'SUBMITTED','APPROVED','payment_approved', ['approved_by'=>auth()->id(),'approved_at'=>now()]); }
+    public function approve(Vendor $vendor, VendorPayment $payment)
+    {
+        DB::transaction(function () use ($payment) {
+            if (strtoupper((string) $payment->status) !== 'SUBMITTED') {
+                throw ValidationException::withMessages(['status' => 'Invalid status transition']);
+            }
+
+            $payment->update([
+                'status' => 'APPROVED',
+                'approved_by' => auth()->id(),
+                'approved_at' => now(),
+            ]);
+
+            $this->upsertVendorPaymentFinanceHubOutbox($payment->fresh(['vendor', 'lines', 'cashAccount.chartOfAccount']));
+        });
+
+        $this->sendVendorPaymentFinanceHubEvent($payment->id);
+
+        return back()->with('success', 'payment approved dan event Finance Hub Vendor Payment dibuat.');
+    }
     public function markAsPaid(Vendor $vendor, VendorPayment $payment){
         DB::transaction(function() use($payment){
             if (strtoupper((string)$payment->status) !== 'APPROVED') throw ValidationException::withMessages(['status'=>'Invalid status']);
@@ -186,32 +205,47 @@ class VendorPaymentController extends Controller
         $encoded = json_encode($payload);
         $hash = hash('sha256', (string) $encoded);
 
-        DB::table('integration_outbox')->updateOrInsert(
-            ['idempotency_key' => $payload['idempotency_key']],
-            [
-                'event_type' => $payload['event_name'],
-                'aggregate_type' => 'vendor_payment',
-                'aggregate_id' => $payment->id,
-                'payload_json' => $encoded,
-                'payload_hash' => $hash,
-                'status' => 'ready',
-                'available_at' => now(),
-                'updated_at' => now(),
-                'created_at' => now(),
-            ]
-        );
+        $existing = DB::table('integration_outbox')
+            ->where('idempotency_key', $payload['idempotency_key'])
+            ->first();
+
+        $values = [
+            'event_type' => $payload['event_name'],
+            'aggregate_type' => 'vendor_payment',
+            'aggregate_id' => $payment->id,
+            'payload_json' => $encoded,
+            'payload_hash' => $hash,
+            'available_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        if (! $existing || ! in_array($existing->status, ['sent', 'acked'], true)) {
+            $values['status'] = 'ready';
+        }
+
+        if ($existing) {
+            DB::table('integration_outbox')->where('id', $existing->id)->update($values);
+
+            return;
+        }
+
+        DB::table('integration_outbox')->insert(array_merge($values, [
+            'idempotency_key' => $payload['idempotency_key'],
+            'status' => $values['status'] ?? 'ready',
+            'created_at' => now(),
+        ]));
     }
 
     private function buildVendorPaymentFinanceHubPayload(VendorPayment $payment): array
     {
         $documentNo = (string) ($payment->payment_no ?: $payment->payment_number ?: ('VP-'.$payment->id));
-        $postedAt = $payment->posted_at ?: now();
+        $eventAt = $payment->posted_at ?: ($payment->approved_at ?: ($payment->paid_at ?: now()));
         $paymentDate = $payment->payment_date ? $payment->payment_date->toDateString() : now()->toDateString();
         $cashAccount = $payment->cashAccount;
 
         return [
             'event_name' => 'vendor.payment.posted',
-            'event_datetime' => $postedAt->copy()->utc()->toJSON(),
+            'event_datetime' => $eventAt->copy()->utc()->toJSON(),
             'idempotency_key' => 'VP-POSTED-'.$documentNo,
             'source_document_type' => 'vendor_payment',
             'source_document_id' => (string) $payment->id,
@@ -221,7 +255,7 @@ class VendorPaymentController extends Controller
                 'transaction_type' => $payment->payment_method === 'CASH' ? 'vendor.payment.cash' : 'vendor.payment.bank_transfer',
                 'currency_code' => (string) ($payment->currency ?: $payment->currency_code ?: 'IDR'),
                 'posting_date' => $paymentDate,
-                'entry_date' => $postedAt->toDateString(),
+                'entry_date' => $eventAt->toDateString(),
                 'reference_no' => $documentNo,
                 'description' => 'Vendor Payment '.$documentNo,
                 'cash_account_id' => $cashAccount?->id,
@@ -262,7 +296,7 @@ class VendorPaymentController extends Controller
             ->where('aggregate_id', $paymentId)
             ->first();
 
-        if (! $outbox) {
+        if (! $outbox || in_array($outbox->status, ['sent', 'acked'], true)) {
             return;
         }
 
