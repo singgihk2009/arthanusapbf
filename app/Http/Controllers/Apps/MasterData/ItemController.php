@@ -390,7 +390,8 @@ class ItemController extends Controller implements HasMiddleware
                         ->orWhere('receiving_entries.vendor_name', 'like', $keyword)
                         ->orWhere('receiving_entries.number', 'like', $keyword)
                         ->orWhere('uoms.name', 'like', $keyword)
-                        ->orWhere('uoms.code', 'like', $keyword);
+                        ->orWhere('uoms.code', 'like', $keyword)
+                        ->orWhere('receiving_entry_lines.batch_number', 'like', $keyword);
                 });
             })
             ->select([
@@ -404,6 +405,8 @@ class ItemController extends Controller implements HasMiddleware
                 DB::raw("COALESCE(receiving_entries.reference, receiving_entries.number) as reference"),
                 DB::raw("COALESCE(DATE_FORMAT(purchase_orders.po_date, '%Y-%m-%d'), '-') as po_date"),
                 DB::raw('COALESCE(uoms.code, uoms.name) as uom_name'),
+                DB::raw("COALESCE(receiving_entry_lines.batch_number, '-') as batch_number"),
+                DB::raw("COALESCE(DATE_FORMAT(receiving_entry_lines.expired_date, '%Y-%m-%d'), '-') as expired_date"),
                 DB::raw('COALESCE(receiving_entry_lines.price, 0) as unit_price'),
                 DB::raw('ABS(receiving_entry_lines.qty) as qty'),
                 DB::raw('ABS(COALESCE(receiving_entry_lines.value, receiving_entry_lines.qty * COALESCE(receiving_entry_lines.price, 0))) as value'),
@@ -493,6 +496,8 @@ class ItemController extends Controller implements HasMiddleware
                 $join->on('source_ledgers_map.usage_ledger_id', '=', 'stock_ledgers.id');
             })
             ->leftJoin('stock_ledgers as source_ledgers', 'source_ledgers.id', '=', 'source_ledgers_map.source_ledger_id')
+            ->leftJoin('item_batches as usage_batches', 'usage_batches.id', '=', 'stock_ledgers.batch_id')
+            ->leftJoin('item_batches as source_batches', 'source_batches.id', '=', 'source_ledgers.batch_id')
             ->leftJoin('receiving_entries as source_receiving_entries', function ($join) {
                 $join->on('source_receiving_entries.id', '=', 'source_ledgers.trx_id')
                     ->where('source_ledgers.trx_type', '=', 'RCV_IN');
@@ -534,6 +539,8 @@ class ItemController extends Controller implements HasMiddleware
                         ->orWhere('items.sku', 'like', $keyword)
                         ->orWhere('categories.name', 'like', $keyword)
                         ->orWhere('stock_ledgers.trx_type', 'like', $keyword)
+                        ->orWhere('usage_batches.batch_no', 'like', $keyword)
+                        ->orWhere('source_batches.batch_no', 'like', $keyword)
                         ->orWhereRaw('CAST(stock_ledgers.trx_id AS CHAR) like ?', [$keyword]);
                 });
             })
@@ -543,6 +550,8 @@ class ItemController extends Controller implements HasMiddleware
                 DB::raw('COALESCE(categories.name, "-") as category_name'),
                 'items.sku',
                 DB::raw('COALESCE(uoms.code, uoms.name) as uom_name'),
+                DB::raw("COALESCE(usage_batches.batch_no, source_batches.batch_no, '-') as batch_number"),
+                DB::raw("COALESCE(DATE_FORMAT(usage_batches.expired_date, '%Y-%m-%d'), DATE_FORMAT(source_batches.expired_date, '%Y-%m-%d'), '-') as expired_date"),
                 DB::raw("DATE_FORMAT(stock_ledgers.trx_datetime, '%Y-%m-%d %H:%i:%s') as trx_datetime"),
                 DB::raw("COALESCE(internal_usages.transaction_code, '-') as transaction_code"),
                 DB::raw("CONCAT(stock_ledgers.trx_type, '-', stock_ledgers.trx_id) as reference"),
