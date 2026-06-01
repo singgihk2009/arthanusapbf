@@ -153,7 +153,7 @@ class PurchaseOrderController extends Controller
 
     public function show(PurchaseOrder $purchaseOrder)
     {
-        $purchaseOrder->load(['vendor:id,name','items.product:id,name','items.uom:id,name']);
+        $purchaseOrder->load(['vendor:id,name,address,city,province,phone','items.product:id,name','items.uom:id,name']);
         $purchaseOrderDocuments = Document::query()
             ->with('documentType:id,name,code')
             ->where('owner_type', 'purchase_order')
@@ -240,7 +240,15 @@ class PurchaseOrderController extends Controller
             $gr->documents = $goodsReceiptDocuments->concat($receivingEntryDocuments)->values();
         });
         $purchaseOrder->setRelation('documents', $purchaseOrderDocuments);
-        return Inertia::render('Apps/Procurement/PurchaseOrders/Show', ['purchaseOrder' => $purchaseOrder]);
+
+        $company = Schema::hasTable('company_profiles')
+            ? DB::table('company_profiles')->orderBy('id')->first()
+            : null;
+
+        return Inertia::render('Apps/Procurement/PurchaseOrders/Show', [
+            'purchaseOrder' => $purchaseOrder,
+            'company' => $company,
+        ]);
     }
 
     public function edit(Request $request, PurchaseOrder $purchaseOrder)
