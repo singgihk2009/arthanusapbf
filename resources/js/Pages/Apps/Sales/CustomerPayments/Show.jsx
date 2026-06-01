@@ -33,11 +33,11 @@ export default function Page({ payment, allocations = [] }) {
             <div className='overflow-x-auto'>
               <table className='min-w-full text-sm'>
                 <thead className='bg-gray-50'>
-                  <tr><th className='px-3 py-2 text-left'>Invoice</th><th className='px-3 py-2 text-right'>Kas</th><th className='px-3 py-2 text-right'>Diskon</th><th className='px-3 py-2 text-right'>WHT</th><th className='px-3 py-2 text-right'>Potongan Lain</th><th className='px-3 py-2 text-right'>Settlement</th></tr>
+                  <tr><th className='px-3 py-2 text-left'>Invoice</th><th className='px-3 py-2 text-right'>Kas</th><th className='px-3 py-2 text-right'>Biaya Lainnya</th><th className='px-3 py-2 text-right'>WHT</th><th className='px-3 py-2 text-right'>Potongan Lain</th><th className='px-3 py-2 text-right'>Settlement</th></tr>
                 </thead>
                 <tbody className='divide-y'>
                   {allocations.map((allocation) => {
-                    const settlement = Number(allocation.amount_applied || 0) + Number(allocation.discount_taken || 0) + Number(allocation.wht_amount || 0) + Number(allocation.other_deduction_amount || 0) + Number(allocation.writeoff_amount || 0);
+                    const settlement = Number(allocation.amount_applied || 0) + Number(allocation.discount_taken || 0) - Number(allocation.wht_amount || 0) - Number(allocation.other_deduction_amount || 0) - Number(allocation.writeoff_amount || 0);
                     return (
                       <tr key={allocation.id}>
                         <td className='px-3 py-2'><Link href={route('apps.customer-invoices.show', allocation.customer_invoice_id)} className='text-blue-600 hover:underline'>{allocation.invoice_number}</Link></td>
@@ -61,7 +61,7 @@ export default function Page({ payment, allocations = [] }) {
               <div className='flex justify-between'><span>Metode</span><b>{payment.payment_method || '-'}</b></div>
               <div className='flex justify-between'><span>Kas Diterima</span><b>{formatCurrency(payment.amount)}</b></div>
               <div className='flex justify-between'><span>Bank Charge</span><b>{formatCurrency(payment.bank_charge)}</b></div>
-              <div className='flex justify-between'><span>Diskon</span><b>{formatCurrency(payment.discount_taken)}</b></div>
+              <div className='flex justify-between'><span>Biaya Lainnya</span><b>{formatCurrency(payment.discount_taken)}</b></div>
               <div className='flex justify-between'><span>WHT</span><b>{formatCurrency(payment.wht_amount)}</b></div>
               <div className='flex justify-between'><span>Potongan Lain</span><b>{formatCurrency(payment.other_deduction_amount)}</b></div>
               <div className='flex justify-between border-t pt-2 text-base'><span>Total Settlement</span><b>{formatCurrency(payment.gross_settlement_amount)}</b></div>

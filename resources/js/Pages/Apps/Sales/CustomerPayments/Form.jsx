@@ -39,7 +39,7 @@ export default function Page({ paymentDraft }) {
       discountTaken: summary.discountTaken + discountTaken,
       whtAmount: summary.whtAmount + whtAmount,
       otherDeductionAmount: summary.otherDeductionAmount + otherDeductionAmount,
-      grossSettlementAmount: summary.grossSettlementAmount + amountApplied + discountTaken + whtAmount + otherDeductionAmount,
+      grossSettlementAmount: summary.grossSettlementAmount + amountApplied + discountTaken - whtAmount - otherDeductionAmount,
     };
   }, { amountApplied: 0, discountTaken: 0, whtAmount: 0, otherDeductionAmount: 0, grossSettlementAmount: 0 }), [form.allocations]);
 
@@ -96,8 +96,8 @@ export default function Page({ paymentDraft }) {
               <div className='font-semibold'>Flow Collection Payment</div>
               <ol className='mt-2 list-decimal space-y-1 pl-5'>
                 <li>Pilih invoice yang dibayar oleh customer; satu payment dapat melunasi satu atau beberapa invoice.</li>
-                <li>Isi nilai kas diterima pada kolom Bayar, lalu isi potongan WHT dan/atau Potongan Lain bila ada.</li>
-                <li>Total settlement = Bayar + Diskon + WHT + Potongan Lain; nilai ini akan mengurangi balance due invoice saat payment diposting.</li>
+                <li>Isi nilai invoice/kas pada kolom Bayar, lalu isi Biaya Lainnya, potongan WHT, dan/atau Potongan Lain bila ada.</li>
+                <li>Total settlement = Nilai Invoice + Biaya Lainnya - Potongan WHT - Potongan Lainnya.</li>
               </ol>
             </div>
 
@@ -108,7 +108,7 @@ export default function Page({ paymentDraft }) {
                     <th className='px-3 py-2 text-left'>Invoice</th>
                     <th className='px-3 py-2 text-right'>Balance Due</th>
                     <th className='px-3 py-2 text-right'>Bayar/Kas</th>
-                    <th className='px-3 py-2 text-right'>Diskon</th>
+                    <th className='px-3 py-2 text-right'>Biaya Lainnya</th>
                     <th className='px-3 py-2 text-right'>WHT</th>
                     <th className='px-3 py-2 text-right'>Potongan Lain</th>
                     <th className='px-3 py-2 text-right'>Settlement</th>
@@ -117,8 +117,8 @@ export default function Page({ paymentDraft }) {
                 <tbody className='divide-y'>
                   {form.allocations.map((allocation, index) => {
                     const invoice = invoicesById.get(allocation.customer_invoice_id);
-                    const settlement = Number(allocation.amount_applied || 0) + Number(allocation.discount_taken || 0) + Number(allocation.wht_amount || 0) + Number(allocation.other_deduction_amount || 0);
-                    const overAllocated = settlement - Number(invoice?.balance_due || 0) > 0.01;
+                    const settlement = Number(allocation.amount_applied || 0) + Number(allocation.discount_taken || 0) - Number(allocation.wht_amount || 0) - Number(allocation.other_deduction_amount || 0);
+                    const overAllocated = Number(allocation.amount_applied || 0) - Number(invoice?.balance_due || 0) > 0.01;
 
                     return (
                       <tr key={allocation.customer_invoice_id} className={overAllocated ? 'bg-red-50' : ''}>
@@ -157,7 +157,7 @@ export default function Page({ paymentDraft }) {
               <h2 className='mb-3 font-semibold'>Ringkasan</h2>
               <div className='space-y-2 text-sm'>
                 <div className='flex justify-between'><span>Kas Diterima</span><b>{formatCurrency(totals.amountApplied)}</b></div>
-                <div className='flex justify-between'><span>Diskon</span><b>{formatCurrency(totals.discountTaken)}</b></div>
+                <div className='flex justify-between'><span>Biaya Lainnya</span><b>{formatCurrency(totals.discountTaken)}</b></div>
                 <div className='flex justify-between'><span>WHT</span><b>{formatCurrency(totals.whtAmount)}</b></div>
                 <div className='flex justify-between'><span>Potongan Lain</span><b>{formatCurrency(totals.otherDeductionAmount)}</b></div>
                 <div className='flex justify-between border-t pt-2 text-base'><span>Total Settlement</span><b>{formatCurrency(totals.grossSettlementAmount)}</b></div>

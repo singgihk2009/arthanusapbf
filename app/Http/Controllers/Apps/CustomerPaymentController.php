@@ -108,7 +108,11 @@ class CustomerPaymentController extends Controller
                 }
 
                 $settlement = $this->allocationSettlement($allocation);
-                if ($settlement - (float) $invoice->balance_due > 0.01) {
+                if ($settlement < -0.01) {
+                    throw ValidationException::withMessages(['allocations' => "Settlement untuk invoice {$invoice->number} tidak boleh negatif."]);
+                }
+
+                if ($allocation['amount_applied'] - (float) $invoice->balance_due > 0.01) {
                     throw ValidationException::withMessages(['allocations' => "Alokasi untuk invoice {$invoice->number} melebihi balance due."]);
                 }
             }
@@ -117,7 +121,7 @@ class CustomerPaymentController extends Controller
             $discountTaken = (float) $allocations->sum('discount_taken');
             $whtAmount = (float) $allocations->sum('wht_amount');
             $otherDeductionAmount = (float) $allocations->sum('other_deduction_amount') + (float) $allocations->sum('writeoff_amount');
-            $grossSettlementAmount = $cashAmount + $discountTaken + $whtAmount + $otherDeductionAmount;
+            $grossSettlementAmount = $cashAmount + $discountTaken - $whtAmount - $otherDeductionAmount;
 
             $payload = [
                 'number' => $this->generateNumber(),
@@ -233,16 +237,20 @@ class CustomerPaymentController extends Controller
 
                 $settlement = (float) $allocation->amount_applied
                     + (float) $allocation->discount_taken
-                    + (float) ($allocation->wht_amount ?? 0)
-                    + (float) ($allocation->other_deduction_amount ?? 0)
-                    + (float) $allocation->writeoff_amount;
+                    - (float) ($allocation->wht_amount ?? 0)
+                    - (float) ($allocation->other_deduction_amount ?? 0)
+                    - (float) $allocation->writeoff_amount;
 
-                if ($settlement - (float) $invoice->balance_due > 0.01) {
+                if ($settlement < -0.01) {
+                    throw ValidationException::withMessages(['allocations' => "Settlement untuk invoice {$invoice->number} tidak boleh negatif."]);
+                }
+
+                if ((float) $allocation->amount_applied - (float) $invoice->balance_due > 0.01) {
                     throw ValidationException::withMessages(['allocations' => "Alokasi untuk invoice {$invoice->number} melebihi balance due."]);
                 }
 
                 $nextPaid = (float) $invoice->amount_paid + (float) $allocation->amount_applied;
-                $nextBalance = max(0, (float) $invoice->balance_due - $settlement);
+                $nextBalance = max(0, (float) $invoice->balance_due - (float) $allocation->amount_applied);
                 $nextStatus = $nextBalance <= 0.01 ? 'paid' : 'partially_paid';
 
                 DB::table('customer_invoices')->where('id', $invoice->id)->update([
@@ -333,9 +341,9 @@ class CustomerPaymentController extends Controller
     {
         return (float) $allocation['amount_applied']
             + (float) $allocation['discount_taken']
-            + (float) $allocation['wht_amount']
-            + (float) $allocation['other_deduction_amount']
-            + (float) $allocation['writeoff_amount'];
+            - (float) $allocation['wht_amount']
+            - (float) $allocation['other_deduction_amount']
+            - (float) $allocation['writeoff_amount'];
     }
 
     private function generateNumber(): string
