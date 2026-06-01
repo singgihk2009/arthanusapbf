@@ -239,6 +239,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::get('/customers/template/excel', [CustomerController::class, 'downloadTemplateExcel'])->name('customers.template.excel');
     Route::post('/customers/import/excel', [CustomerController::class, 'importExcel'])->name('customers.import.excel');
     Route::get('/customers/export/excel', [CustomerController::class, 'exportExcel'])->name('customers.export.excel');
+    Route::get('/customers/{customer}/kontra-bon', [CustomerController::class, 'kontraBon'])->name('customers.kontra-bon');
     Route::resource('/customers', CustomerController::class);
     Route::get('/price-lists/resolve-price', [PriceListController::class, 'resolvePrice'])->name('price-lists.resolve-price')->middleware('can:price-list.view');
     Route::get('/items/search', [PriceListController::class, 'searchItems'])->name('items.search');

@@ -259,6 +259,61 @@ class CustomerController extends Controller
         ]);
     }
 
+
+    public function kontraBon(Request $request, Customer $customer)
+    {
+        abort_unless(Schema::hasTable('customer_invoices'), 404);
+
+        $selectedInvoiceIds = collect(explode(',', (string) $request->query('invoice_ids', '')))
+            ->map(fn ($id): int => (int) trim((string) $id))
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        $today = now()->toDateString();
+        $invoices = DB::table('customer_invoices')
+            ->where('customer_id', $customer->id)
+            ->when($selectedInvoiceIds->isNotEmpty(), fn ($query) => $query->whereIn('id', $selectedInvoiceIds))
+            ->whereIn('status', ['posted', 'partially_paid', 'overdue'])
+            ->where('balance_due', '>', 0)
+            ->whereNotNull('due_date')
+            ->whereDate('due_date', '<=', $today)
+            ->orderBy('due_date')
+            ->orderBy('number')
+            ->get([
+                'id',
+                'number',
+                'invoice_date',
+                'due_date',
+                'status',
+                'grand_total',
+                'amount_paid',
+                'balance_due',
+            ])
+            ->map(function (object $invoice) use ($today): object {
+                $invoice->days_overdue = \Carbon\Carbon::parse($invoice->due_date)->startOfDay()->diffInDays(\Carbon\Carbon::parse($today)->startOfDay());
+
+                return $invoice;
+            });
+
+        $company = Schema::hasTable('company_profiles')
+            ? DB::table('company_profiles')->orderBy('id')->first()
+            : null;
+
+        return Inertia::render('Apps/Sales/Customers/KontraBon', [
+            'customer' => $customer,
+            'invoices' => $invoices,
+            'company' => $company,
+            'document' => [
+                'number' => 'KB-'.now()->format('Ymd-His').'-'.$customer->id,
+                'date' => $today,
+                'printed_at' => now()->format('Y-m-d H:i:s'),
+                'total_balance' => $invoices->sum(fn (object $invoice): float => (float) $invoice->balance_due),
+                'invoice_count' => $invoices->count(),
+            ],
+        ]);
+    }
+
     public function edit(Customer $customer)
     {
         return Inertia::render('Apps/Sales/Customers/Form', ['customer' => $customer]);
