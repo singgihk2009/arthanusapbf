@@ -3,7 +3,7 @@ import Card from '@/Components/Card';
 import Table from '@/Components/Table';
 import { Head, router } from '@inertiajs/react';
 
-export default function Show({ purchaseOrder }) {
+export default function Show({ purchaseOrder, company = null }) {
     const canCancel = purchaseOrder.items.every((i) => +i.qty_received === 0);
     const poStatus = String(purchaseOrder.status || '').toLowerCase();
     const approvalStatusClass = { draft: 'bg-gray-100 text-gray-700', approved: 'bg-blue-100 text-blue-700', pending_approval: 'bg-amber-100 text-amber-700', rejected: 'bg-rose-100 text-rose-700', closed: 'bg-purple-100 text-purple-700', cancelled: 'bg-red-100 text-red-700' }[poStatus] || 'bg-gray-100';
@@ -113,22 +113,40 @@ export default function Show({ purchaseOrder }) {
     );
 
     const handlePrintPo = () => {
-        const linesHtml = (purchaseOrder.items || []).map((item, index) => {
+        const getUnitName = (item) => item.uom?.name || item.uom_name || item.unit || item.unit_name || 'BOX';
+        const printLines = purchaseOrder.items || [];
+        const blankRows = Array.from({ length: Math.max(0, 10 - printLines.length) });
+        const vendorAddress = [purchaseOrder.vendor?.address, purchaseOrder.vendor?.city, purchaseOrder.vendor?.province].filter(Boolean).join(', ');
+        const companyAddress = [company?.address, company?.city, company?.province].filter(Boolean).join(', ');
+        const logoMarkup = company?.logo_path
+            ? `<img src="/storage/${escapeHtml(company.logo_path)}" alt="Logo" class="company-logo" />`
+            : `<div class="company-logo-text"><span class="logo-symbol">✚</span><span><strong>artha</strong><br/>nusa</span></div>`;
+
+        const linesHtml = printLines.map((item, index) => {
             const productName = escapeHtml(item.product?.name || item.product_name || '-');
             const qty = formatNumber(item.qty_ordered, 0);
-            const unitPrice = formatNumber(item.unit_price ?? item.price ?? 0, 2);
-            const lineTotal = formatNumber(item.line_total ?? 0, 2);
+            const unit = escapeHtml(getUnitName(item));
 
             return `
                 <tr>
-                    <td>${index + 1}</td>
+                    <td class="center">${index + 1}</td>
                     <td>${productName}</td>
-                    <td class="right">${qty}</td>
-                    <td class="right">${unitPrice}</td>
-                    <td class="right">${lineTotal}</td>
+                    <td class="center">${qty}</td>
+                    <td class="center">${unit}</td>
+                    <td class="center">${qty} ${unit}</td>
                 </tr>
             `;
         }).join('');
+
+        const blankRowsHtml = blankRows.map((_, index) => `
+            <tr class="blank-row">
+                <td class="center">${printLines.length + index + 1}</td>
+                <td>&nbsp;</td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+        `).join('');
 
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
@@ -140,79 +158,119 @@ export default function Show({ purchaseOrder }) {
                     <meta charset="utf-8" />
                     <title>Purchase Order ${escapeHtml(purchaseOrder.po_number)}</title>
                     <style>
-                        @page { size: A4 portrait; margin: 32mm 12mm 14mm 12mm; }
+                        @page { size: A4 portrait; margin: 10mm 9mm 12mm; }
                         * { box-sizing: border-box; }
-                        body { font-family: Arial, sans-serif; color: #111827; font-size: 12px; }
-                        .header-space { height: 16mm; }
-                        h1 { margin: 0 0 10px; font-size: 20px; letter-spacing: 0.5px; }
-                        .po-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; margin-bottom: 12px; }
-                        .po-meta .label { color: #4b5563; width: 120px; display: inline-block; }
+                        body { margin: 0; color: #111; background: #fff; font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.2; }
+                        .sheet { width: 100%; min-height: 277mm; }
+                        .header { display: grid; grid-template-columns: 150px 1fr 210px; align-items: start; column-gap: 10px; }
+                        .company-logo { max-width: 130px; max-height: 54px; object-fit: contain; }
+                        .company-logo-text { display: flex; align-items: center; gap: 5px; color: #42a9e9; font-family: Arial, sans-serif; font-size: 22px; letter-spacing: 2px; line-height: .72; }
+                        .company-logo-text strong { color: #2f80da; font-size: 26px; font-weight: 700; letter-spacing: 0; }
+                        .logo-symbol { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border-radius: 50%; background: #42a9e9; color: #fff; font-size: 14px; }
+                        .company-main { text-align: center; }
+                        .company-name { font-family: "Times New Roman", serif; font-size: 17px; font-weight: 800; letter-spacing: 1px; }
+                        .company-subtitle { font-size: 10px; font-weight: 700; }
+                        .company-contact { margin-top: 38px; }
+                        .license-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; margin-top: 3px; }
+                        .rule { margin: 4px 0 10px; border-top: 1px dashed #777; }
+                        .title { margin: 13px 0 16px; text-align: center; font-size: 17px; letter-spacing: 11px; }
+                        .meta { display: grid; grid-template-columns: 1fr 220px; gap: 20px; margin-bottom: 22px; }
+                        .label { display: inline-block; min-width: 62px; }
+                        .vendor-name { text-transform: uppercase; font-weight: 700; }
                         table { width: 100%; border-collapse: collapse; }
-                        th, td { border: 1px solid #d1d5db; padding: 6px; vertical-align: top; }
-                        th { background: #f3f4f6; text-align: left; font-weight: 700; }
-                        .right { text-align: right; }
-                        .summary { margin-top: 10px; width: 45%; margin-left: auto; }
-                        .summary td { border: 1px solid #d1d5db; }
-                        .notes { margin-top: 14px; }
-                        .sign { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-                        .sign-box { text-align: center; }
-                        .sign-space { height: 60px; }
+                        .items { border-top: 1px dashed #777; border-bottom: 1px dashed #777; }
+                        .items th { border-bottom: 1px dashed #777; font-weight: 400; text-align: center; }
+                        .items th, .items td { padding: 1px 4px; height: 15px; vertical-align: top; }
+                        .items th:nth-child(1), .items td:nth-child(1) { width: 30px; }
+                        .items th:nth-child(2), .items td:nth-child(2) { width: auto; }
+                        .items th:nth-child(3), .items td:nth-child(3) { width: 90px; }
+                        .items th:nth-child(4), .items td:nth-child(4) { width: 110px; }
+                        .items th:nth-child(5), .items td:nth-child(5) { width: 125px; }
+                        .center { text-align: center; }
+                        .blank-row td { height: 16px; }
+                        .footer-rule { margin-top: 3px; border-top: 1px dashed #777; }
+                        .signatures { display: grid; grid-template-columns: 1fr 150px 1fr; align-items: end; gap: 36px; margin-top: 32px; }
+                        .sign-box { text-align: center; min-height: 118px; }
+                        .sign-title { margin-bottom: 56px; }
+                        .sign-line { border-top: 1px solid #444; height: 1px; margin-top: 48px; }
+                        .sign-name-space { min-height: 28px; }
+                        .middle-logo { display: flex; align-items: center; justify-content: center; color: #2f80da; font-family: Arial, sans-serif; font-size: 30px; line-height: .75; letter-spacing: 2px; padding-bottom: 28px; }
+                        .middle-logo strong { font-size: 34px; letter-spacing: 0; }
                     </style>
                 </head>
                 <body>
-                    <div class="header-space"></div>
-                    <h1>PURCHASE ORDER</h1>
+                    <main class="sheet">
+                        <header class="header">
+                            <div>${logoMarkup}</div>
+                            <div class="company-main">
+                                <div class="company-name">${escapeHtml(company?.legal_name || 'PT. ARUTALA MAHA NUSANTARA')}</div>
+                                <div class="company-subtitle">PEDAGANG BESAR FARMASI DAN ALAT KESEHATAN</div>
+                                <div>${escapeHtml(companyAddress || 'Jl. Pasar Baru Ruko No. 75-76')}</div>
+                                <div>${escapeHtml(company?.city || 'Muka')}${company?.postal_code ? `, ${escapeHtml(company.postal_code)}` : ''}</div>
+                                <div>${escapeHtml(company?.country || 'Indonesia')}</div>
+                            </div>
+                            <div class="company-contact">
+                                <div>Phone : ${escapeHtml(company?.phone || '-')}</div>
+                            </div>
+                        </header>
 
-                    <div class="po-meta">
-                        <div><span class="label">PO Number</span>: ${escapeHtml(purchaseOrder.po_number)}</div>
-                        <div><span class="label">PO Date</span>: ${escapeHtml(formatDisplayDate(purchaseOrder.po_date))}</div>
-                        <div><span class="label">Vendor</span>: ${escapeHtml(purchaseOrder.vendor?.name || '-')}</div>
-                        <div><span class="label">Expected Delivery</span>: ${escapeHtml(purchaseOrder.expected_delivery_date || '-')}</div>
-                        <div><span class="label">Currency</span>: IDR</div>
-                        <div><span class="label">Status</span>: ${escapeHtml(poStatus.toUpperCase())}</div>
-                    </div>
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width: 5%;">No</th>
-                                <th style="width: 43%;">Item</th>
-                                <th style="width: 12%;" class="right">Qty</th>
-                                <th style="width: 20%;" class="right">Unit Price</th>
-                                <th style="width: 20%;" class="right">Line Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${linesHtml}
-                        </tbody>
-                    </table>
-
-                    <table class="summary">
-                        <tbody>
-                            <tr>
-                                <td><strong>Grand Total</strong></td>
-                                <td class="right"><strong>${formatNumber(purchaseOrder.grand_total ?? 0, 2)}</strong></td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <div class="notes">
-                        <strong>Catatan:</strong><br/>
-                        Mohon mengacu pada nomor PO ini saat pengiriman barang dan penagihan invoice.
-                    </div>
-
-                    <div class="sign">
-                        <div class="sign-box">
-                            <div>Diterima oleh Vendor</div>
-                            <div class="sign-space"></div>
-                            <div>(____________________)</div>
+                        <div class="license-grid">
+                            <div>Mobile : ${escapeHtml(company?.mobile || company?.phone || '-')}</div>
+                            <div>No. Izin CDOB Obat Lain : ${escapeHtml(company?.cdob_other_license_number || '-')}</div>
+                            <div>NPWP: ${escapeHtml(company?.tax_id || '-')}</div>
+                            <div>No. Izin CDOB CCP : ${escapeHtml(company?.cdob_ccp_license_number || '-')}</div>
+                            <div>No. Izin PBF : ${escapeHtml(company?.pbf_license_number || '-')}</div>
+                            <div></div>
+                            <div>No.Izin IDAK : ${escapeHtml(company?.idak_license_number || '-')}</div>
+                            <div></div>
                         </div>
-                        <div class="sign-box">
-                            <div>Disetujui Pembeli</div>
-                            <div class="sign-space"></div>
-                            <div>(____________________)</div>
-                        </div>
-                    </div>
+                        <div class="rule"></div>
+
+                        <h1 class="title">PURCHASE ORDER</h1>
+
+                        <section class="meta">
+                            <div>
+                                <div>Pemasok :</div>
+                                <div>Yth. <span class="vendor-name">${escapeHtml(purchaseOrder.vendor?.name || '-')}</span></div>
+                                <div>${escapeHtml(vendorAddress || 'di Tempat')}</div>
+                            </div>
+                            <div>
+                                <div><span class="label">Nomor</span>: ${escapeHtml(purchaseOrder.po_number)}</div>
+                                <div><span class="label">Tanggal</span>: ${escapeHtml(formatDisplayDate(purchaseOrder.po_date))}</div>
+                            </div>
+                        </section>
+
+                        <table class="items">
+                            <thead>
+                                <tr>
+                                    <th>No</th>
+                                    <th>Nama Barang</th>
+                                    <th>QTY</th>
+                                    <th>Satuan</th>
+                                    <th>Jumlah</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${linesHtml}
+                                ${blankRowsHtml}
+                            </tbody>
+                        </table>
+                        <div class="footer-rule"></div>
+
+                        <section class="signatures">
+                            <div class="sign-box">
+                                <div class="sign-title">Pemohon,</div>
+                                <div class="sign-line"></div>
+                                <div class="sign-name-space"></div>
+                            </div>
+                            <div class="middle-logo"><span class="logo-symbol">✚</span><span><strong>artha</strong><br/>nusa</span></div>
+                            <div class="sign-box">
+                                <div class="sign-title">Persetujuan,</div>
+                                <div class="sign-line"></div>
+                                <div class="sign-name-space"></div>
+                            </div>
+                        </section>
+                    </main>
                 </body>
             </html>
         `;
