@@ -2,7 +2,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import { Head, Link, usePage } from '@inertiajs/react';
 import React, { useMemo, useState } from 'react';
 
-const emptyLine = { item_id: '', batch_id: '', qty_used: '', uom_id: '', notes: '' };
+const emptyLine = { item_id: '', batch_id: '', qty_used: '', uom_id: '', notes: '', sale_line_id: '', source_line_id: '', qty_ordered: '', qty_already_shipped: '', qty_remaining: '' };
 const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 const lineInputClassName = 'rounded border border-gray-300 bg-white px-2 py-1 text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 
@@ -13,6 +13,7 @@ export default function Edit() {
     const [message, setMessage] = useState(null);
     const [loading, setLoading] = useState(false);
     const viewOnly = !!entry.view_only;
+    const isSalesShipment = String(entry.source_type || '').toLowerCase() === 'sales_order' || !!entry.sale_id;
 
     const defaultUomByItemId = useMemo(() => new Map(items.map((item) => [String(item.id), String(item.base_uom_id ?? '')])), [items]);
 
@@ -24,6 +25,12 @@ export default function Edit() {
 
         if (field === 'item_id') {
             updatedLine.uom_id = defaultUomByItemId.get(String(value)) ?? '';
+            updatedLine.batch_id = '';
+            updatedLine.sale_line_id = '';
+            updatedLine.source_line_id = '';
+            updatedLine.qty_ordered = '';
+            updatedLine.qty_already_shipped = '';
+            updatedLine.qty_remaining = '';
         }
 
         updated[index] = updatedLine;
@@ -81,13 +88,13 @@ export default function Edit() {
 
                         <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
                             <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-                                <thead className="bg-gray-50 dark:bg-gray-900"><tr><th className="px-2 py-2 text-left">Item</th><th className="px-2 py-2 text-left">Batch</th><th className="px-2 py-2 text-left">Qty</th><th className="px-2 py-2 text-left">UOM</th><th className="px-2 py-2 text-left">Keterangan</th><th className="px-2 py-2 text-left">Aksi</th></tr></thead>
+                                <thead className="bg-gray-50 dark:bg-gray-900"><tr><th className="px-2 py-2 text-left">Item</th><th className="px-2 py-2 text-left">Batch</th>{isSalesShipment && <th className='px-2 py-2 text-left'>Qty Ordered</th>}{isSalesShipment && <th className='px-2 py-2 text-left'>Already Shipped</th>}{isSalesShipment && <th className='px-2 py-2 text-left'>Remaining</th>}<th className="px-2 py-2 text-left">Qty</th><th className="px-2 py-2 text-left">UOM</th><th className="px-2 py-2 text-left">Keterangan</th><th className="px-2 py-2 text-left">Aksi</th></tr></thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                     {form.lines.map((line, index) => (
                                         <tr key={index}>
-                                            <td className="p-2"><select disabled={viewOnly} value={line.item_id} onChange={(e) => { updateLine(index, 'item_id', e.target.value); updateLine(index, 'batch_id', ''); }} className={`w-56 ${lineInputClassName}`}><option value="">Pilih Item</option>{items.map((item) => <option key={item.id} value={item.id}>{item.sku} - {item.name}</option>)}</select>{errors[`lines.${index}.item_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.item_id`][0]}</p>}</td>
+                                            <td className="p-2"><select disabled={viewOnly || (isSalesShipment && !!line.sale_line_id)} value={line.item_id} onChange={(e) => updateLine(index, 'item_id', e.target.value)} className={`w-56 ${lineInputClassName}`}><option value="">Pilih Item</option>{items.map((item) => <option key={item.id} value={item.id}>{item.sku} - {item.name}</option>)}</select>{errors[`lines.${index}.item_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.item_id`][0]}</p>}{errors[`lines.${index}.sale_line_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.sale_line_id`][0]}</p>}</td>
                                             <td className="p-2"><select value={line.batch_id} onChange={(e) => updateLine(index, 'batch_id', e.target.value)} className={`w-44 ${lineInputClassName}`} disabled={viewOnly || !line.item_id}><option value="">Tanpa batch (AVG)</option>{availableBatches(line.item_id).map((batch) => <option key={batch.id} value={batch.id}>{batch.batch_no}{batch.expired_date ? ` (EXP ${batch.expired_date})` : ''}</option>)}</select>{errors[`lines.${index}.batch_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.batch_id`][0]}</p>}</td>
-                                            <td className="p-2"><input disabled={viewOnly} type="number" min="0" step="0.000001" value={line.qty_used} onChange={(e) => updateLine(index, 'qty_used', e.target.value)} className={`w-28 ${lineInputClassName}`} />{errors[`lines.${index}.qty_used`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.qty_used`][0]}</p>}</td>
+                                            {isSalesShipment && <td className='p-2'>{line.qty_ordered || '-'}</td>}{isSalesShipment && <td className='p-2'>{line.qty_already_shipped || '-'}</td>}{isSalesShipment && <td className='p-2'>{line.qty_remaining || '-'}</td>}<td className="p-2"><input disabled={viewOnly} type="number" min="0" step="0.000001" value={line.qty_used} onChange={(e) => updateLine(index, 'qty_used', e.target.value)} className={`w-28 ${lineInputClassName}`} />{errors[`lines.${index}.qty_used`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.qty_used`][0]}</p>}</td>
                                             <td className="p-2"><select disabled={viewOnly} value={line.uom_id} onChange={(e) => updateLine(index, 'uom_id', e.target.value)} className={`w-36 ${lineInputClassName}`}><option value="">UOM</option>{uoms.map((uom) => <option key={uom.id} value={uom.id}>{uom.code}</option>)}</select>{errors[`lines.${index}.uom_id`] && <p className="mt-1 text-xs text-red-500">{errors[`lines.${index}.uom_id`][0]}</p>}</td>
                                             <td className="p-2"><input disabled={viewOnly} value={line.notes} onChange={(e) => updateLine(index, 'notes', e.target.value)} className={`w-44 ${lineInputClassName}`} /></td>
                                             <td className="p-2">{!viewOnly && <button type="button" onClick={() => removeLine(index)} className="rounded border border-red-300 px-2 py-1 text-red-600">Hapus</button>}</td>
@@ -97,7 +104,7 @@ export default function Edit() {
                             </table>
                         </div>
 
-                        {!viewOnly && <div className="flex flex-wrap items-center justify-between gap-2">
+                        {!viewOnly && !isSalesShipment && <div className="flex flex-wrap items-center justify-between gap-2">
                             <button type="button" onClick={addLine} className="rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:text-gray-100">+ Tambah Line</button>
                         </div>}
 
