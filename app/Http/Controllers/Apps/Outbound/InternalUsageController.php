@@ -132,6 +132,8 @@ class InternalUsageController extends Controller
         $this->warehouseAccessService->assertWarehouseAccess($request->user(), $validated['warehouse_id']);
 
         DB::transaction(function () use ($validated): void {
+            $linkagePayload = $this->resolveSalesDispatchLinkage((object) [], $validated);
+
             $entryPayload = [
                 'number' => $this->generateNumber(),
                 'warehouse_id' => $validated['warehouse_id'],
@@ -146,11 +148,11 @@ class InternalUsageController extends Controller
                 'notes' => $validated['notes'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
-                'source_type' => $validated['source_type'] ?? null,
-                'source_id' => $validated['source_id'] ?? null,
-                'source_number' => $validated['source_number'] ?? null,
-                'customer_id' => $validated['customer_id'] ?? null,
-                'sale_id' => $validated['sale_id'] ?? null,
+                'source_type' => $linkagePayload['source_type'],
+                'source_id' => $linkagePayload['source_id'],
+                'source_number' => $linkagePayload['source_number'],
+                'customer_id' => $linkagePayload['customer_id'],
+                'sale_id' => $linkagePayload['sale_id'],
             ];
             $entryPayload = $this->appendDispatchHeaderPayload($entryPayload, $validated);
             $entryId = DB::table('internal_usages')->insertGetId($entryPayload);
@@ -207,6 +209,7 @@ class InternalUsageController extends Controller
                 'source_id' => $entry->source_id ? (int) $entry->source_id : null,
                 'source_type' => (string) ($entry->source_type ?? ''),
                 'source_number' => (string) ($entry->source_number ?? ''),
+                'customer_id' => $entry->customer_id ? (int) $entry->customer_id : null,
                 'view_only' => $viewOnly,
             ],
             'lines' => $lines,
@@ -232,6 +235,8 @@ class InternalUsageController extends Controller
             $linked = DB::table('inv_transactions')->where('source_table', 'internal_usages')->where('source_id', $entry->id)->exists();
             abort_if($linked, 422, 'Dokumen sudah terikat GL, gunakan reversal/adjustment.');
 
+            $linkagePayload = $this->resolveSalesDispatchLinkage($entry, $validated);
+
             $entryPayload = [
                 'warehouse_id' => $validated['warehouse_id'],
                 'facility_scheme_id' => $validated['facility_scheme_id'],
@@ -243,11 +248,11 @@ class InternalUsageController extends Controller
                 'document_date' => $validated['document_date'],
                 'notes' => $validated['notes'] ?? null,
                 'updated_at' => now(),
-                'source_type' => $validated['source_type'] ?? null,
-                'source_id' => $validated['source_id'] ?? null,
-                'source_number' => $validated['source_number'] ?? null,
-                'customer_id' => $validated['customer_id'] ?? null,
-                'sale_id' => $validated['sale_id'] ?? null,
+                'source_type' => $linkagePayload['source_type'],
+                'source_id' => $linkagePayload['source_id'],
+                'source_number' => $linkagePayload['source_number'],
+                'customer_id' => $linkagePayload['customer_id'],
+                'sale_id' => $linkagePayload['sale_id'],
             ];
             $entryPayload = $this->appendDispatchHeaderPayload($entryPayload, $validated);
             DB::table('internal_usages')->where('id', $internalUsage)->update($entryPayload);
@@ -280,6 +285,61 @@ class InternalUsageController extends Controller
         });
 
         return back()->with('success', 'Dispatch berhasil dihapus.');
+    }
+
+
+    private function resolveSalesDispatchLinkage(object $entry, array $validated): array
+    {
+        $sourceType = $this->nullableString($this->valueFromRequestOrEntry($validated, $entry, 'source_type'));
+        $sourceId = $this->nullableInt($this->valueFromRequestOrEntry($validated, $entry, 'source_id'));
+        $sourceNumber = $this->nullableString($this->valueFromRequestOrEntry($validated, $entry, 'source_number'));
+        $customerId = $this->nullableInt($this->valueFromRequestOrEntry($validated, $entry, 'customer_id'));
+        $saleId = $this->nullableInt($this->valueFromRequestOrEntry($validated, $entry, 'sale_id'));
+
+        if ($sourceType === 'sales_order' && ! $saleId && $sourceId) {
+            $saleId = $sourceId;
+        }
+
+        if ($saleId) {
+            $sale = DB::table('sales')->where('id', $saleId)->first(['id', 'customer_id', 'number']);
+            if ($sale) {
+                $sourceType = $sourceType ?: 'sales_order';
+                $sourceId = $sourceId ?: (int) $sale->id;
+                $sourceNumber = $sourceNumber ?: (string) $sale->number;
+                $customerId = $customerId ?: (int) $sale->customer_id;
+            }
+        }
+
+        return [
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+            'source_number' => $sourceNumber,
+            'customer_id' => $customerId,
+            'sale_id' => $saleId,
+        ];
+    }
+
+    private function valueFromRequestOrEntry(array $validated, object $entry, string $key): mixed
+    {
+        return array_key_exists($key, $validated) ? $validated[$key] : ($entry->{$key} ?? null);
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        $value = is_string($value) ? trim($value) : $value;
+
+        return $value === null || $value === '' ? null : (string) $value;
+    }
+
+    private function nullableInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $value = (int) $value;
+
+        return $value > 0 ? $value : null;
     }
 
     private function replaceLines(int $entryId, array $lines): void

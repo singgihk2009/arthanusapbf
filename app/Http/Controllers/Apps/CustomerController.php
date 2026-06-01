@@ -170,7 +170,9 @@ class CustomerController extends Controller
                 ->leftJoin('warehouses as w', 'w.id', '=', 'iu.warehouse_id')
                 ->when(Schema::hasTable('shipments'), function ($query): void {
                     $query->leftJoin('shipments as sh', 'sh.dispatch_id', '=', 'iu.id')
-                        ->leftJoin('sales as so', 'so.id', '=', 'sh.sale_id');
+                        ->leftJoin('sales as so', function ($join): void {
+                            $join->on('so.id', '=', DB::raw("COALESCE(iu.sale_id, sh.sale_id, CASE WHEN iu.source_type = 'sales_order' THEN iu.source_id END)"));
+                        });
                 })
                 ->when(Schema::hasTable('customer_invoice_dispatches'), function ($query): void {
                     $query->leftJoin('customer_invoice_dispatches as cid', 'cid.internal_usage_id', '=', 'iu.id')
@@ -180,9 +182,10 @@ class CustomerController extends Controller
                 })
                 ->where(function ($query) use ($customer): void {
                     $query->where('iu.customer_id', $customer->id)
-                        ->orWhere('sh.customer_id', $customer->id);
+                        ->orWhere('sh.customer_id', $customer->id)
+                        ->orWhere('so.customer_id', $customer->id);
                 })
-                ->groupBy('iu.id', 'iu.number', 'iu.document_date', 'iu.department', 'iu.cost_center', 'iu.status', 'iu.sale_id', 'iu.source_type', 'iu.source_id', 'iu.source_number', 'iu.customer_id', 'w.name', 'sh.sale_id', 'sh.customer_id', 'so.number')
+                ->groupBy('iu.id', 'iu.number', 'iu.document_date', 'iu.department', 'iu.cost_center', 'iu.status', 'iu.sale_id', 'iu.source_type', 'iu.source_id', 'iu.source_number', 'iu.customer_id', 'w.name', 'sh.sale_id', 'sh.customer_id', 'so.id', 'so.number', 'so.customer_id')
                 ->orderByDesc('iu.id')
                 ->get([
                     'iu.id',
@@ -191,9 +194,9 @@ class CustomerController extends Controller
                     'iu.department',
                     'iu.cost_center',
                     'iu.status',
-                    DB::raw('COALESCE(iu.sale_id, sh.sale_id) as sale_id'),
+                    DB::raw('COALESCE(iu.sale_id, sh.sale_id, so.id) as sale_id'),
                     DB::raw("COALESCE(iu.source_type, CASE WHEN sh.sale_id IS NOT NULL THEN 'sales_order' END) as source_type"),
-                    DB::raw('COALESCE(iu.source_id, sh.sale_id) as source_id'),
+                    DB::raw('COALESCE(iu.source_id, sh.sale_id, so.id) as source_id'),
                     DB::raw('COALESCE(iu.source_number, so.number) as source_number'),
                     DB::raw('COALESCE(w.name, "-") as warehouse_label'),
                     DB::raw(Schema::hasTable('customer_invoice_dispatches') ? 'MAX(ci.id) as invoice_id' : 'NULL as invoice_id'),
