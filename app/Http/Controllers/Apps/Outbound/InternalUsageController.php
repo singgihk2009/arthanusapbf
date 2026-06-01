@@ -163,6 +163,74 @@ class InternalUsageController extends Controller
         return to_route('apps.outbound.internal-usage.index')->with('success', 'Dispatch berhasil disimpan.');
     }
 
+    public function print(int $internalUsage): Response
+    {
+        $user = auth()->user();
+        abort_if(! $user, 401);
+
+        $customerCodeColumns = collect(['customer_code', 'code'])
+            ->filter(fn (string $column): bool => Schema::hasColumn('customers', $column))
+            ->map(fn (string $column): string => 'c.'.$column)
+            ->values();
+        $customerNameColumns = collect(['customer_name', 'name'])
+            ->filter(fn (string $column): bool => Schema::hasColumn('customers', $column))
+            ->map(fn (string $column): string => 'c.'.$column)
+            ->values();
+        $customerCodeExpression = 'COALESCE('.$customerCodeColumns->push("'-'")->implode(', ').') as customer_code';
+        $customerNameExpression = 'COALESCE('.$customerNameColumns->push('iu.sender_receiver_name', "'-'")->implode(', ').') as customer_name';
+
+        $entry = DB::table('internal_usages as iu')
+            ->leftJoin('warehouses as w', 'w.id', '=', 'iu.warehouse_id')
+            ->leftJoin('customers as c', 'c.id', '=', 'iu.customer_id')
+            ->leftJoin('users as su', 'su.id', '=', 'c.salesman_id')
+            ->where('iu.id', $internalUsage)
+            ->select([
+                'iu.*',
+                DB::raw('COALESCE(w.code, "-") as warehouse_code'),
+                DB::raw('COALESCE(w.name, "-") as warehouse_name'),
+                DB::raw($customerCodeExpression),
+                DB::raw($customerNameExpression),
+                DB::raw('COALESCE(c.address, "-") as customer_address'),
+                DB::raw('COALESCE(c.city, "") as customer_city'),
+                DB::raw('COALESCE(c.province, "") as customer_province'),
+                DB::raw('COALESCE(c.phone, "") as customer_phone'),
+                DB::raw('COALESCE(c.npwp, "-") as customer_npwp'),
+                DB::raw('c.salesman_id as salesman_id'),
+                DB::raw('COALESCE(su.name, "") as salesman_name'),
+            ])
+            ->first();
+
+        abort_if(! $entry, 404);
+        $this->warehouseAccessService->assertWarehouseAccess($user, $entry->warehouse_id);
+
+        $lines = DB::table('internal_usage_lines as iul')
+            ->leftJoin('items as i', 'i.id', '=', 'iul.item_id')
+            ->leftJoin('uoms as u', 'u.id', '=', 'iul.uom_id')
+            ->leftJoin('item_batches as ib', 'ib.id', '=', 'iul.batch_id')
+            ->where('iul.internal_usage_id', $internalUsage)
+            ->orderBy('iul.id')
+            ->get([
+                'iul.id',
+                'iul.qty_used',
+                'iul.notes',
+                DB::raw('COALESCE(i.sku, "-") as item_sku'),
+                DB::raw('COALESCE(i.name, "-") as item_name'),
+                DB::raw('COALESCE(u.code, "-") as uom_code'),
+                DB::raw('COALESCE(ib.batch_no, "-") as batch_no'),
+                DB::raw('ib.expired_date as expired_date'),
+            ]);
+
+        $company = Schema::hasTable('company_profiles')
+            ? DB::table('company_profiles')->orderBy('id')->first()
+            : null;
+
+        return Inertia::render('Apps/Outbound/InternalUsage/Print', [
+            'entry' => $entry,
+            'lines' => $lines,
+            'company' => $company,
+        ]);
+    }
+
     public function edit(Request $request, int $internalUsage): Response
     {
         $user = auth()->user();
