@@ -94,7 +94,16 @@ export default function Page({ customer, summary, salesOrders = [], dispatches =
     [customerInvoices],
   );
   const allPayableInvoicesChecked = payableInvoiceIds.length > 0 && payableInvoiceIds.every((id) => selectedInvoiceIds.includes(id));
+  const todayString = new Date().toISOString().slice(0, 10);
+  const kontraBonInvoiceIds = useMemo(
+    () => customerInvoices
+      .filter((invoice) => ['posted', 'partially_paid', 'overdue'].includes(statusKey(invoice.status)) && Number(invoice.balance_due || 0) > 0 && invoice.due_date && invoice.due_date <= todayString)
+      .map((invoice) => invoice.id),
+    [customerInvoices, todayString],
+  );
+  const selectedKontraBonInvoiceIds = selectedInvoiceIds.filter((id) => kontraBonInvoiceIds.includes(id));
   const createPaymentUrl = selectedInvoiceIds.length ? `/apps/customer-payments/create?invoice_ids=${selectedInvoiceIds.join(',')}` : '#';
+  const kontraBonUrl = selectedKontraBonInvoiceIds.length ? `/apps/customers/${customer.id}/kontra-bon?invoice_ids=${selectedKontraBonInvoiceIds.join(',')}` : '#';
 
   const approvableSalesOrderIds = useMemo(
     () => salesOrders.filter((salesOrder) => {
@@ -497,7 +506,10 @@ export default function Page({ customer, summary, salesOrders = [], dispatches =
                         <h3 className='font-semibold text-slate-900'>4. Invoice → Collection</h3>
                         <p className='text-xs text-slate-500'>Pilih invoice posted/partial/overdue untuk collection payment.</p>
                       </div>
-                      <Link href={createPaymentUrl} className={`rounded-lg px-3 py-2 text-sm font-medium ${selectedInvoiceIds.length ? 'bg-slate-900 text-white' : 'pointer-events-none bg-slate-200 text-slate-500'}`}>Create Payment ({selectedInvoiceIds.length})</Link>
+                      <div className='flex flex-wrap gap-2'>
+                        <Link href={createPaymentUrl} className={`rounded-lg px-3 py-2 text-sm font-medium ${selectedInvoiceIds.length ? 'bg-slate-900 text-white' : 'pointer-events-none bg-slate-200 text-slate-500'}`}>Create Payment ({selectedInvoiceIds.length})</Link>
+                        <Link href={kontraBonUrl} target='_blank' className={`rounded-lg px-3 py-2 text-sm font-medium ${selectedKontraBonInvoiceIds.length ? 'bg-amber-500 text-white hover:bg-amber-600' : 'pointer-events-none bg-slate-200 text-slate-500'}`}>Kontra Bon ({selectedKontraBonInvoiceIds.length})</Link>
+                      </div>
                     </div>
                     <div className='mt-3 overflow-x-auto rounded-lg border border-slate-200'>
                       <table className='min-w-full text-sm'>
@@ -701,7 +713,7 @@ export default function Page({ customer, summary, salesOrders = [], dispatches =
 
           {activeTab === 'Invoices' && (
             <div className='space-y-3'>
-              <div className='flex flex-wrap items-center justify-between gap-2 rounded border bg-gray-50 p-3 text-sm'><div><b>Invoice terbuka: {payableInvoiceIds.length}</b><div className='text-gray-600'>Terpilih untuk collection: {selectedInvoiceIds.length}</div></div><Link href={createPaymentUrl} className={`rounded px-3 py-2 font-medium ${selectedInvoiceIds.length ? 'bg-indigo-600 text-white' : 'pointer-events-none bg-gray-200 text-gray-500'}`}>Create Payment</Link></div>
+              <div className='flex flex-wrap items-center justify-between gap-2 rounded border bg-gray-50 p-3 text-sm'><div><b>Invoice terbuka: {payableInvoiceIds.length}</b><div className='text-gray-600'>Terpilih untuk collection: {selectedInvoiceIds.length} · jatuh tempo untuk Kontra Bon: {selectedKontraBonInvoiceIds.length}</div></div><div className='flex flex-wrap gap-2'><Link href={createPaymentUrl} className={`rounded px-3 py-2 font-medium ${selectedInvoiceIds.length ? 'bg-indigo-600 text-white' : 'pointer-events-none bg-gray-200 text-gray-500'}`}>Create Payment</Link><Link href={kontraBonUrl} target='_blank' className={`rounded px-3 py-2 font-medium ${selectedKontraBonInvoiceIds.length ? 'bg-amber-500 text-white' : 'pointer-events-none bg-gray-200 text-gray-500'}`}>Kontra Bon</Link></div></div>
               <div className='overflow-x-auto rounded border'><table className='min-w-full text-sm'><thead className='bg-gray-50'><tr><th className='px-3 py-2 text-center'><input type='checkbox' checked={allPayableInvoicesChecked} onChange={toggleAllPayableInvoices} disabled={!payableInvoiceIds.length} /></th><th className='px-3 py-2 text-left'>Number</th><th className='px-3 py-2 text-left'>Tanggal</th><th className='px-3 py-2 text-left'>Due Date</th><th className='px-3 py-2 text-left'>Status</th><th className='px-3 py-2 text-right'>Grand Total</th><th className='px-3 py-2 text-right'>Balance Due</th><th className='px-3 py-2 text-center'>Aksi</th></tr></thead><tbody className='divide-y'>{!customerInvoices.length && <tr><td colSpan={8} className='px-3 py-4 text-center text-gray-500'>Belum ada invoice.</td></tr>}{customerInvoices.map((invoice) => { const payable = payableInvoiceIds.includes(invoice.id); return <tr key={invoice.id}><td className='px-3 py-2 text-center'>{payable ? <input type='checkbox' checked={selectedInvoiceIds.includes(invoice.id)} onChange={() => toggleInvoiceSelection(invoice.id)} /> : '-'}</td><td className='px-3 py-2'>{invoice.number}</td><td className='px-3 py-2'>{invoice.invoice_date}</td><td className='px-3 py-2'>{invoice.due_date || '-'}</td><td className='px-3 py-2'><StatusPill status={invoice.status} /></td><td className='px-3 py-2 text-right'>{formatCurrency(invoice.grand_total)}</td><td className='px-3 py-2 text-right'>{formatCurrency(invoice.balance_due)}</td><td className='px-3 py-2 text-center'><div className='flex justify-center gap-1'><Link href={route('apps.customer-invoices.show', invoice.id)} className='rounded border px-2 py-1 text-xs'>View</Link>{statusKey(invoice.status) === 'draft' && <Link href={route('apps.customer-invoices.edit', invoice.id)} className='rounded border border-indigo-300 px-2 py-1 text-xs text-indigo-700'>Edit</Link>}</div></td></tr>; })}</tbody></table></div>
             </div>
           )}
