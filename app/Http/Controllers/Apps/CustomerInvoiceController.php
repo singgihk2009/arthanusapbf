@@ -366,7 +366,7 @@ class CustomerInvoiceController extends Controller
                 DB::raw('COALESCE(i.name, "") as item_name'),
                 DB::raw('COALESCE(ib.batch_no, "") as batch_no'),
                 DB::raw('COALESCE(u.code, "") as uom_code'),
-                DB::raw('COALESCE(ib.unit_cost, bal.avg_cost, 0) as fallback_unit_cost'),
+                DB::raw('COALESCE(bal.avg_cost, 0) as fallback_unit_cost'),
             ])
             ->map(function (object $line) use ($snapshotCosts): array {
                 $qty = (float) $line->qty;
