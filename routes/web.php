@@ -198,6 +198,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::get('/outbound/internal-usage/create', [InternalUsageController::class, 'create'])->name('outbound.internal-usage.create');
     Route::get('/sales-orders/{salesOrder}/dispatch/create', [InternalUsageController::class, 'createFromSalesOrder'])->name('sales-orders.dispatch.create')->middleware('can:shipment.create|dispatch.create');
     Route::post('/outbound/internal-usage', [InternalUsageController::class, 'store'])->name('outbound.internal-usage.store');
+    Route::get('/outbound/internal-usage/{internalUsage}/print', [InternalUsageController::class, 'print'])->name('outbound.internal-usage.print');
     Route::get('/outbound/internal-usage/{internalUsage}/edit', [InternalUsageController::class, 'edit'])->name('outbound.internal-usage.edit');
     Route::put('/outbound/internal-usage/{internalUsage}', [InternalUsageController::class, 'update'])->name('outbound.internal-usage.update');
     Route::delete('/outbound/internal-usage/{internalUsage}', [InternalUsageController::class, 'destroy'])->name('outbound.internal-usage.destroy');
