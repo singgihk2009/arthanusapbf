@@ -548,7 +548,9 @@ class CustomerInvoiceController extends Controller
         $dispatchQuery = DB::table('internal_usages as iu')
             ->leftJoin('warehouses as w', 'w.id', '=', 'iu.warehouse_id')
             ->leftJoin('shipments as sh', 'sh.dispatch_id', '=', 'iu.id')
-            ->leftJoin('sales as so', 'so.id', '=', 'sh.sale_id')
+            ->leftJoin('sales as so', function ($join): void {
+                $join->on('so.id', '=', DB::raw("COALESCE(iu.sale_id, sh.sale_id, CASE WHEN iu.source_type = 'sales_order' THEN iu.source_id END)"));
+            })
             ->whereIn('iu.id', $dispatchIds)
             ->where('iu.status', 'POSTED')
             ->where(function ($query): void {
@@ -560,9 +562,9 @@ class CustomerInvoiceController extends Controller
                 'iu.id',
                 'iu.number',
                 'iu.document_date',
-                DB::raw('COALESCE(iu.customer_id, sh.customer_id) as customer_id'),
-                DB::raw('COALESCE(iu.sale_id, sh.sale_id) as sale_id'),
-                DB::raw('COALESCE(iu.source_id, sh.sale_id) as source_id'),
+                DB::raw('COALESCE(iu.customer_id, sh.customer_id, so.customer_id) as customer_id'),
+                DB::raw('COALESCE(iu.sale_id, sh.sale_id, so.id) as sale_id'),
+                DB::raw('COALESCE(iu.source_id, sh.sale_id, so.id) as source_id'),
                 DB::raw('COALESCE(iu.source_number, so.number) as source_number'),
                 DB::raw('COALESCE(w.name, "-") as warehouse_label'),
             ]);
@@ -574,7 +576,8 @@ class CustomerInvoiceController extends Controller
         if ($customerId) {
             $dispatchQuery->where(function ($query) use ($customerId): void {
                 $query->where('iu.customer_id', $customerId)
-                    ->orWhere('sh.customer_id', $customerId);
+                    ->orWhere('sh.customer_id', $customerId)
+                    ->orWhere('so.customer_id', $customerId);
             });
         }
 
