@@ -4,8 +4,10 @@ import AppLayout from '@/Layouts/AppLayout';
 
 const formatCurrency = (value) => Number(value || 0).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' });
 
-export default function Page({ invoiceDraft }) {
+export default function Page({ invoiceDraft, mode = 'create' }) {
   const defaults = invoiceDraft?.defaults ?? {};
+  const invoice = invoiceDraft?.invoice ?? null;
+  const isEdit = mode === 'edit' || Boolean(invoice?.id);
   const [draftLines, setDraftLines] = useState(invoiceDraft?.lines ?? []);
   const [editingLineId, setEditingLineId] = useState(null);
   const [form, setForm] = useState({
@@ -19,7 +21,7 @@ export default function Page({ invoiceDraft }) {
     tax_enabled: defaults.tax_enabled ?? true,
     tax_percent: defaults.tax_percent ?? 11,
     freight_amount: defaults.freight_amount ?? 0,
-    notes: '',
+    notes: defaults.notes ?? '',
   });
   const [errors, setErrors] = useState({});
   const [processing, setProcessing] = useState(false);
@@ -62,19 +64,27 @@ export default function Page({ invoiceDraft }) {
     setProcessing(true);
     setErrors({});
 
-    router.post(route('apps.customer-invoices.store'), form, {
+    const url = isEdit ? route('apps.customer-invoices.update', invoice.id) : route('apps.customer-invoices.store');
+    const options = {
       onError: (serverErrors) => setErrors(serverErrors),
       onFinish: () => setProcessing(false),
-    });
+    };
+
+    if (isEdit) {
+      router.put(url, form, options);
+      return;
+    }
+
+    router.post(url, form, options);
   };
 
   if (!invoiceDraft) {
     return (
       <AppLayout>
-        <Head title='Create Customer Invoice' />
+        <Head title={isEdit ? 'Edit Customer Invoice' : 'Create Customer Invoice'} />
         <div className='p-6'>
           <div className='rounded border bg-white p-4 shadow-sm'>
-            <h1 className='text-xl font-semibold'>Create Customer Invoice</h1>
+            <h1 className='text-xl font-semibold'>{isEdit ? 'Edit Customer Invoice' : 'Create Customer Invoice'}</h1>
             <p className='mt-2 text-sm text-gray-600'>Pilih dispatch POSTED dari tab Fulfillment customer untuk membuat invoice berdasarkan satu atau beberapa dispatch.</p>
             <Link href={route('apps.customers.index')} className='mt-4 inline-block rounded border px-3 py-2 text-sm'>Back to Customers</Link>
           </div>
@@ -85,15 +95,18 @@ export default function Page({ invoiceDraft }) {
 
   return (
     <AppLayout>
-      <Head title='Create Customer Invoice' />
+      <Head title={isEdit ? `Edit Invoice ${invoice?.number || ''}` : 'Create Customer Invoice'} />
       <div className='space-y-4 p-6'>
         <div className='rounded border bg-white p-4 shadow-sm'>
           <div className='flex flex-wrap items-start justify-between gap-3'>
             <div>
-              <h1 className='text-xl font-semibold'>Draft Invoice dari Dispatch</h1>
-              <p className='text-sm text-gray-600'>{invoiceDraft.customer.customer_name} ({invoiceDraft.customer.customer_code})</p>
+              <h1 className='text-xl font-semibold'>{isEdit ? `Edit Draft Invoice ${invoice?.number || ''}` : 'Draft Invoice dari Dispatch'}</h1>
+              <p className='text-sm text-gray-600'>{invoiceDraft.customer.customer_name} ({invoiceDraft.customer.customer_code}){isEdit ? ' • Status: Draft' : ''}</p>
             </div>
-            <Link href={route('apps.customers.show', invoiceDraft.customer.id)} className='rounded border px-3 py-2 text-sm'>Back to Customer</Link>
+            <div className='flex flex-wrap gap-2'>
+              {isEdit && <Link href={route('apps.customer-invoices.show', invoice.id)} className='rounded border px-3 py-2 text-sm'>Back to Invoice</Link>}
+              <Link href={route('apps.customers.show', invoiceDraft.customer.id)} className='rounded border px-3 py-2 text-sm'>Back to Customer</Link>
+            </div>
           </div>
         </div>
 
@@ -193,7 +206,7 @@ export default function Page({ invoiceDraft }) {
                 <div className='flex justify-between'><span>PPN</span><b>{formatCurrency(totals.taxTotal)}</b></div>
                 <div className='flex justify-between border-t pt-2 text-base'><span>Grand Total</span><b>{formatCurrency(totals.grandTotal)}</b></div>
               </div>
-              <button type='submit' disabled={processing} className='mt-4 w-full rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50'>{processing ? 'Menyimpan...' : 'Simpan Draft Invoice'}</button>
+              <button type='submit' disabled={processing} className='mt-4 w-full rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50'>{processing ? 'Menyimpan...' : isEdit ? 'Update Draft Invoice' : 'Simpan Draft Invoice'}</button>
             </div>
           </div>
         </form>

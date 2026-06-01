@@ -67,34 +67,14 @@ class CustomerInvoiceController extends Controller
 
         $invoice = DB::transaction(function () use ($validated) {
             $draft = $this->buildDraftFromDispatches($validated['dispatch_ids'], (int) $validated['customer_id'], true);
-            $linePrices = collect($validated['line_prices'] ?? [])->mapWithKeys(fn ($price, $lineId): array => [(int) $lineId => (float) $price]);
-            $lines = collect($draft['lines'] ?? [])->map(function (array $line) use ($linePrices): array {
-                $lineId = (int) $line['internal_usage_line_id'];
-                if (! $linePrices->has($lineId)) {
-                    return $line;
-                }
-
-                $unitPrice = max(0, (float) $linePrices->get($lineId));
-                $line['unit_price'] = $unitPrice;
-                $line['line_total'] = (float) $line['qty'] * $unitPrice;
-
-                return $line;
-            });
-
-            if ($lines->isEmpty()) {
-                throw ValidationException::withMessages(['dispatch_ids' => 'Dispatch terpilih tidak memiliki line yang bisa ditagihkan.']);
-            }
-
-            $subtotal = (float) $lines->sum('line_total');
-            $freightAmount = (float) ($validated['freight_amount'] ?? 0);
-            $discountType = (string) ($validated['discount_type'] ?? 'amount');
-            $discountValue = (float) ($validated['discount_value'] ?? 0);
-            $discountTotal = $discountType === 'percent' ? $subtotal * $discountValue / 100 : $discountValue;
-            $discountTotal = min($discountTotal, $subtotal);
-            $taxPercent = (bool) ($validated['tax_enabled'] ?? false) ? (float) ($validated['tax_percent'] ?? 11) : 0;
-            $taxBase = max(0, $subtotal - $discountTotal + $freightAmount);
-            $taxTotal = $taxBase * $taxPercent / 100;
-            $grandTotal = $taxBase + $taxTotal;
+            $prepared = $this->prepareInvoiceData($draft, $validated);
+            $lines = $prepared['lines'];
+            $subtotal = $prepared['subtotal'];
+            $freightAmount = $prepared['freight_amount'];
+            $discountTotal = $prepared['discount_total'];
+            $taxPercent = $prepared['tax_percent'];
+            $taxTotal = $prepared['tax_total'];
+            $grandTotal = $prepared['grand_total'];
             $saleIds = collect($draft['dispatches'])->pluck('sale_id')->filter()->unique()->values();
 
             $payload = [
@@ -226,12 +206,97 @@ class CustomerInvoiceController extends Controller
 
     public function edit(string $id)
     {
-        return Inertia::render('Apps/Sales/CustomerInvoices/Form', ['id' => $id]);
+        return Inertia::render('Apps/Sales/CustomerInvoices/Form', [
+            'invoiceDraft' => $this->buildDraftFromInvoice((int) $id),
+            'mode' => 'edit',
+        ]);
     }
 
     public function update(Request $request, string $id)
     {
-        return back()->with('success', 'Updated');
+        $validated = $request->validate([
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'dispatch_ids' => ['required', 'array', 'min:1'],
+            'dispatch_ids.*' => ['integer'],
+            'invoice_date' => ['required', 'date'],
+            'due_date' => ['nullable', 'date'],
+            'discount_type' => ['nullable', 'in:amount,percent'],
+            'discount_value' => ['nullable', 'numeric', 'min:0'],
+            'tax_enabled' => ['nullable', 'boolean'],
+            'tax_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'freight_amount' => ['nullable', 'numeric', 'min:0'],
+            'line_prices' => ['nullable', 'array'],
+            'line_prices.*' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        DB::transaction(function () use ($validated, $id): void {
+            $invoice = DB::table('customer_invoices')->lockForUpdate()->where('id', $id)->first();
+            abort_unless($invoice, 404);
+
+            if ($invoice->status !== 'draft') {
+                throw ValidationException::withMessages(['status' => 'Hanya draft invoice yang bisa diedit.']);
+            }
+
+            $draft = $this->buildDraftFromDispatches($validated['dispatch_ids'], (int) $validated['customer_id'], true, (int) $id);
+            $prepared = $this->prepareInvoiceData($draft, $validated);
+            $saleIds = collect($draft['dispatches'])->pluck('sale_id')->filter()->unique()->values();
+
+            $payload = [
+                'customer_id' => (int) $validated['customer_id'],
+                'sale_id' => $saleIds->count() === 1 ? $saleIds->first() : null,
+                'shipment_id' => null,
+                'invoice_date' => $validated['invoice_date'],
+                'due_date' => $validated['due_date'] ?? null,
+                'subtotal' => $prepared['subtotal'],
+                'discount_total' => $prepared['discount_total'],
+                'tax_total' => $prepared['tax_total'],
+                'grand_total' => $prepared['grand_total'],
+                'balance_due' => $prepared['grand_total'] - (float) ($invoice->amount_paid ?? 0),
+                'notes' => $validated['notes'] ?? null,
+                'updated_at' => now(),
+            ];
+
+            if (Schema::hasColumn('customer_invoices', 'freight_amount')) {
+                $payload['freight_amount'] = $prepared['freight_amount'];
+            }
+
+            DB::table('customer_invoices')->where('id', $id)->update($payload);
+            DB::table('customer_invoice_dispatches')->where('customer_invoice_id', $id)->delete();
+            DB::table('customer_invoice_lines')->where('customer_invoice_id', $id)->delete();
+
+            foreach ($draft['dispatches'] as $dispatch) {
+                DB::table('customer_invoice_dispatches')->insert([
+                    'customer_invoice_id' => (int) $id,
+                    'internal_usage_id' => $dispatch['id'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            foreach ($prepared['lines'] as $line) {
+                DB::table('customer_invoice_lines')->insert([
+                    'customer_invoice_id' => (int) $id,
+                    'shipment_line_id' => null,
+                    'dispatch_id' => $line['dispatch_id'],
+                    'internal_usage_line_id' => $line['internal_usage_line_id'],
+                    'sale_line_id' => $line['sale_line_id'],
+                    'item_id' => $line['item_id'],
+                    'uom_id' => $line['uom_id'],
+                    'qty' => $line['qty'],
+                    'unit_price' => $line['unit_price'],
+                    'discount_percent' => 0,
+                    'discount_amount' => 0,
+                    'tax_percent' => $prepared['tax_percent'],
+                    'tax_amount' => $prepared['subtotal'] > 0 ? $prepared['tax_total'] * ((float) $line['line_total'] / $prepared['subtotal']) : 0,
+                    'line_total' => $line['line_total'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        });
+
+        return redirect()->route('apps.customer-invoices.show', $id)->with('success', 'Draft invoice berhasil diperbarui.');
     }
 
     public function destroy(string $id)
@@ -552,7 +617,49 @@ class CustomerInvoiceController extends Controller
         return collect(explode(',', (string) $raw))->map(fn ($id) => (int) trim($id))->filter()->unique()->values()->all();
     }
 
-    private function buildDraftFromDispatches(array $dispatchIds, ?int $customerId = null, bool $lock = false): array
+    private function prepareInvoiceData(array $draft, array $validated): array
+    {
+        $linePrices = collect($validated['line_prices'] ?? [])->mapWithKeys(fn ($price, $lineId): array => [(int) $lineId => (float) $price]);
+        $lines = collect($draft['lines'] ?? [])->map(function (array $line) use ($linePrices): array {
+            $lineId = (int) $line['internal_usage_line_id'];
+            if (! $linePrices->has($lineId)) {
+                return $line;
+            }
+
+            $unitPrice = max(0, (float) $linePrices->get($lineId));
+            $line['unit_price'] = $unitPrice;
+            $line['line_total'] = (float) $line['qty'] * $unitPrice;
+
+            return $line;
+        });
+
+        if ($lines->isEmpty()) {
+            throw ValidationException::withMessages(['dispatch_ids' => 'Dispatch terpilih tidak memiliki line yang bisa ditagihkan.']);
+        }
+
+        $subtotal = (float) $lines->sum('line_total');
+        $freightAmount = (float) ($validated['freight_amount'] ?? 0);
+        $discountType = (string) ($validated['discount_type'] ?? 'amount');
+        $discountValue = (float) ($validated['discount_value'] ?? 0);
+        $discountTotal = $discountType === 'percent' ? $subtotal * $discountValue / 100 : $discountValue;
+        $discountTotal = min($discountTotal, $subtotal);
+        $taxPercent = (bool) ($validated['tax_enabled'] ?? false) ? (float) ($validated['tax_percent'] ?? 11) : 0;
+        $taxBase = max(0, $subtotal - $discountTotal + $freightAmount);
+        $taxTotal = $taxBase * $taxPercent / 100;
+        $grandTotal = $taxBase + $taxTotal;
+
+        return [
+            'lines' => $lines,
+            'subtotal' => $subtotal,
+            'freight_amount' => $freightAmount,
+            'discount_total' => $discountTotal,
+            'tax_percent' => $taxPercent,
+            'tax_total' => $taxTotal,
+            'grand_total' => $grandTotal,
+        ];
+    }
+
+    private function buildDraftFromDispatches(array $dispatchIds, ?int $customerId = null, bool $lock = false, ?int $ignoreInvoiceId = null): array
     {
         $dispatchIds = collect($dispatchIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
         if ($dispatchIds->isEmpty()) {
@@ -609,6 +716,7 @@ class CustomerInvoiceController extends Controller
             ->join('customer_invoices as ci', 'ci.id', '=', 'cid.customer_invoice_id')
             ->whereIn('cid.internal_usage_id', $dispatchIds)
             ->where('ci.status', '!=', 'cancelled')
+            ->when($ignoreInvoiceId, fn ($query) => $query->where('ci.id', '!=', $ignoreInvoiceId))
             ->pluck('cid.internal_usage_id');
 
         if ($alreadyInvoiced->isNotEmpty()) {
@@ -635,6 +743,138 @@ class CustomerInvoiceController extends Controller
                 'subtotal' => $subtotal,
             ],
         ];
+    }
+
+
+    private function buildDraftFromInvoice(int $invoiceId): array
+    {
+        $invoice = DB::table('customer_invoices')->where('id', $invoiceId)->first();
+        abort_unless($invoice, 404);
+
+        if ($invoice->status !== 'draft') {
+            throw ValidationException::withMessages(['status' => 'Hanya draft invoice yang bisa diedit.']);
+        }
+
+        $dispatches = DB::table('customer_invoice_dispatches as cid')
+            ->join('internal_usages as iu', 'iu.id', '=', 'cid.internal_usage_id')
+            ->leftJoin('warehouses as w', 'w.id', '=', 'iu.warehouse_id')
+            ->leftJoin('shipments as sh', 'sh.dispatch_id', '=', 'iu.id')
+            ->leftJoin('sales as so', function ($join): void {
+                $join->on('so.id', '=', DB::raw("COALESCE(iu.sale_id, sh.sale_id, CASE WHEN iu.source_type = 'sales_order' THEN iu.source_id END)"));
+            })
+            ->where('cid.customer_invoice_id', $invoiceId)
+            ->orderBy('iu.document_date')
+            ->get([
+                'iu.id',
+                'iu.number',
+                'iu.document_date',
+                DB::raw('COALESCE(iu.customer_id, sh.customer_id, so.customer_id) as customer_id'),
+                DB::raw('COALESCE(iu.sale_id, sh.sale_id, so.id) as sale_id'),
+                DB::raw('COALESCE(iu.source_id, sh.sale_id, so.id) as source_id'),
+                DB::raw('COALESCE(iu.source_number, so.number) as source_number'),
+                DB::raw('COALESCE(w.name, "-") as warehouse_label'),
+            ]);
+
+        $customer = DB::table('customers')->where('id', $invoice->customer_id)->first();
+        $lines = $this->buildDraftLinesFromInvoice($invoiceId);
+        $subtotal = (float) ($invoice->subtotal ?? $lines->sum('line_total'));
+        $freightAmount = (float) ($invoice->freight_amount ?? 0);
+        $discountTotal = (float) ($invoice->discount_total ?? 0);
+        $taxBase = max(0, $subtotal - $discountTotal + $freightAmount);
+        $taxTotal = (float) ($invoice->tax_total ?? 0);
+        $taxPercent = $taxBase > 0 ? round($taxTotal / $taxBase * 100, 2) : 0;
+
+        return [
+            'invoice' => $invoice,
+            'customer' => $customer,
+            'dispatches' => $dispatches->map(fn ($dispatch) => (array) $dispatch)->values()->all(),
+            'lines' => $lines->values()->all(),
+            'defaults' => [
+                'invoice_date' => $invoice->invoice_date,
+                'due_date' => $invoice->due_date,
+                'discount_type' => 'amount',
+                'discount_value' => $discountTotal,
+                'tax_enabled' => $taxTotal > 0,
+                'tax_percent' => $taxPercent ?: 11,
+                'freight_amount' => $freightAmount,
+                'subtotal' => $subtotal,
+                'notes' => $invoice->notes ?? '',
+            ],
+        ];
+    }
+
+    private function buildDraftLinesFromInvoice(int $invoiceId): Collection
+    {
+        return DB::table('customer_invoice_lines as cil')
+            ->leftJoin('internal_usages as iu', 'iu.id', '=', 'cil.dispatch_id')
+            ->leftJoin('internal_usage_lines as iul', 'iul.id', '=', 'cil.internal_usage_line_id')
+            ->leftJoin('items as i', 'i.id', '=', 'cil.item_id')
+            ->leftJoin('uoms as u', 'u.id', '=', 'cil.uom_id')
+            ->leftJoin('item_batches as ib', 'ib.id', '=', 'iul.batch_id')
+            ->leftJoinSub(
+                DB::table('inv_transactions as it')
+                    ->join('inv_transaction_items as iti', 'iti.inv_transaction_id', '=', 'it.id')
+                    ->where('it.source_table', 'internal_usages')
+                    ->select([
+                        'it.source_id as dispatch_id',
+                        'iti.product_id as item_id',
+                        'iti.batch_id',
+                        DB::raw('AVG(iti.unit_cost_snapshot) as unit_cost'),
+                    ])
+                    ->groupBy('it.source_id', 'iti.product_id', 'iti.batch_id'),
+                'cost',
+                function ($join): void {
+                    $join->on('cost.dispatch_id', '=', 'cil.dispatch_id')
+                        ->on('cost.item_id', '=', 'cil.item_id')
+                        ->whereRaw('(cost.batch_id = iul.batch_id OR (cost.batch_id IS NULL AND iul.batch_id IS NULL))');
+                }
+            )
+            ->leftJoinSub(
+                DB::table('inv_balances')
+                    ->where('company_id', 1)
+                    ->select('product_id', DB::raw('AVG(avg_cost) as avg_cost'))
+                    ->groupBy('product_id'),
+                'bal',
+                'bal.product_id',
+                '=',
+                'cil.item_id'
+            )
+            ->where('cil.customer_invoice_id', $invoiceId)
+            ->orderBy('cil.id')
+            ->get([
+                'cil.internal_usage_line_id',
+                'cil.dispatch_id',
+                DB::raw('COALESCE(iu.number, "-") as dispatch_number'),
+                'cil.sale_line_id',
+                'cil.item_id',
+                'cil.uom_id',
+                'cil.qty',
+                'cil.unit_price',
+                'cil.line_total',
+                DB::raw('COALESCE(ib.batch_no, "-") as batch_no'),
+                'ib.expired_date',
+                DB::raw('COALESCE(cost.unit_cost, bal.avg_cost, 0) as cogs'),
+                DB::raw('COALESCE(i.sku, "-") as item_sku'),
+                DB::raw('COALESCE(i.name, "-") as item_name'),
+                DB::raw('COALESCE(u.code, "-") as uom_code'),
+            ])
+            ->map(fn (object $line): array => [
+                'internal_usage_line_id' => (int) $line->internal_usage_line_id,
+                'dispatch_id' => (int) $line->dispatch_id,
+                'dispatch_number' => $line->dispatch_number,
+                'sale_line_id' => $line->sale_line_id ? (int) $line->sale_line_id : null,
+                'item_id' => (int) $line->item_id,
+                'uom_id' => $line->uom_id ? (int) $line->uom_id : null,
+                'item_sku' => $line->item_sku,
+                'item_name' => $line->item_name,
+                'uom_code' => $line->uom_code,
+                'batch_no' => $line->batch_no,
+                'expired_date' => $line->expired_date,
+                'cogs' => (float) $line->cogs,
+                'qty' => (float) $line->qty,
+                'unit_price' => (float) $line->unit_price,
+                'line_total' => (float) $line->line_total,
+            ]);
     }
 
     private function buildDraftLines(Collection $dispatches): Collection

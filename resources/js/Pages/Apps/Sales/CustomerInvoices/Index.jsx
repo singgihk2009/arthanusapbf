@@ -54,6 +54,7 @@ export default function Page({ invoices }) {
               {!rows.length && <tr><td colSpan={12} className='px-3 py-4 text-center text-gray-500'>Belum ada invoice.</td></tr>}
               {rows.map((invoice) => {
                 const payable = payableInvoiceIds.includes(invoice.id);
+                const draft = String(invoice.status || '').toLowerCase() === 'draft';
                 return (
                 <tr key={invoice.id}>
                   <td className='px-3 py-2 text-center'>{payable ? <input type='checkbox' checked={selectedInvoiceIds.includes(invoice.id)} onChange={() => toggleInvoiceSelection(invoice.id)} /> : '-'}</td>
@@ -67,7 +68,12 @@ export default function Page({ invoices }) {
                   <td className='px-3 py-2 text-right'>{formatCurrency(invoice.tax_total)}</td>
                   <td className='px-3 py-2 text-right'>{formatCurrency(invoice.freight_amount)}</td>
                   <td className='px-3 py-2 text-right'>{formatCurrency(invoice.grand_total)}</td>
-                  <td className='px-3 py-2 text-center'><Link href={route('apps.customer-invoices.show', invoice.id)} className='rounded border px-2 py-1 text-xs'>View</Link></td>
+                  <td className='px-3 py-2 text-center'>
+                      <div className='flex justify-center gap-1'>
+                        <Link href={route('apps.customer-invoices.show', invoice.id)} className='rounded border px-2 py-1 text-xs'>View</Link>
+                        {draft && <Link href={route('apps.customer-invoices.edit', invoice.id)} className='rounded border border-indigo-300 px-2 py-1 text-xs text-indigo-700'>Edit</Link>}
+                      </div>
+                    </td>
                 </tr>
                 );
               })}
