@@ -547,19 +547,23 @@ class CustomerInvoiceController extends Controller
 
         $dispatchQuery = DB::table('internal_usages as iu')
             ->leftJoin('warehouses as w', 'w.id', '=', 'iu.warehouse_id')
+            ->leftJoin('shipments as sh', 'sh.dispatch_id', '=', 'iu.id')
+            ->leftJoin('sales as so', 'so.id', '=', 'sh.sale_id')
             ->whereIn('iu.id', $dispatchIds)
             ->where('iu.status', 'POSTED')
             ->where(function ($query): void {
-                $query->where('iu.source_type', 'sales_order')->orWhereNotNull('iu.sale_id');
+                $query->where('iu.source_type', 'sales_order')
+                    ->orWhereNotNull('iu.sale_id')
+                    ->orWhereNotNull('sh.sale_id');
             })
             ->select([
                 'iu.id',
                 'iu.number',
                 'iu.document_date',
-                'iu.customer_id',
-                'iu.sale_id',
-                'iu.source_id',
-                'iu.source_number',
+                DB::raw('COALESCE(iu.customer_id, sh.customer_id) as customer_id'),
+                DB::raw('COALESCE(iu.sale_id, sh.sale_id) as sale_id'),
+                DB::raw('COALESCE(iu.source_id, sh.sale_id) as source_id'),
+                DB::raw('COALESCE(iu.source_number, so.number) as source_number'),
                 DB::raw('COALESCE(w.name, "-") as warehouse_label'),
             ]);
 
@@ -568,7 +572,10 @@ class CustomerInvoiceController extends Controller
         }
 
         if ($customerId) {
-            $dispatchQuery->where('iu.customer_id', $customerId);
+            $dispatchQuery->where(function ($query) use ($customerId): void {
+                $query->where('iu.customer_id', $customerId)
+                    ->orWhere('sh.customer_id', $customerId);
+            });
         }
 
         $dispatches = $dispatchQuery->get();
@@ -619,7 +626,17 @@ class CustomerInvoiceController extends Controller
 
         return DB::table('internal_usage_lines as iul')
             ->join('internal_usages as iu', 'iu.id', '=', 'iul.internal_usage_id')
-            ->join('sales_lines as sl', 'sl.id', '=', 'iul.sale_line_id')
+            ->leftJoin('shipments as sh', 'sh.dispatch_id', '=', 'iu.id')
+            ->leftJoin('shipment_lines as shl', function ($join): void {
+                $join->on('shl.shipment_id', '=', 'sh.id')
+                    ->on('shl.item_id', '=', 'iul.item_id')
+                    ->whereRaw('(shl.batch_id = iul.batch_id OR (shl.batch_id IS NULL AND iul.batch_id IS NULL))')
+                    ->whereRaw('ABS(shl.qty_shipped - iul.qty_used) < 0.0001');
+            })
+            ->join('sales_lines as sl', function ($join): void {
+                $join->on('sl.id', '=', 'iul.sale_line_id')
+                    ->orOn('sl.id', '=', 'shl.sale_line_id');
+            })
             ->leftJoin('items as i', 'i.id', '=', 'iul.item_id')
             ->leftJoin('uoms as u', 'u.id', '=', 'iul.uom_id')
             ->whereIn('iul.internal_usage_id', $dispatchIds)
@@ -629,7 +646,7 @@ class CustomerInvoiceController extends Controller
                 'iul.id as internal_usage_line_id',
                 'iul.internal_usage_id as dispatch_id',
                 'iu.number as dispatch_number',
-                'iul.sale_line_id',
+                DB::raw('COALESCE(iul.sale_line_id, shl.sale_line_id) as sale_line_id'),
                 'iul.item_id',
                 'iul.uom_id',
                 'iul.qty_used as qty',
