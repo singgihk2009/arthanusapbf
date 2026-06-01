@@ -134,6 +134,11 @@ class IntegrationController extends Controller
                     ->where('integration_outbox.aggregate_type', '=', 'vendor_payment');
             })
             ->leftJoin('vendors as payment_vendors', 'payment_vendors.id', '=', 'vendor_payments.vendor_id')
+            ->leftJoin('customer_invoices', function ($join): void {
+                $join->on('customer_invoices.id', '=', 'integration_outbox.aggregate_id')
+                    ->where('integration_outbox.aggregate_type', '=', 'sales_invoice');
+            })
+            ->leftJoin('customers', 'customers.id', '=', 'customer_invoices.customer_id')
             ->select([
                 'integration_outbox.id',
                 'integration_outbox.event_type',
@@ -158,6 +163,9 @@ class IntegrationController extends Controller
                 'vendor_payments.status as vendor_payment_status',
                 'payment_vendors.vendor_name as payment_vendor_name',
                 'payment_vendors.name as payment_vendor_name_fallback',
+                'customer_invoices.number as customer_invoice_no',
+                'customer_invoices.status as customer_invoice_status',
+                'customers.customer_name',
             ]);
     }
 
@@ -175,6 +183,27 @@ class IntegrationController extends Controller
                 'trx_no' => $documentNo,
                 'trx_type' => $vendorName ? 'Vendor Payment - '.$vendorName : 'Vendor Payment',
                 'gl_status' => $row->vendor_payment_status ?: '-',
+                'event_type' => $row->event_type,
+                'outbox_status' => $row->outbox_status,
+                'outbox_attempts' => $row->outbox_attempts,
+                'outbox_last_error' => $row->outbox_last_error,
+                'gl_reference_no' => null,
+                'gl_error_message' => $row->outbox_last_error,
+                'created_at' => $row->created_at,
+                'updated_at' => $row->updated_at,
+            ];
+        }
+
+        if ($row->aggregate_type === 'sales_invoice') {
+            $documentNo = $row->customer_invoice_no ?: ('Sales Invoice #'.$row->aggregate_id);
+
+            return [
+                'id' => $row->id,
+                'aggregate_type' => $row->aggregate_type,
+                'aggregate_id' => $row->aggregate_id,
+                'trx_no' => $documentNo,
+                'trx_type' => $row->customer_name ? 'Sales Invoice - '.$row->customer_name : 'Sales Invoice',
+                'gl_status' => $row->customer_invoice_status ?: '-',
                 'event_type' => $row->event_type,
                 'outbox_status' => $row->outbox_status,
                 'outbox_attempts' => $row->outbox_attempts,
@@ -237,6 +266,7 @@ class IntegrationController extends Controller
         $eventsUrl = match ($outbox->aggregate_type) {
             'vendor_invoice' => $this->vendorInvoiceFinanceHubEventsUrl(),
             'vendor_payment' => $this->vendorPaymentFinanceHubEventsUrl(),
+            'sales_invoice' => $this->salesInvoiceFinanceHubEventsUrl(),
             default => config('services.finance_hub.events_url'),
         };
         $clientKey = config('services.finance_hub.client_key');
@@ -302,6 +332,21 @@ class IntegrationController extends Controller
                 'updated_at' => now(),
             ]);
         }
+    }
+
+    private function salesInvoiceFinanceHubEventsUrl(): ?string
+    {
+        $configuredUrl = config('services.finance_hub.sales_invoice_events_url');
+        if (is_string($configuredUrl) && trim($configuredUrl) !== '') {
+            return trim($configuredUrl);
+        }
+
+        $baseUrl = config('services.finance_hub.base_url');
+        if (is_string($baseUrl) && trim($baseUrl) !== '') {
+            return rtrim(trim($baseUrl), '/').'/api/integrations/events';
+        }
+
+        return null;
     }
 
     private function vendorInvoiceFinanceHubEventsUrl(): ?string
