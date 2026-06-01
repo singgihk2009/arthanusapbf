@@ -25,7 +25,7 @@ export default function Page({ payments }) {
                 <th className='px-3 py-2 text-left'>Metode</th>
                 <th className='px-3 py-2 text-left'>Status</th>
                 <th className='px-3 py-2 text-right'>Kas</th>
-                <th className='px-3 py-2 text-right'>Diskon</th>
+                <th className='px-3 py-2 text-right'>Biaya Lainnya</th>
                 <th className='px-3 py-2 text-right'>WHT</th>
                 <th className='px-3 py-2 text-right'>Potongan Lain</th>
                 <th className='px-3 py-2 text-right'>Settlement</th>
