@@ -21,6 +21,7 @@ const stockTone = (stock) => {
 export default function Page({ customer, salesOrder, warehouses = [], priceList }) {
   const isEdit = Boolean(salesOrder?.id);
   const searchRef = useRef(null);
+  const previousWarehouseRef = useRef(salesOrder?.warehouse_id || warehouses?.[0]?.id || '');
   const [selectedRow, setSelectedRow] = useState(0);
   const [searchResetKey, setSearchResetKey] = useState(0);
 
@@ -61,6 +62,36 @@ export default function Page({ customer, salesOrder, warehouses = [], priceList 
     searchRef.current?.focus();
   };
   const chooseBatch=(i,batchId)=>{const b=(data.lines[i].batch_options||[]).find(x=>String(x.id)===String(batchId)); const cogs = Number(b?.cogs ?? data.lines[i].cogs ?? 0); patchLine(i,{batch_id:batchId,available_stock:b?.available_stock ?? data.lines[i].available_stock,cogs,unit_price:calcMarkupPrice(cogs)});};
+
+  useEffect(() => {
+    if (String(previousWarehouseRef.current || '') === String(data.warehouse_id || '')) return;
+    previousWarehouseRef.current = data.warehouse_id || '';
+
+    const refreshBatchOptions = async () => {
+      const lines = await Promise.all((data.lines || []).map(async (line) => {
+        if (!line?.item_id) return line;
+        const response = await axios.get(route('apps.sales-orders.batches'), { params: { item_id: line.item_id, warehouse_id: data.warehouse_id || null } });
+        const options = response.data || [];
+        const selected = options.find((batch) => String(batch.id) === String(line.batch_id));
+        const fallback = options[0] || null;
+        const nextBatchId = selected ? line.batch_id : '';
+        const cogs = Number((selected || fallback)?.cogs ?? line.cogs ?? 0);
+
+        return {
+          ...line,
+          batch_id: nextBatchId,
+          batch_options: options,
+          available_stock: (selected || fallback)?.available_stock ?? null,
+          cogs,
+          unit_price: calcMarkupPrice(cogs),
+        };
+      }));
+
+      setData((prev) => ({ ...prev, lines }));
+    };
+
+    refreshBatchOptions();
+  }, [data.warehouse_id]);
   const save=(e)=>{e.preventDefault(); isEdit ? put(route('apps.sales-orders.update',salesOrder.id)) : post(route('apps.customers.sales-orders.store',customer.id));};
 
   const addLine = () => setData('lines',[...data.lines,makeLine()]);
