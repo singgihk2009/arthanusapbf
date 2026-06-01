@@ -60,12 +60,26 @@ class CustomerInvoiceController extends Controller
             'tax_enabled' => ['nullable', 'boolean'],
             'tax_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'freight_amount' => ['nullable', 'numeric', 'min:0'],
+            'line_prices' => ['nullable', 'array'],
+            'line_prices.*' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $invoice = DB::transaction(function () use ($validated) {
             $draft = $this->buildDraftFromDispatches($validated['dispatch_ids'], (int) $validated['customer_id'], true);
-            $lines = collect($draft['lines'] ?? []);
+            $linePrices = collect($validated['line_prices'] ?? [])->mapWithKeys(fn ($price, $lineId): array => [(int) $lineId => (float) $price]);
+            $lines = collect($draft['lines'] ?? [])->map(function (array $line) use ($linePrices): array {
+                $lineId = (int) $line['internal_usage_line_id'];
+                if (! $linePrices->has($lineId)) {
+                    return $line;
+                }
+
+                $unitPrice = max(0, (float) $linePrices->get($lineId));
+                $line['unit_price'] = $unitPrice;
+                $line['line_total'] = (float) $line['qty'] * $unitPrice;
+
+                return $line;
+            });
 
             if ($lines->isEmpty()) {
                 throw ValidationException::withMessages(['dispatch_ids' => 'Dispatch terpilih tidak memiliki line yang bisa ditagihkan.']);
@@ -642,6 +656,35 @@ class CustomerInvoiceController extends Controller
             })
             ->leftJoin('items as i', 'i.id', '=', 'iul.item_id')
             ->leftJoin('uoms as u', 'u.id', '=', 'iul.uom_id')
+            ->leftJoin('item_batches as ib', 'ib.id', '=', 'iul.batch_id')
+            ->leftJoinSub(
+                DB::table('inv_transactions as it')
+                    ->join('inv_transaction_items as iti', 'iti.inv_transaction_id', '=', 'it.id')
+                    ->where('it.source_table', 'internal_usages')
+                    ->select([
+                        'it.source_id as dispatch_id',
+                        'iti.product_id as item_id',
+                        'iti.batch_id',
+                        DB::raw('AVG(iti.unit_cost_snapshot) as unit_cost'),
+                    ])
+                    ->groupBy('it.source_id', 'iti.product_id', 'iti.batch_id'),
+                'cost',
+                function ($join): void {
+                    $join->on('cost.dispatch_id', '=', 'iul.internal_usage_id')
+                        ->on('cost.item_id', '=', 'iul.item_id')
+                        ->whereRaw('(cost.batch_id = iul.batch_id OR (cost.batch_id IS NULL AND iul.batch_id IS NULL))');
+                }
+            )
+            ->leftJoinSub(
+                DB::table('inv_balances')
+                    ->where('company_id', 1)
+                    ->select('product_id', DB::raw('AVG(avg_cost) as avg_cost'))
+                    ->groupBy('product_id'),
+                'bal',
+                'bal.product_id',
+                '=',
+                'iul.item_id'
+            )
             ->whereIn('iul.internal_usage_id', $dispatchIds)
             ->orderBy('iu.document_date')
             ->orderBy('iul.id')
@@ -654,6 +697,9 @@ class CustomerInvoiceController extends Controller
                 'iul.uom_id',
                 'iul.qty_used as qty',
                 'sl.unit_price',
+                DB::raw('COALESCE(ib.batch_no, "-") as batch_no'),
+                'ib.expired_date',
+                DB::raw('COALESCE(cost.unit_cost, bal.avg_cost, 0) as cogs'),
                 DB::raw('COALESCE(i.sku, "-") as item_sku'),
                 DB::raw('COALESCE(i.name, "-") as item_name'),
                 DB::raw('COALESCE(u.code, "-") as uom_code'),
@@ -672,6 +718,9 @@ class CustomerInvoiceController extends Controller
                     'item_sku' => $line->item_sku,
                     'item_name' => $line->item_name,
                     'uom_code' => $line->uom_code,
+                    'batch_no' => $line->batch_no,
+                    'expired_date' => $line->expired_date,
+                    'cogs' => (float) $line->cogs,
                     'qty' => $qty,
                     'unit_price' => $unitPrice,
                     'line_total' => $qty * $unitPrice,
