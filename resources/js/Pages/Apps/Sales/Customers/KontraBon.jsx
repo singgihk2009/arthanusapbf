@@ -27,7 +27,7 @@ export default function Page({ customer, invoices = [], company = null, bankAcco
             .kontra-print { display: block !important; position: absolute; inset: 0 auto auto 0; width: 100%; color: #000; }
             .kontra-form { font-family: "Courier New", Courier, monospace; font-size: 10px; line-height: 1.12; letter-spacing: -0.25px; }
             .kb-grid { display: grid; grid-template-columns: 1fr 330px; }
-            .kb-company { padding: 0 10px 3px 42px; }
+            .kb-company { padding: 0 10px 3px 0; text-align: left; }
             .kb-title-box { border-left: 1px solid #000; padding: 1px 0 3px 12px; }
             .kb-title { font-weight: 700; margin-bottom: 17px; }
             .kb-row { display: grid; grid-template-columns: 76px 8px 1fr; white-space: nowrap; }
@@ -45,18 +45,18 @@ export default function Page({ customer, invoices = [], company = null, bankAcco
             .kb-table th:nth-child(4), .kb-table td:nth-child(4) { width: 210px; }
             .kb-table th:nth-child(5), .kb-table td:nth-child(5) { width: 160px; }
             .kb-table th:nth-child(6), .kb-table td:nth-child(6) { width: auto; }
-            .kb-line-row td { height: 112px; }
+            .kb-line-row td { height: 20px; line-height: 1.12; }
+            .kb-filler-row td { height: 72px; }
             .kb-empty-row td { height: 112px; text-align: center; padding-top: 16px; }
             .kb-total-row td { border-top: 1px solid #000; border-bottom: 1px solid #000; height: 22px; }
             .kb-double-rule { border-top: 1px solid #000; border-bottom: 1px solid #000; height: 3px; margin-top: 8px; }
             .kb-num { text-align: right; white-space: nowrap; }
-            .kb-bottom { display: grid; grid-template-columns: 505px 1fr 320px; gap: 28px; padding-top: 14px; }
+            .kb-bottom { display: grid; grid-template-columns: 505px minmax(0, 1fr) minmax(0, 1fr); gap: 20px; padding-top: 14px; }
             .kb-payment-box { border: 1px solid #000; padding: 6px 10px; min-height: 74px; }
             .kb-payment-title { margin-bottom: 2px; }
-            .kb-sign { text-align: center; min-height: 95px; display: flex; flex-direction: column; justify-content: flex-end; }
+            .kb-sign { text-align: center; min-height: 95px; display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; }
             .kb-sign-label { margin-bottom: 62px; }
             .kb-sign-line { border-top: 1px solid #000; padding-top: 2px; }
-            .kb-company-sign { text-align: center; padding-top: 62px; }
             .kb-note { margin-top: 2px; font-size: 8.5px; }
           }
         `}</style>
@@ -149,16 +149,21 @@ export default function Page({ customer, invoices = [], company = null, bankAcco
               <tr><th>No.</th><th>Tanggal</th><th>No. Trx</th><th>No. Faktur</th><th>Jumlah</th><th>Keterangan</th></tr>
             </thead>
             <tbody>
-              {invoices.length ? invoices.map((invoice, index) => (
-                <tr className='kb-line-row' key={invoice.id}>
-                  <td>{index + 1}</td>
-                  <td>{invoice.invoice_date}</td>
-                  <td>{invoice.transaction_number || '-'}</td>
-                  <td>{invoice.number}</td>
-                  <td className='kb-num'>{formatMoneyPlain(invoice.balance_due)}</td>
-                  <td>{invoice.days_overdue ? `${invoice.days_overdue} hari lewat jatuh tempo` : ''}</td>
-                </tr>
-              )) : <tr className='kb-empty-row'><td colSpan={6}>Tidak ada invoice jatuh tempo yang belum dibayar pada pilihan ini.</td></tr>}
+              {invoices.length ? (
+                <>
+                  {invoices.map((invoice, index) => (
+                    <tr className='kb-line-row' key={invoice.id}>
+                      <td>{index + 1}</td>
+                      <td>{invoice.invoice_date}</td>
+                      <td>{invoice.transaction_number || '-'}</td>
+                      <td>{invoice.number}</td>
+                      <td className='kb-num'>{formatMoneyPlain(invoice.balance_due)}</td>
+                      <td>{invoice.days_overdue ? `${invoice.days_overdue} hari lewat jatuh tempo` : ''}</td>
+                    </tr>
+                  ))}
+                  <tr className='kb-filler-row'><td /><td /><td /><td /><td /><td /></tr>
+                </>
+              ) : <tr className='kb-empty-row'><td colSpan={6}>Tidak ada invoice jatuh tempo yang belum dibayar pada pilihan ini.</td></tr>}
               <tr className='kb-total-row'>
                 <td colSpan={4} className='kb-num'>Total</td>
                 <td className='kb-num'>{formatMoneyPlain(totalBalance)}</td>
@@ -183,8 +188,8 @@ export default function Page({ customer, invoices = [], company = null, bankAcco
               <div className='kb-sign-label'>Penerima</div>
               <div className='kb-sign-line'>Terima Tgl: ____________</div>
             </div>
-            <div className='kb-sign kb-company-sign'>
-              <div>Hormat Kami,</div>
+            <div className='kb-sign'>
+              <div className='kb-sign-label'>Hormat Kami,</div>
               <div className='kb-sign-line'>{dash(company?.legal_name || 'PT. ARUTALA MAHA NUSANTARA')}</div>
             </div>
           </div>
