@@ -267,6 +267,7 @@ class IntegrationController extends Controller
             'vendor_invoice' => $this->vendorInvoiceFinanceHubEventsUrl(),
             'vendor_payment' => $this->vendorPaymentFinanceHubEventsUrl(),
             'sales_invoice' => $this->salesInvoiceFinanceHubEventsUrl(),
+            'customer_invoice_collection' => $this->customerCollectionFinanceHubEventsUrl(),
             default => config('services.finance_hub.events_url'),
         };
         $clientKey = config('services.finance_hub.client_key');
@@ -364,6 +365,22 @@ class IntegrationController extends Controller
         return null;
     }
 
+
+
+    private function customerCollectionFinanceHubEventsUrl(): ?string
+    {
+        $configuredUrl = config('services.finance_hub.customer_collection_events_url');
+        if (is_string($configuredUrl) && trim($configuredUrl) !== '') {
+            return trim($configuredUrl);
+        }
+
+        $baseUrl = config('services.finance_hub.base_url');
+        if (is_string($baseUrl) && trim($baseUrl) !== '') {
+            return rtrim(trim($baseUrl), '/').'/api/integrations/events';
+        }
+
+        return null;
+    }
 
     private function vendorPaymentFinanceHubEventsUrl(): ?string
     {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Apps;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -43,6 +44,7 @@ class CustomerPaymentController extends Controller
 
         return Inertia::render('Apps/Sales/CustomerPayments/Form', [
             'paymentDraft' => $invoiceIds ? $this->buildDraftFromInvoices($invoiceIds) : null,
+            'cashAccounts' => $this->cashAccounts(),
         ]);
     }
 
@@ -55,6 +57,11 @@ class CustomerPaymentController extends Controller
             'payment_date' => ['required', 'date'],
             'payment_method' => ['nullable', 'string', 'max:100'],
             'bank_account_id' => ['nullable', 'integer'],
+            'cash_account_id' => ['required', 'integer', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! $this->validCashAccount((int) $value)) {
+                    $fail('Cash account tidak valid, tidak aktif, atau belum terhubung ke Master COA.');
+                }
+            }],
             'bank_charge' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'allocations' => ['required', 'array', 'min:1'],
@@ -129,6 +136,7 @@ class CustomerPaymentController extends Controller
                 'payment_date' => $validated['payment_date'],
                 'payment_method' => $validated['payment_method'] ?? null,
                 'bank_account_id' => $validated['bank_account_id'] ?? null,
+                'cash_account_id' => $validated['cash_account_id'],
                 'amount' => $cashAmount,
                 'bank_charge' => (float) ($validated['bank_charge'] ?? 0),
                 'discount_taken' => $discountTaken,
@@ -220,11 +228,14 @@ class CustomerPaymentController extends Controller
 
     public function post(string $id)
     {
-        DB::transaction(function () use ($id): void {
+        $paymentId = DB::transaction(function () use ($id): int {
             $payment = DB::table('customer_payments')->lockForUpdate()->where('id', $id)->first();
             abort_unless($payment, 404);
             if ($payment->status !== 'draft') {
                 throw ValidationException::withMessages(['status' => 'Hanya draft payment yang bisa diposting.']);
+            }
+            if (Schema::hasColumn('customer_payments', 'cash_account_id') && ! $this->validCashAccount((int) ($payment->cash_account_id ?? 0))) {
+                throw ValidationException::withMessages(['cash_account_id' => 'Cash account wajib dipilih dan harus aktif sebelum payment diposting.']);
             }
 
             $allocations = DB::table('customer_payment_allocations')->where('customer_payment_id', $id)->get();
@@ -267,9 +278,15 @@ class CustomerPaymentController extends Controller
                 'posted_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            $this->upsertCustomerCollectionFinanceHubOutbox((int) $id);
+
+            return (int) $id;
         });
 
-        return back()->with('success', 'Payment posted.');
+        $this->sendCustomerCollectionFinanceHubEvent($paymentId);
+
+        return back()->with('success', 'Payment posted dan event Finance Hub Customer Collection dibuat.');
     }
 
     public function cancel(string $id)
@@ -283,6 +300,290 @@ class CustomerPaymentController extends Controller
         DB::table('customer_payments')->where('id', $id)->update(['status' => 'cancelled', 'updated_at' => now()]);
 
         return back()->with('success', 'Cancelled');
+    }
+
+
+    private function cashAccounts()
+    {
+        if (! Schema::hasTable('cash_accounts')) {
+            return collect();
+        }
+
+        $companyId = auth()->user()?->company_id ?? 1;
+
+        return DB::table('cash_accounts as ca')
+            ->leftJoin('chart_of_accounts as coa', 'coa.id', '=', 'ca.chart_of_account_id')
+            ->where('ca.company_id', $companyId)
+            ->where('ca.is_active', true)
+            ->whereNull('ca.deleted_at')
+            ->orderByDesc('ca.is_default')
+            ->orderBy('ca.cash_type')
+            ->orderBy('ca.code')
+            ->get([
+                'ca.id',
+                'ca.code',
+                'ca.name',
+                'ca.cash_type',
+                'ca.currency_code',
+                DB::raw('COALESCE(coa.account_code, "") as gl_account_code'),
+            ])
+            ->map(fn (object $account): array => [
+                'id' => (int) $account->id,
+                'code' => $account->code,
+                'name' => $account->name,
+                'cash_type' => $account->cash_type,
+                'currency_code' => $account->currency_code,
+                'gl_account_code' => $account->gl_account_code,
+                'label' => trim("{$account->code} - {$account->name} ({$account->cash_type}/{$account->currency_code})"),
+            ]);
+    }
+
+
+    private function defaultCashAccountId(): ?int
+    {
+        if (! Schema::hasTable('cash_accounts')) {
+            return null;
+        }
+
+        $companyId = auth()->user()?->company_id ?? 1;
+        $id = DB::table('cash_accounts')
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->orderByDesc('is_default')
+            ->orderBy('cash_type')
+            ->orderBy('code')
+            ->value('id');
+
+        return $id ? (int) $id : null;
+    }
+
+    private function validCashAccount(int $cashAccountId): bool
+    {
+        if ($cashAccountId <= 0 || ! Schema::hasTable('cash_accounts')) {
+            return false;
+        }
+
+        $companyId = auth()->user()?->company_id ?? 1;
+
+        return DB::table('cash_accounts as ca')
+            ->join('chart_of_accounts as coa', 'coa.id', '=', 'ca.chart_of_account_id')
+            ->where('ca.id', $cashAccountId)
+            ->where('ca.company_id', $companyId)
+            ->where('ca.is_active', true)
+            ->whereNull('ca.deleted_at')
+            ->where('coa.is_active', true)
+            ->exists();
+    }
+
+    private function upsertCustomerCollectionFinanceHubOutbox(int $paymentId): void
+    {
+        if (! Schema::hasTable('integration_outbox')) {
+            return;
+        }
+
+        $payload = $this->buildCustomerCollectionFinanceHubPayload($paymentId);
+        $encoded = json_encode($payload);
+        $hash = hash('sha256', (string) $encoded);
+
+        DB::table('integration_outbox')->updateOrInsert(
+            ['idempotency_key' => $payload['idempotency_key']],
+            [
+                'event_type' => $payload['event_name'],
+                'aggregate_type' => 'customer_invoice_collection',
+                'aggregate_id' => $paymentId,
+                'payload_json' => $encoded,
+                'payload_hash' => $hash,
+                'status' => 'ready',
+                'available_at' => now(),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+    }
+
+    private function buildCustomerCollectionFinanceHubPayload(int $paymentId): array
+    {
+        $payment = DB::table('customer_payments as cp')
+            ->leftJoin('customers as c', 'c.id', '=', 'cp.customer_id')
+            ->leftJoin('cash_accounts as ca', 'ca.id', '=', 'cp.cash_account_id')
+            ->leftJoin('chart_of_accounts as coa', 'coa.id', '=', 'ca.chart_of_account_id')
+            ->where('cp.id', $paymentId)
+            ->select([
+                'cp.*',
+                DB::raw('COALESCE(c.customer_code, "") as customer_code'),
+                DB::raw('COALESCE(c.customer_name, "") as customer_name'),
+                DB::raw('ca.id as cash_account_id'),
+                DB::raw('ca.code as cash_account_code'),
+                DB::raw('ca.name as cash_account_name'),
+                DB::raw('ca.cash_type as cash_account_type'),
+                DB::raw('ca.currency_code as cash_account_currency_code'),
+                DB::raw('coa.account_code as gl_account_code'),
+            ])
+            ->first();
+
+        abort_unless($payment, 404);
+
+        $postedAt = $payment->posted_at ? \Carbon\Carbon::parse($payment->posted_at) : now();
+        $postingDate = (string) ($payment->payment_date ?: $postedAt->toDateString());
+        $documentNo = (string) $payment->number;
+
+        $allocations = DB::table('customer_payment_allocations as cpa')
+            ->join('customer_invoices as ci', 'ci.id', '=', 'cpa.customer_invoice_id')
+            ->where('cpa.customer_payment_id', $paymentId)
+            ->orderBy('cpa.id')
+            ->get([
+                'cpa.*',
+                'ci.number as invoice_no',
+                'ci.grand_total as invoice_amount',
+            ]);
+
+        $deductions = $allocations
+            ->filter(fn (object $allocation): bool => (float) ($allocation->other_deduction_amount ?? 0) + (float) ($allocation->writeoff_amount ?? 0) > 0)
+            ->map(fn (object $allocation): array => [
+                'code' => (float) ($allocation->writeoff_amount ?? 0) > 0 ? 'WRITEOFF' : 'OTHER-DEDUCTION',
+                'description' => 'Potongan customer invoice '.$allocation->invoice_no,
+                'amount' => (float) ($allocation->other_deduction_amount ?? 0) + (float) ($allocation->writeoff_amount ?? 0),
+            ])
+            ->values()
+            ->all();
+
+        $otherCharges = $allocations
+            ->filter(fn (object $allocation): bool => (float) ($allocation->discount_taken ?? 0) > 0)
+            ->map(fn (object $allocation): array => [
+                'code' => 'OTHER-CHARGE',
+                'description' => 'Biaya lainnya collection invoice '.$allocation->invoice_no,
+                'amount' => (float) ($allocation->discount_taken ?? 0),
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'source_module' => 'sales',
+            'event_name' => 'customer.invoice.collection.posted',
+            'event_datetime' => $postedAt->copy()->timezone(config('app.timezone', 'UTC'))->toIso8601String(),
+            'idempotency_key' => 'customer-invoice-collection:'.$documentNo.':posted:v1',
+            'source_document_type' => 'customer_invoice_collection',
+            'source_document_id' => $documentNo,
+            'source_document_no' => $documentNo,
+            'schema_version' => 'v1',
+            'payload' => [
+                'transaction_type' => 'customer.invoice.collection',
+                'currency_code' => (string) ($payment->cash_account_currency_code ?: 'IDR'),
+                'exchange_rate' => 1,
+                'posting_date' => $postingDate,
+                'entry_date' => $postedAt->toDateString(),
+                'reference_no' => $documentNo,
+                'description' => 'Customer invoice collection '.$documentNo,
+                'gl_account_code' => $payment->gl_account_code,
+                'source_cash_account' => $payment->cash_account_id ? [
+                    'id' => (int) $payment->cash_account_id,
+                    'code' => (string) $payment->cash_account_code,
+                    'name' => (string) $payment->cash_account_name,
+                    'cash_type' => (string) $payment->cash_account_type,
+                    'currency_code' => (string) ($payment->cash_account_currency_code ?: 'IDR'),
+                ] : null,
+                'customer' => [
+                    'customer_code' => (string) $payment->customer_code,
+                    'customer_name' => (string) $payment->customer_name,
+                ],
+                'amounts' => [
+                    'invoice_total' => (float) ($payment->amount ?? 0),
+                    'other_charge' => (float) ($payment->discount_taken ?? 0),
+                    'withholding_tax_total' => (float) ($payment->wht_amount ?? 0),
+                    'other_deduction' => (float) ($payment->other_deduction_amount ?? 0),
+                    'bank_charge' => (float) ($payment->bank_charge ?? 0),
+                ],
+                'invoice_lines' => $allocations->map(fn (object $allocation): array => [
+                    'invoice_no' => (string) $allocation->invoice_no,
+                    'invoice_amount' => (float) $allocation->invoice_amount,
+                    'collection_amount' => (float) $allocation->amount_applied,
+                    'withholding_tax' => (float) ($allocation->wht_amount ?? 0),
+                ])->values()->all(),
+                'deductions' => $deductions,
+                'other_charges' => $otherCharges,
+            ],
+        ];
+    }
+
+    private function sendCustomerCollectionFinanceHubEvent(int $paymentId): void
+    {
+        if (! Schema::hasTable('integration_outbox')) {
+            return;
+        }
+
+        $outbox = DB::table('integration_outbox')
+            ->where('aggregate_type', 'customer_invoice_collection')
+            ->where('aggregate_id', $paymentId)
+            ->first();
+
+        if (! $outbox || in_array($outbox->status, ['sent', 'acked'], true)) {
+            return;
+        }
+
+        $eventsUrl = $this->customerCollectionFinanceHubEventsUrl();
+        $clientKey = config('services.finance_hub.client_key');
+        $clientSecret = config('services.finance_hub.client_secret');
+
+        if (! $eventsUrl || ! $clientKey || ! $clientSecret) {
+            $this->markCustomerCollectionFinanceHubOutboxFailed((int) $outbox->id, 'Konfigurasi Finance Hub Customer Collection belum lengkap. Pastikan FINANCE_HUB_BASE_URL, FINANCE_HUB_CLIENT_KEY, dan FINANCE_HUB_CLIENT_SECRET tersedia.');
+            return;
+        }
+
+        $eventPayload = json_decode((string) $outbox->payload_json, true) ?: [];
+        $payload = array_merge([
+            'client_key' => $clientKey,
+            'client_secret' => $clientSecret,
+        ], $eventPayload);
+
+        try {
+            $response = Http::acceptJson()
+                ->asJson()
+                ->timeout((int) config('services.finance_hub.timeout', 10))
+                ->post($eventsUrl, $payload);
+
+            if ($response->successful()) {
+                DB::table('integration_outbox')->where('id', $outbox->id)->update([
+                    'status' => 'sent',
+                    'attempts' => DB::raw('attempts + 1'),
+                    'last_error' => null,
+                    'updated_at' => now(),
+                ]);
+
+                return;
+            }
+
+            $message = sprintf('Finance Hub HTTP %s: %s', $response->status(), mb_strimwidth($response->body(), 0, 500));
+        } catch (\Throwable $exception) {
+            $message = $exception->getMessage();
+        }
+
+        $this->markCustomerCollectionFinanceHubOutboxFailed((int) $outbox->id, $message);
+    }
+
+    private function customerCollectionFinanceHubEventsUrl(): ?string
+    {
+        $configuredUrl = config('services.finance_hub.customer_collection_events_url');
+        if (is_string($configuredUrl) && trim($configuredUrl) !== '') {
+            return trim($configuredUrl);
+        }
+
+        $baseUrl = config('services.finance_hub.base_url');
+        if (is_string($baseUrl) && trim($baseUrl) !== '') {
+            return rtrim(trim($baseUrl), '/').'/api/integrations/events';
+        }
+
+        return null;
+    }
+
+    private function markCustomerCollectionFinanceHubOutboxFailed(int $outboxId, string $message): void
+    {
+        DB::table('integration_outbox')->where('id', $outboxId)->update([
+            'status' => 'failed',
+            'attempts' => DB::raw('attempts + 1'),
+            'last_error' => $message,
+            'updated_at' => now(),
+        ]);
     }
 
     private function parseInvoiceIds(mixed $raw): array
@@ -333,6 +634,7 @@ class CustomerPaymentController extends Controller
             'defaults' => [
                 'payment_date' => now()->toDateString(),
                 'payment_method' => 'Transfer Bank',
+                'cash_account_id' => $this->defaultCashAccountId(),
             ],
         ];
     }
