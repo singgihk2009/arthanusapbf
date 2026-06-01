@@ -6,9 +6,12 @@ const formatCurrency = (value) => Number(value || 0).toLocaleString('id-ID', { s
 
 export default function Page({ invoiceDraft }) {
   const defaults = invoiceDraft?.defaults ?? {};
+  const [draftLines, setDraftLines] = useState(invoiceDraft?.lines ?? []);
+  const [editingLineId, setEditingLineId] = useState(null);
   const [form, setForm] = useState({
     customer_id: invoiceDraft?.customer?.id ?? '',
     dispatch_ids: invoiceDraft?.dispatches?.map((dispatch) => dispatch.id) ?? [],
+    line_prices: Object.fromEntries((invoiceDraft?.lines ?? []).map((line) => [line.internal_usage_line_id, line.unit_price])),
     invoice_date: defaults.invoice_date ?? new Date().toISOString().slice(0, 10),
     due_date: defaults.due_date ?? '',
     discount_type: defaults.discount_type ?? 'amount',
@@ -22,7 +25,7 @@ export default function Page({ invoiceDraft }) {
   const [processing, setProcessing] = useState(false);
 
   const totals = useMemo(() => {
-    const subtotal = Number(invoiceDraft?.lines?.reduce((sum, line) => sum + Number(line.line_total || 0), 0) || 0);
+    const subtotal = Number(draftLines.reduce((sum, line) => sum + Number(line.line_total || 0), 0) || 0);
     const discountValue = Number(form.discount_value || 0);
     const discountTotal = form.discount_type === 'percent' ? subtotal * discountValue / 100 : discountValue;
     const cappedDiscount = Math.min(discountTotal, subtotal);
@@ -38,9 +41,21 @@ export default function Page({ invoiceDraft }) {
       taxTotal,
       grandTotal: taxBase + taxTotal,
     };
-  }, [form.discount_type, form.discount_value, form.freight_amount, form.tax_enabled, form.tax_percent, invoiceDraft?.lines]);
+  }, [draftLines, form.discount_type, form.discount_value, form.freight_amount, form.tax_enabled, form.tax_percent]);
 
   const updateForm = (field, value) => setForm((previous) => ({ ...previous, [field]: value }));
+  const updateLinePrice = (lineId, value) => {
+    const numericValue = Math.max(0, Number(value || 0));
+    setDraftLines((previous) => previous.map((line) => {
+      if (String(line.internal_usage_line_id) !== String(lineId)) return line;
+
+      return { ...line, unit_price: numericValue, line_total: Number(line.qty || 0) * numericValue };
+    }));
+    setForm((previous) => ({
+      ...previous,
+      line_prices: { ...previous.line_prices, [lineId]: numericValue },
+    }));
+  };
 
   const submit = (event) => {
     event.preventDefault();
@@ -109,13 +124,39 @@ export default function Page({ invoiceDraft }) {
                     <tr><th className='px-3 py-2 text-left'>Dispatch</th><th className='px-3 py-2 text-left'>Item</th><th className='px-3 py-2 text-right'>Qty</th><th className='px-3 py-2 text-left'>UOM</th><th className='px-3 py-2 text-right'>Harga</th><th className='px-3 py-2 text-right'>Total</th></tr>
                   </thead>
                   <tbody className='divide-y'>
-                    {invoiceDraft.lines.map((line) => (
+                    {draftLines.map((line) => (
                       <tr key={line.internal_usage_line_id}>
                         <td className='px-3 py-2'>{line.dispatch_number}</td>
-                        <td className='px-3 py-2'>{line.item_sku} - {line.item_name}</td>
+                        <td className='px-3 py-2'>
+                          <div className='font-medium'>{line.item_sku} - {line.item_name}</div>
+                          <div className='mt-1 text-xs text-gray-500'>Batch: {line.batch_no || '-'}</div>
+                          <div className='text-xs text-gray-500'>Expired: {line.expired_date || '-'}</div>
+                        </td>
                         <td className='px-3 py-2 text-right'>{Number(line.qty || 0).toLocaleString('id-ID')}</td>
                         <td className='px-3 py-2'>{line.uom_code}</td>
-                        <td className='px-3 py-2 text-right'>{formatCurrency(line.unit_price)}</td>
+                        <td className='px-3 py-2 text-right'>
+                          {editingLineId === line.internal_usage_line_id ? (
+                            <div className='flex flex-col items-end gap-1'>
+                              <input
+                                type='number'
+                                min='0'
+                                step='0.01'
+                                value={line.unit_price}
+                                onChange={(event) => updateLinePrice(line.internal_usage_line_id, event.target.value)}
+                                onBlur={() => setEditingLineId(null)}
+                                className='w-32 rounded border px-2 py-1 text-right'
+                                autoFocus
+                              />
+                              <button type='button' className='text-xs text-indigo-600' onMouseDown={(event) => event.preventDefault()} onClick={() => setEditingLineId(null)}>Selesai</button>
+                            </div>
+                          ) : (
+                            <div className='flex flex-col items-end gap-1'>
+                              <span>{formatCurrency(line.unit_price)}</span>
+                              <span className='text-xs text-gray-500'>COGS: {formatCurrency(line.cogs)}</span>
+                              <button type='button' className='text-xs font-medium text-indigo-600 hover:underline' onClick={() => setEditingLineId(line.internal_usage_line_id)}>Edit Price</button>
+                            </div>
+                          )}
+                        </td>
                         <td className='px-3 py-2 text-right'>{formatCurrency(line.line_total)}</td>
                       </tr>
                     ))}
