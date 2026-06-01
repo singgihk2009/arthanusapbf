@@ -271,24 +271,30 @@ class CustomerController extends Controller
             ->values();
 
         $today = now()->toDateString();
-        $invoices = DB::table('customer_invoices')
-            ->where('customer_id', $customer->id)
-            ->when($selectedInvoiceIds->isNotEmpty(), fn ($query) => $query->whereIn('id', $selectedInvoiceIds))
-            ->whereIn('status', ['posted', 'partially_paid', 'overdue'])
-            ->where('balance_due', '>', 0)
-            ->whereNotNull('due_date')
-            ->whereDate('due_date', '<=', $today)
-            ->orderBy('due_date')
-            ->orderBy('number')
+        $invoiceQuery = DB::table('customer_invoices as ci');
+        if (Schema::hasTable('sales')) {
+            $invoiceQuery->leftJoin('sales as s', 's.id', '=', 'ci.sale_id');
+        }
+
+        $invoices = $invoiceQuery
+            ->where('ci.customer_id', $customer->id)
+            ->when($selectedInvoiceIds->isNotEmpty(), fn ($query) => $query->whereIn('ci.id', $selectedInvoiceIds))
+            ->whereIn('ci.status', ['posted', 'partially_paid', 'overdue'])
+            ->where('ci.balance_due', '>', 0)
+            ->whereNotNull('ci.due_date')
+            ->whereDate('ci.due_date', '<=', $today)
+            ->orderBy('ci.due_date')
+            ->orderBy('ci.number')
             ->get([
-                'id',
-                'number',
-                'invoice_date',
-                'due_date',
-                'status',
-                'grand_total',
-                'amount_paid',
-                'balance_due',
+                'ci.id',
+                'ci.number',
+                'ci.invoice_date',
+                'ci.due_date',
+                'ci.status',
+                'ci.grand_total',
+                'ci.amount_paid',
+                'ci.balance_due',
+                DB::raw(Schema::hasTable('sales') ? 'COALESCE(s.number, "-") as transaction_number' : '"-" as transaction_number'),
             ])
             ->map(function (object $invoice) use ($today): object {
                 $invoice->days_overdue = \Carbon\Carbon::parse($invoice->due_date)->startOfDay()->diffInDays(\Carbon\Carbon::parse($today)->startOfDay());
@@ -299,11 +305,20 @@ class CustomerController extends Controller
         $company = Schema::hasTable('company_profiles')
             ? DB::table('company_profiles')->orderBy('id')->first()
             : null;
+        $bankAccount = Schema::hasTable('cash_accounts')
+            ? DB::table('cash_accounts')
+                ->where('cash_type', 'BANK')
+                ->where('is_active', true)
+                ->orderByDesc('is_default')
+                ->orderBy('id')
+                ->first(['bank_name', 'account_number', 'account_holder_name'])
+            : null;
 
         return Inertia::render('Apps/Sales/Customers/KontraBon', [
             'customer' => $customer,
             'invoices' => $invoices,
             'company' => $company,
+            'bankAccount' => $bankAccount,
             'document' => [
                 'number' => 'KB-'.now()->format('Ymd-His').'-'.$customer->id,
                 'date' => $today,
