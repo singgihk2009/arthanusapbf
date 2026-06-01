@@ -4,7 +4,7 @@ import AppLayout from '@/Layouts/AppLayout';
 
 const formatCurrency = (value) => Number(value || 0).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' });
 
-export default function Page({ paymentDraft }) {
+export default function Page({ paymentDraft, cashAccounts = [] }) {
   const defaults = paymentDraft?.defaults ?? {};
   const [form, setForm] = useState({
     customer_id: paymentDraft?.customer?.id ?? '',
@@ -12,6 +12,7 @@ export default function Page({ paymentDraft }) {
     payment_date: defaults.payment_date ?? new Date().toISOString().slice(0, 10),
     payment_method: defaults.payment_method ?? 'Transfer Bank',
     bank_account_id: '',
+    cash_account_id: defaults.cash_account_id ?? '',
     bank_charge: 0,
     notes: '',
     allocations: paymentDraft?.invoices?.map((invoice) => ({
@@ -148,6 +149,14 @@ export default function Page({ paymentDraft }) {
               <div className='space-y-3 text-sm'>
                 <label className='block'>Tanggal Terima<input type='date' value={form.payment_date} onChange={(event) => updateForm('payment_date', event.target.value)} className='mt-1 w-full rounded border px-3 py-2' /></label>
                 <label className='block'>Metode Pembayaran<input value={form.payment_method} onChange={(event) => updateForm('payment_method', event.target.value)} className='mt-1 w-full rounded border px-3 py-2' /></label>
+                <label className='block'>Cash/Bank Receipt Account
+                  <select value={form.cash_account_id} onChange={(event) => updateForm('cash_account_id', event.target.value)} className='mt-1 w-full rounded border px-3 py-2'>
+                    <option value=''>Pilih Cash Account / Bank / Cash Equivalent</option>
+                    {cashAccounts.map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}
+                  </select>
+                </label>
+                {errors.cash_account_id && <p className='text-xs text-red-600'>{errors.cash_account_id}</p>}
+                {!cashAccounts.length && <p className='text-xs text-amber-600'>Belum ada Cash Account aktif. Tambahkan melalui Master &gt; Cash Account.</p>}
                 <label className='block'>Bank Charge<input type='number' min='0' step='0.01' value={form.bank_charge} onChange={(event) => updateForm('bank_charge', event.target.value)} className='mt-1 w-full rounded border px-3 py-2' /></label>
                 <label className='block'>Catatan<textarea value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} className='mt-1 w-full rounded border px-3 py-2' rows={3} /></label>
               </div>
