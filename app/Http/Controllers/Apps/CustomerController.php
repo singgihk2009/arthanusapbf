@@ -194,15 +194,56 @@ class CustomerController extends Controller
                 ])
             : collect();
 
+        $customerInvoices = Schema::hasTable('customer_invoices')
+            ? DB::table('customer_invoices')
+                ->where('customer_id', $customer->id)
+                ->orderByDesc('id')
+                ->get([
+                    'id',
+                    'number',
+                    'invoice_date',
+                    'due_date',
+                    'status',
+                    'subtotal',
+                    'discount_total',
+                    'tax_total',
+                    DB::raw(Schema::hasColumn('customer_invoices', 'freight_amount') ? 'freight_amount' : '0 as freight_amount'),
+                    'grand_total',
+                    'amount_paid',
+                    'balance_due',
+                ])
+            : collect();
+
+        $customerPayments = Schema::hasTable('customer_payments')
+            ? DB::table('customer_payments')
+                ->where('customer_id', $customer->id)
+                ->orderByDesc('id')
+                ->get([
+                    'id',
+                    'number',
+                    'payment_date',
+                    'payment_method',
+                    'amount',
+                    'bank_charge',
+                    'discount_taken',
+                    DB::raw(Schema::hasColumn('customer_payments', 'wht_amount') ? 'wht_amount' : '0 as wht_amount'),
+                    DB::raw(Schema::hasColumn('customer_payments', 'other_deduction_amount') ? 'other_deduction_amount' : '0 as other_deduction_amount'),
+                    DB::raw(Schema::hasColumn('customer_payments', 'gross_settlement_amount') ? 'gross_settlement_amount' : '(amount + discount_taken) as gross_settlement_amount'),
+                    'status',
+                ])
+            : collect();
+
         return Inertia::render('Apps/Sales/Customers/Show', [
             'customer' => $customer,
             'salesOrders' => $salesOrders,
             'dispatches' => $dispatches,
+            'customerInvoices' => $customerInvoices,
+            'customerPayments' => $customerPayments,
             'summary' => [
                 'total_sales_orders' => Schema::hasTable('sales') ? $customer->salesOrders()?->count() ?? 0 : 0,
-                'total_invoices' => Schema::hasTable('customer_invoices') ? $customer->invoices()?->count() ?? 0 : 0,
-                'total_payments' => Schema::hasTable('customer_payments') ? $customer->payments()?->count() ?? 0 : 0,
-                'outstanding_balance' => 0,
+                'total_invoices' => $customerInvoices->count(),
+                'total_payments' => $customerPayments->count(),
+                'outstanding_balance' => $customerInvoices->sum(fn ($invoice): float => (float) ($invoice->balance_due ?? 0)),
             ],
             'documentTypes' => DocumentType::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'code', 'name']),
         ]);
