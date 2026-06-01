@@ -120,6 +120,8 @@ export default function Index() {
                         { key: 'category_name', label: 'Kategory Barang', sortKey: 'category' },
                         { key: 'item_name', label: 'Nama Barang', sortKey: 'item' },
                         { key: 'uom_name', label: 'Satuan' },
+                        { key: 'batch_number', label: 'Batch Number' },
+                        { key: 'expired_date', label: 'Tgl Expired' },
                         { key: 'qty', label: 'Jumlah Barang', sortKey: 'qty' },
                         { key: 'unit_price', label: 'Harga Satuan', sortKey: 'unit_price' },
                         { key: 'value', label: 'Total Harga', sortKey: 'value' },
@@ -137,6 +139,8 @@ export default function Index() {
                         { key: 'category_name', label: 'Kategory Barang', sortKey: 'category' },
                         { key: 'item_name', label: 'Nama Barang', sortKey: 'item' },
                         { key: 'uom_name', label: 'Satuan' },
+                        { key: 'batch_number', label: 'Batch Number' },
+                        { key: 'expired_date', label: 'Tgl Expired' },
                         { key: 'qty', label: 'Jumlah Barang', sortKey: 'qty' },
                         { key: 'unit_price', label: 'Harga Satuan', sortKey: 'unit_price' },
                         { key: 'value', label: 'Total Harga', sortKey: 'value' },
@@ -468,6 +472,8 @@ export default function Index() {
                                                 <Table.Td>{row.category_name}</Table.Td>
                                                 <Table.Td>{row.item_name}</Table.Td>
                                                 <Table.Td>{row.uom_name}</Table.Td>
+                                                <Table.Td>{row.batch_number ?? '-'}</Table.Td>
+                                                <Table.Td>{formatDate(row.expired_date)}</Table.Td>
                                                 <Table.Td>{Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 6 })}</Table.Td>
                                                 <Table.Td>{Number(row.unit_price).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
                                                 <Table.Td>{Number(row.value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR' })}</Table.Td>
