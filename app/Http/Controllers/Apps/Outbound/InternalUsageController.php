@@ -180,6 +180,11 @@ class InternalUsageController extends Controller
                 'qty_used' => (string) $line->qty_used,
                 'uom_id' => (string) $line->uom_id,
                 'notes' => (string) ($line->notes ?? ''),
+                'sale_line_id' => $line->sale_line_id ? (string) $line->sale_line_id : '',
+                'source_line_id' => $line->source_line_id ? (string) $line->source_line_id : '',
+                'qty_ordered' => $line->qty_ordered !== null ? (string) $line->qty_ordered : '',
+                'qty_already_shipped' => $line->qty_already_shipped !== null ? (string) $line->qty_already_shipped : '',
+                'qty_remaining' => $line->qty_remaining !== null ? (string) $line->qty_remaining : '',
             ]);
 
         $isPosted = strtoupper((string) $entry->status) === 'POSTED';
