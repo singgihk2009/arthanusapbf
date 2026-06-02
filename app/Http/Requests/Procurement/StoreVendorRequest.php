@@ -17,6 +17,7 @@ class StoreVendorRequest extends FormRequest
             'vendor_code' => ['required', 'string', 'max:100', Rule::unique('vendors', 'vendor_code')->ignore($vendorId)],
             'vendor_name' => ['required', 'string', 'max:255'],
             'vendor_type' => ['required', 'string', 'max:100'],
+            'id_kemenkes' => ['nullable', 'string', 'max:100'],
             'address' => ['required', 'string'],
             'province' => ['nullable', 'string', 'max:255'],
             'postal_code' => ['nullable', 'string', 'max:20'],

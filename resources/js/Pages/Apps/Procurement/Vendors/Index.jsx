@@ -58,7 +58,7 @@ export default function Index() {
                 <input
                     value={form.search}
                     onChange={(e) => setForm((previous) => ({ ...previous, search: e.target.value }))}
-                    placeholder='Cari nama / type / status kualifikasi vendor'
+                    placeholder='Cari nama / type / ID Kemenkes / status kualifikasi vendor'
                     className='block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none dark:border-gray-900 dark:bg-gray-950 dark:text-gray-100'
                 />
             </div>
@@ -74,6 +74,7 @@ export default function Index() {
                 <input type='file' accept='.xlsx,.csv,.txt' onChange={(e) => importForm.setData('file', e.target.files?.[0] || null)} className='block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none dark:border-gray-900 dark:bg-gray-950 dark:text-gray-100' />
             </div>
             <div className='flex items-end gap-2 md:col-span-6'>
+                <a href='/apps/procurement/vendors/export/excel' className='inline-flex items-center gap-1 rounded-lg border border-emerald-500 px-3 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'>Export Vendor</a>
                 <a href='/apps/procurement/vendors/template/excel' className='inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900'>Template Import Excel</a>
                 <button type='button' onClick={submitImport} className='inline-flex items-center gap-1 rounded-lg border border-indigo-500 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-indigo-950/30' disabled={!importForm.data.file || importForm.processing}><IconFileImport size={16} strokeWidth={1.5} />{importForm.processing ? 'Importing...' : 'Import Excel'}</button>
             </div>
@@ -94,7 +95,7 @@ export default function Index() {
                 <Table.Thead>
                     <tr>
                         <Table.Th className='w-10'>No</Table.Th>
-                        <Table.Th>Kode</Table.Th><Table.Th>Nama</Table.Th><Table.Th>Type Vendor</Table.Th><Table.Th>Alamat</Table.Th><Table.Th>Provinsi</Table.Th><Table.Th>Status Qualification</Table.Th><Table.Th>Action</Table.Th>
+                        <Table.Th>Kode</Table.Th><Table.Th>Nama</Table.Th><Table.Th>Type Vendor</Table.Th><Table.Th>ID Kemenkes</Table.Th><Table.Th>Alamat</Table.Th><Table.Th>Provinsi</Table.Th><Table.Th>Status Qualification</Table.Th><Table.Th>Action</Table.Th>
                     </tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -103,6 +104,7 @@ export default function Index() {
                         <Table.Td>{v.vendor_code}</Table.Td>
                         <Table.Td><Link href={`/apps/procurement/vendors/${v.id}?tab=overview`} className='text-indigo-600 hover:underline'>{v.vendor_name || v.name || '-'}</Link></Table.Td>
                         <Table.Td>{v.vendor_type || '-'}</Table.Td>
+                        <Table.Td>{v.id_kemenkes || '-'}</Table.Td>
                         <Table.Td>{v.address || '-'}</Table.Td>
                         <Table.Td>{v.province || '-'}</Table.Td>
                         <Table.Td>{v.qualification_status || '-'}</Table.Td>
@@ -119,7 +121,7 @@ export default function Index() {
                                 <button type='button' onClick={() => deleteVendor(v.id)} className='inline-flex items-center gap-1 rounded-md border border-red-300 px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30'><IconTrash size={16} strokeWidth={1.75} />Delete</button>
                             </div>
                         </Table.Td>
-                    </tr>) : <Table.Empty colSpan={8} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>Data vendor tidak ditemukan.</span></>} />}
+                    </tr>) : <Table.Empty colSpan={9} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>Data vendor tidak ditemukan.</span></>} />}
                 </Table.Tbody>
             </Table>
         </Table.Card>
