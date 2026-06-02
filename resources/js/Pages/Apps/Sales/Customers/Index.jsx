@@ -107,6 +107,7 @@ export default function Page({ customers, filters = {} }) {
                     <tr>
                         <Table.Th className='w-10'>No</Table.Th>
                         <Table.Th>Customer Code</Table.Th>
+                        <Table.Th>ID Kemenkes</Table.Th>
                         <Table.Th>Customer Name</Table.Th>
                         <Table.Th>ID Kemenkes</Table.Th>
                         <Table.Th>Contact Person</Table.Th>
@@ -123,6 +124,7 @@ export default function Page({ customers, filters = {} }) {
                     {customers.data.length ? customers.data.map((c, i) => <tr key={c.id} className='hover:bg-gray-100 dark:hover:bg-gray-900'>
                         <Table.Td className='text-center'>{++i + (customers.current_page - 1) * customers.per_page}</Table.Td>
                         <Table.Td>{c.customer_code}</Table.Td>
+                        <Table.Td>{c.id_kemenkes || '-'}</Table.Td>
                         <Table.Td><Link href={route('apps.customers.show', c.id)} className='text-indigo-600 hover:underline'>{c.customer_name}</Link></Table.Td>
                         <Table.Td>{c.id_kemenkes || '-'}</Table.Td>
                         <Table.Td>{c.contact_person || '-'}</Table.Td>

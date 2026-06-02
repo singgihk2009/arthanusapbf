@@ -166,6 +166,7 @@ class VendorController extends Controller
         $data = $request->validate([
             'vendor_name' => ['nullable', 'string', 'max:255'],
             'vendor_type' => ['nullable', 'string', 'max:100'],
+            'id_kemenkes' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'string'],
             'postal_code' => ['nullable', 'string', 'max:20'],
             'village' => ['nullable', 'string', 'max:255'],
@@ -191,6 +192,7 @@ class VendorController extends Controller
         $vendor->update([
             'vendor_name' => null,
             'vendor_type' => null,
+            'id_kemenkes' => null,
             'address' => null,
             'postal_code' => null,
             'village' => null,

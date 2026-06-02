@@ -95,13 +95,14 @@ export default function Index() {
                 <Table.Thead>
                     <tr>
                         <Table.Th className='w-10'>No</Table.Th>
-                        <Table.Th>Kode</Table.Th><Table.Th>Nama</Table.Th><Table.Th>Type Vendor</Table.Th><Table.Th>ID Kemenkes</Table.Th><Table.Th>Alamat</Table.Th><Table.Th>Provinsi</Table.Th><Table.Th>Status Qualification</Table.Th><Table.Th>Action</Table.Th>
+                        <Table.Th>Kode</Table.Th><Table.Th>ID Kemenkes</Table.Th><Table.Th>Nama</Table.Th><Table.Th>Type Vendor</Table.Th><Table.Th>Alamat</Table.Th><Table.Th>Provinsi</Table.Th><Table.Th>Status Qualification</Table.Th><Table.Th>Action</Table.Th>
                     </tr>
                 </Table.Thead>
                 <Table.Tbody>
                     {vendors.data.length ? vendors.data.map((v, i) => <tr key={v.id} className='hover:bg-gray-100 dark:hover:bg-gray-900'>
                         <Table.Td className='text-center'>{++i + (vendors.current_page - 1) * vendors.per_page}</Table.Td>
                         <Table.Td>{v.vendor_code}</Table.Td>
+                        <Table.Td>{v.id_kemenkes || '-'}</Table.Td>
                         <Table.Td><Link href={`/apps/procurement/vendors/${v.id}?tab=overview`} className='text-indigo-600 hover:underline'>{v.vendor_name || v.name || '-'}</Link></Table.Td>
                         <Table.Td>{v.vendor_type || '-'}</Table.Td>
                         <Table.Td>{v.id_kemenkes || '-'}</Table.Td>
