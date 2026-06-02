@@ -70,7 +70,7 @@ export default function Page({ customers, filters = {} }) {
                 <input
                     value={form.search}
                     onChange={(e) => setForm((previous) => ({ ...previous, search: e.target.value }))}
-                    placeholder='Cari kode / nama / contact person customer'
+                    placeholder='Cari kode / nama / ID Kemenkes / contact person customer'
                     className='block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none dark:border-gray-900 dark:bg-gray-950 dark:text-gray-100'
                 />
             </div>
@@ -107,6 +107,7 @@ export default function Page({ customers, filters = {} }) {
                     <tr>
                         <Table.Th className='w-10'>No</Table.Th>
                         <Table.Th>Customer Code</Table.Th>
+                        <Table.Th>ID Kemenkes</Table.Th>
                         <Table.Th>Customer Name</Table.Th>
                         <Table.Th>Contact Person</Table.Th>
                         <Table.Th>Phone</Table.Th>
@@ -122,6 +123,7 @@ export default function Page({ customers, filters = {} }) {
                     {customers.data.length ? customers.data.map((c, i) => <tr key={c.id} className='hover:bg-gray-100 dark:hover:bg-gray-900'>
                         <Table.Td className='text-center'>{++i + (customers.current_page - 1) * customers.per_page}</Table.Td>
                         <Table.Td>{c.customer_code}</Table.Td>
+                        <Table.Td>{c.id_kemenkes || '-'}</Table.Td>
                         <Table.Td><Link href={route('apps.customers.show', c.id)} className='text-indigo-600 hover:underline'>{c.customer_name}</Link></Table.Td>
                         <Table.Td>{c.contact_person || '-'}</Table.Td>
                         <Table.Td>{c.phone || '-'}</Table.Td>
@@ -136,7 +138,7 @@ export default function Page({ customers, filters = {} }) {
                                 <button type='button' onClick={() => onDelete(c.id)} className='inline-flex items-center gap-1 rounded-md border border-red-300 px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30'><IconTrash size={16} strokeWidth={1.75} />Delete</button>
                             </div>
                         </Table.Td>
-                    </tr>) : <Table.Empty colSpan={11} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>Data customer tidak ditemukan.</span></>} />}
+                    </tr>) : <Table.Empty colSpan={12} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>Data customer tidak ditemukan.</span></>} />}
                 </Table.Tbody>
             </Table>
         </Table.Card>

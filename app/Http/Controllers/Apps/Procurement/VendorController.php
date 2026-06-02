@@ -42,6 +42,7 @@ class VendorController extends Controller
                     $sub->where('vendor_code', 'like', "%{$search}%")
                         ->orWhere('vendor_name', 'like', "%{$search}%")
                         ->orWhere('vendor_type', 'like', "%{$search}%")
+                        ->orWhere('id_kemenkes', 'like', "%{$search}%")
                         ->orWhere('qualification_status', 'like', "%{$search}%");
                 });
             })
@@ -58,8 +59,8 @@ class VendorController extends Controller
     public function downloadTemplateExcel()
     {
         $rows = [
-            ['vendor_code', 'vendor_name', 'vendor_type', 'qualification_status', 'status', 'address', 'city', 'province', 'postal_code', 'phone', 'email'],
-            ['VND-001', 'PT Contoh Vendor', 'Distributor', 'draft', 'ACTIVE', 'Jl. Contoh 123', 'Jakarta', 'DKI Jakarta', '12345', '021123456', 'vendor@example.com'],
+            ['vendor_code', 'vendor_name', 'vendor_type', 'id_kemenkes', 'qualification_status', 'status', 'address', 'city', 'province', 'postal_code', 'phone', 'email'],
+            ['VND-001', 'PT Contoh Vendor', 'Distributor', 'KEMENKES-VND-001', 'draft', 'ACTIVE', 'Jl. Contoh 123', 'Jakarta', 'DKI Jakarta', '12345', '021123456', 'vendor@example.com'],
         ];
         $tempPath = storage_path('app/vendor-master-template-'.now()->format('YmdHis').'.xlsx');
         $this->buildTemplateXlsx($tempPath, $rows);
@@ -82,6 +83,7 @@ class VendorController extends Controller
                     'vendor_name' => $row['vendor_name'] ?? null,
                     'name' => $row['vendor_name'] ?? $row['vendor_code'],
                     'vendor_type' => $row['vendor_type'] ?? null,
+                    'id_kemenkes' => $row['id_kemenkes'] ?? null,
                     'qualification_status' => $row['qualification_status'] ?? 'draft',
                     'status' => $this->normalizeStatus($row['status'] ?? 'ACTIVE'),
                     'address' => $row['address'] ?? null,
@@ -95,6 +97,36 @@ class VendorController extends Controller
             );
         }
         return back()->with('success', 'Import vendor berhasil diproses.');
+    }
+
+
+    public function exportExcel()
+    {
+        $rows = [[
+            'vendor_code', 'vendor_name', 'vendor_type', 'id_kemenkes', 'qualification_status', 'status', 'address', 'city', 'province', 'postal_code', 'phone', 'email',
+        ]];
+
+        foreach (Vendor::query()->orderBy('vendor_code')->get() as $vendor) {
+            $rows[] = [
+                (string) ($vendor->vendor_code ?? ''),
+                (string) ($vendor->vendor_name ?? $vendor->name ?? ''),
+                (string) ($vendor->vendor_type ?? ''),
+                (string) ($vendor->id_kemenkes ?? ''),
+                (string) ($vendor->qualification_status ?? 'draft'),
+                (string) ($vendor->status ?? 'ACTIVE'),
+                (string) ($vendor->address ?? ''),
+                (string) ($vendor->city ?? ''),
+                (string) ($vendor->province ?? ''),
+                (string) ($vendor->postal_code ?? ''),
+                (string) ($vendor->phone ?? ''),
+                (string) ($vendor->email ?? ''),
+            ];
+        }
+
+        $tempPath = storage_path('app/vendor-export-'.now()->format('YmdHis').'.xlsx');
+        $this->buildTemplateXlsx($tempPath, $rows);
+
+        return response()->download($tempPath, 'vendor-export.xlsx')->deleteFileAfterSend(true);
     }
 
     public function show(Vendor $vendor)
@@ -134,6 +166,7 @@ class VendorController extends Controller
         $data = $request->validate([
             'vendor_name' => ['nullable', 'string', 'max:255'],
             'vendor_type' => ['nullable', 'string', 'max:100'],
+            'id_kemenkes' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'string'],
             'postal_code' => ['nullable', 'string', 'max:20'],
             'village' => ['nullable', 'string', 'max:255'],
@@ -159,6 +192,7 @@ class VendorController extends Controller
         $vendor->update([
             'vendor_name' => null,
             'vendor_type' => null,
+            'id_kemenkes' => null,
             'address' => null,
             'postal_code' => null,
             'village' => null,
@@ -673,7 +707,17 @@ class VendorController extends Controller
             foreach ($rowNode->c as $cell) {
                 $ref = (string) $cell['r']; $col=''; foreach (str_split($ref) as $ch) { if (ctype_alpha($ch)) $col.=$ch; else break; }
                 $idx = 0; foreach (str_split($col) as $ch) $idx = ($idx * 26) + (ord($ch) - 64); $idx--;
-                $val = (string) ($cell->v ?? ''); if ((string) $cell['t'] === 's') $val = $sharedStrings[(int) $val] ?? ''; $row[$idx] = trim($val);
+                $type = (string) $cell['t'];
+                $val = (string) ($cell->v ?? '');
+                if ($type === 's') {
+                    $val = $sharedStrings[(int) $val] ?? '';
+                } elseif ($type === 'inlineStr') {
+                    $val = (string) ($cell->is->t ?? '');
+                    if ($val === '' && isset($cell->is->r)) {
+                        foreach ($cell->is->r as $run) $val .= (string) ($run->t ?? '');
+                    }
+                }
+                $row[$idx] = trim($val);
             } ksort($row); $rows[] = array_values($row);
         } $zip->close();
         if ($rows === []) return collect();

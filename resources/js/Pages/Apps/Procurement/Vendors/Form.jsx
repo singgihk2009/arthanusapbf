@@ -13,6 +13,7 @@ export default function Form() {
     vendor_code: vendor?.vendor_code ?? '',
     vendor_name: vendor?.vendor_name ?? '',
     vendor_type: vendor?.vendor_type ?? '',
+    id_kemenkes: vendor?.id_kemenkes ?? '',
     address: vendor?.address ?? '',
     province: vendor?.province ?? '',
     status: vendor?.status ?? 'prospect',
@@ -55,6 +56,7 @@ export default function Form() {
           <Input label='Kode' value={data.vendor_code} onChange={e => setData('vendor_code', e.target.value)} errors={errors.vendor_code} />
           <Input label='Nama' value={data.vendor_name} onChange={e => setData('vendor_name', e.target.value)} errors={errors.vendor_name} />
           <Input label='Type Vendor' value={data.vendor_type} onChange={e => setData('vendor_type', e.target.value)} errors={errors.vendor_type} />
+          <Input label='ID Kemenkes' value={data.id_kemenkes} onChange={e => setData('id_kemenkes', e.target.value)} errors={errors.id_kemenkes} />
           <Input label='Provinsi' value={data.province} onChange={e => setData('province', e.target.value)} errors={errors.province} />
           <Input label='Alamat' value={data.address} onChange={e => setData('address', e.target.value)} errors={errors.address} />
         </div>

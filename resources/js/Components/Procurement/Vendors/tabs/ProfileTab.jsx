@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { useForm } from '@inertiajs/react';
 
-const fields = ['vendor_name', 'vendor_type', 'address', 'postal_code', 'village', 'district', 'city', 'province', 'phone', 'fax', 'email', 'npwp', 'nib_number', 'company_license_number', 'cdakb_cpakb_certificate_number'];
+const fields = ['vendor_name', 'vendor_type', 'id_kemenkes', 'address', 'postal_code', 'village', 'district', 'city', 'province', 'phone', 'fax', 'email', 'npwp', 'nib_number', 'company_license_number', 'cdakb_cpakb_certificate_number'];
+
+const fieldLabels = { id_kemenkes: 'ID Kemenkes' };
 
 const emptyProfile = fields.reduce((acc, key) => ({ ...acc, [key]: '' }), {});
 
@@ -31,7 +33,7 @@ export default function Tab({ data, vendor }) {
 
   return <form onSubmit={submit} className='grid grid-cols-1 md:grid-cols-2 gap-3'>
     {fields.map((key) => <div key={key}>
-      <label className='text-sm font-medium capitalize'>{key.replaceAll('_', ' ')}</label>
+      <label className='text-sm font-medium capitalize'>{fieldLabels[key] ?? key.replaceAll('_', ' ')}</label>
       <input value={form[key]} onChange={e => setData(key, e.target.value)} className='w-full mt-1 rounded border-gray-300' />
       {errors[key] && <p className='text-xs text-red-500 mt-1'>{errors[key]}</p>}
     </div>)}

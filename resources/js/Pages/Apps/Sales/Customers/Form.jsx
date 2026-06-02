@@ -11,6 +11,7 @@ export default function Form({ customer }) {
     customer_code: customer?.customer_code ?? '',
     customer_name: customer?.customer_name ?? '',
     customer_type: customer?.customer_type ?? '',
+    id_kemenkes: customer?.id_kemenkes ?? '',
     contact_person: customer?.contact_person ?? '',
     phone: customer?.phone ?? '',
     email: customer?.email ?? '',
@@ -55,6 +56,7 @@ export default function Form({ customer }) {
           <Input label='Customer Code' value={data.customer_code} onChange={(e) => setData('customer_code', e.target.value)} errors={errors.customer_code} />
           <Input label='Customer Name' value={data.customer_name} onChange={(e) => setData('customer_name', e.target.value)} errors={errors.customer_name} />
           <Input label='Customer Type' value={data.customer_type} onChange={(e) => setData('customer_type', e.target.value)} errors={errors.customer_type} />
+          <Input label='ID Kemenkes' value={data.id_kemenkes} onChange={(e) => setData('id_kemenkes', e.target.value)} errors={errors.id_kemenkes} />
           <Input label='Contact Person' value={data.contact_person} onChange={(e) => setData('contact_person', e.target.value)} errors={errors.contact_person} />
           <Input label='Phone' value={data.phone} onChange={(e) => setData('phone', e.target.value)} errors={errors.phone} />
           <Input label='Email' type='email' value={data.email} onChange={(e) => setData('email', e.target.value)} errors={errors.email} />

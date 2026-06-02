@@ -295,6 +295,7 @@ export default function Page({ customer, summary, salesOrders = [], dispatches =
     customer_code: customer?.customer_code ?? '',
     customer_name: customer?.customer_name ?? '',
     customer_type: customer?.customer_type ?? '',
+    id_kemenkes: customer?.id_kemenkes ?? '',
     contact_person: customer?.contact_person ?? '',
     phone: customer?.phone ?? '',
     email: customer?.email ?? '',
@@ -610,6 +611,7 @@ export default function Page({ customer, summary, salesOrders = [], dispatches =
               <label className='block text-sm'>Customer Code<Input value={data.customer_code} onChange={(e) => setData('customer_code', e.target.value)} className='mt-1 w-full' />{errors.customer_code && <p className='text-xs text-red-600'>{errors.customer_code}</p>}</label>
               <label className='block text-sm'>Customer Name<Input value={data.customer_name} onChange={(e) => setData('customer_name', e.target.value)} className='mt-1 w-full' />{errors.customer_name && <p className='text-xs text-red-600'>{errors.customer_name}</p>}</label>
               <label className='block text-sm'>Customer Type<Input value={data.customer_type || ''} onChange={(e) => setData('customer_type', e.target.value)} className='mt-1 w-full' /></label>
+              <label className='block text-sm'>ID Kemenkes<Input value={data.id_kemenkes || ''} onChange={(e) => setData('id_kemenkes', e.target.value)} className='mt-1 w-full' />{errors.id_kemenkes && <p className='text-xs text-red-600'>{errors.id_kemenkes}</p>}</label>
               <label className='block text-sm'>Contact Person<Input value={data.contact_person || ''} onChange={(e) => setData('contact_person', e.target.value)} className='mt-1 w-full' /></label>
               <label className='block text-sm'>Phone<Input value={data.phone || ''} onChange={(e) => setData('phone', e.target.value)} className='mt-1 w-full' /></label>
               <label className='block text-sm'>Email<Input value={data.email || ''} onChange={(e) => setData('email', e.target.value)} className='mt-1 w-full' /></label>
