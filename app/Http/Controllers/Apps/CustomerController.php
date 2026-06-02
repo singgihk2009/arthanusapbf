@@ -28,7 +28,8 @@ class CustomerController extends Controller
                 ->orWhere('phone', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")
                 ->orWhere('city', 'like', "%{$search}%")
-                ->orWhere('npwp', 'like', "%{$search}%")))
+                ->orWhere('npwp', 'like', "%{$search}%")
+                ->orWhere('id_kemenkes', 'like', "%{$search}%")))
             ->when($status !== '', fn ($q) => $q->where('status', $status))
             ->latest()->paginate(15)->withQueryString();
 
@@ -39,8 +40,8 @@ class CustomerController extends Controller
     public function downloadTemplateExcel()
     {
         $rows = [
-            ['customer_code', 'customer_name', 'contact_person', 'phone', 'email', 'address', 'city', 'province', 'postal_code', 'npwp', 'payment_term_days', 'credit_limit', 'status'],
-            ['CUST-000001', 'PT Contoh Customer', 'Budi', '08123456789', 'customer@example.com', 'Jl. Contoh No. 1', 'Jakarta', 'DKI Jakarta', '12345', '01.234.567.8-999.000', 30, 5000000, 'active'],
+            ['customer_code', 'customer_name', 'id_kemenkes', 'contact_person', 'phone', 'email', 'address', 'city', 'province', 'postal_code', 'npwp', 'payment_term_days', 'credit_limit', 'status'],
+            ['CUST-000001', 'PT Contoh Customer', 'KEMENKES-CUST-001', 'Budi', '08123456789', 'customer@example.com', 'Jl. Contoh No. 1', 'Jakarta', 'DKI Jakarta', '12345', '01.234.567.8-999.000', 30, 5000000, 'active'],
         ];
 
         $tempPath = storage_path('app/customer-master-template-'.now()->format('YmdHis').'.xlsx');
@@ -71,6 +72,7 @@ class CustomerController extends Controller
 
             $payload = [
                 'customer_name' => $row['customer_name'] ?? $customerCode,
+                'id_kemenkes' => $row['id_kemenkes'] ?? null,
                 'contact_person' => $row['contact_person'] ?? null,
                 'phone' => $row['phone'] ?? null,
                 'email' => $row['email'] ?? null,
@@ -107,13 +109,14 @@ class CustomerController extends Controller
     public function exportExcel()
     {
         $rows = [[
-            'customer_code', 'customer_name', 'contact_person', 'phone', 'email', 'address', 'city', 'province', 'postal_code', 'npwp', 'payment_term_days', 'credit_limit', 'status',
+            'customer_code', 'customer_name', 'id_kemenkes', 'contact_person', 'phone', 'email', 'address', 'city', 'province', 'postal_code', 'npwp', 'payment_term_days', 'credit_limit', 'status',
         ]];
 
         foreach (Customer::query()->orderBy('customer_code')->get() as $customer) {
             $rows[] = [
                 (string) ($customer->customer_code ?? ''),
                 (string) ($customer->customer_name ?? ''),
+                (string) ($customer->id_kemenkes ?? ''),
                 (string) ($customer->contact_person ?? ''),
                 (string) ($customer->phone ?? ''),
                 (string) ($customer->email ?? ''),
@@ -422,9 +425,15 @@ class CustomerController extends Controller
                 $r = (string) ($c['r'] ?? '');
                 $col = preg_replace('/\d+/', '', $r);
                 $val = '';
-                if ((string) ($c['t'] ?? '') === 's') {
+                $type = (string) ($c['t'] ?? '');
+                if ($type === 's') {
                     $idx = (int) ($c->v ?? -1);
                     $val = $shared[$idx] ?? '';
+                } elseif ($type === 'inlineStr') {
+                    $val = (string) ($c->is->t ?? '');
+                    if ($val === '' && isset($c->is->r)) {
+                        foreach ($c->is->r as $run) $val .= (string) ($run->t ?? '');
+                    }
                 } else $val = (string) ($c->v ?? '');
                 $data[$col] = trim($val);
             }

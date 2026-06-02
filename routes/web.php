@@ -343,6 +343,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
 
     Route::prefix('procurement')->name('procurement.')->group(function () {
         Route::get('/vendors/qualification-report', [VendorController::class, 'qualificationReport'])->name('vendors.qualification-report');
+        Route::get('/vendors/export/excel', [VendorController::class, 'exportExcel'])->name('vendors.export.excel');
         Route::get('/vendors/template/excel', [VendorController::class, 'downloadTemplateExcel'])->name('vendors.template.excel');
         Route::post('/vendors/import/excel', [VendorController::class, 'importExcel'])->name('vendors.import.excel');
         Route::post('/vendors/{vendor}/submit-qualification', [VendorController::class, 'submitQualification'])->name('vendors.submit-qualification');

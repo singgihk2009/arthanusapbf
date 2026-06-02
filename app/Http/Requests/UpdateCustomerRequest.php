@@ -18,6 +18,7 @@ class UpdateCustomerRequest extends FormRequest
             'customer_code' => ['required','string','max:50',Rule::unique('customers','customer_code')->ignore($id)],
             'customer_name' => ['required','string','max:255'],
             'customer_type' => ['nullable','string','max:100'],
+            'id_kemenkes' => ['nullable','string','max:100'],
             'contact_person' => ['nullable','string','max:150'],
             'phone' => ['nullable','string','max:50'],
             'email' => ['nullable','email','max:150'],
