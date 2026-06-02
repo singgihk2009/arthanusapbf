@@ -109,6 +109,7 @@ export default function Page({ customers, filters = {} }) {
                         <Table.Th>Customer Code</Table.Th>
                         <Table.Th>ID Kemenkes</Table.Th>
                         <Table.Th>Customer Name</Table.Th>
+                        <Table.Th>ID Kemenkes</Table.Th>
                         <Table.Th>Contact Person</Table.Th>
                         <Table.Th>Phone</Table.Th>
                         <Table.Th>City</Table.Th>
@@ -125,6 +126,7 @@ export default function Page({ customers, filters = {} }) {
                         <Table.Td>{c.customer_code}</Table.Td>
                         <Table.Td>{c.id_kemenkes || '-'}</Table.Td>
                         <Table.Td><Link href={route('apps.customers.show', c.id)} className='text-indigo-600 hover:underline'>{c.customer_name}</Link></Table.Td>
+                        <Table.Td>{c.id_kemenkes || '-'}</Table.Td>
                         <Table.Td>{c.contact_person || '-'}</Table.Td>
                         <Table.Td>{c.phone || '-'}</Table.Td>
                         <Table.Td>{c.city || '-'}</Table.Td>

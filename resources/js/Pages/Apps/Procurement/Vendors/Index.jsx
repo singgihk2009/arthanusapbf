@@ -105,6 +105,7 @@ export default function Index() {
                         <Table.Td>{v.id_kemenkes || '-'}</Table.Td>
                         <Table.Td><Link href={`/apps/procurement/vendors/${v.id}?tab=overview`} className='text-indigo-600 hover:underline'>{v.vendor_name || v.name || '-'}</Link></Table.Td>
                         <Table.Td>{v.vendor_type || '-'}</Table.Td>
+                        <Table.Td>{v.id_kemenkes || '-'}</Table.Td>
                         <Table.Td>{v.address || '-'}</Table.Td>
                         <Table.Td>{v.province || '-'}</Table.Td>
                         <Table.Td>{v.qualification_status || '-'}</Table.Td>
