@@ -41,6 +41,7 @@ use App\Http\Controllers\Apps\DocumentRequirementController;
 use App\Http\Controllers\Apps\DocumentMonitoringController;
 use App\Http\Controllers\Apps\DocumentCenterDocumentController;
 use App\Http\Controllers\Apps\CompanyProfileController;
+use App\Http\Controllers\Apps\Setup\ManualPurchaseIntegrationController;
 use App\Http\Controllers\ProfileController;
 
 use App\Http\Controllers\Apps\CustomerController;
@@ -284,6 +285,11 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::put('/setup/company-profile', [CompanyProfileController::class, 'update'])->name('setup.company-profile.update');
     Route::post('/setup/company-profile/logo', [CompanyProfileController::class, 'uploadLogo'])->name('setup.company-profile.logo.upload');
     Route::delete('/setup/company-profile/logo', [CompanyProfileController::class, 'deleteLogo'])->name('setup.company-profile.logo.delete');
+    Route::get('/setup/manual-purchase-integration', [ManualPurchaseIntegrationController::class, 'index'])->name('setup.manual-purchase-integration.index');
+    Route::get('/setup/manual-purchase-integration/template/excel', [ManualPurchaseIntegrationController::class, 'downloadTemplate'])->name('setup.manual-purchase-integration.template.excel');
+    Route::post('/setup/manual-purchase-integration/imports', [ManualPurchaseIntegrationController::class, 'store'])->name('setup.manual-purchase-integration.imports.store');
+    Route::get('/setup/manual-purchase-integration/imports/{batch}', [ManualPurchaseIntegrationController::class, 'show'])->name('setup.manual-purchase-integration.imports.show');
+    Route::post('/setup/manual-purchase-integration/imports/{batch}/commit', [ManualPurchaseIntegrationController::class, 'commit'])->name('setup.manual-purchase-integration.imports.commit');
 
     Route::get('/integration', [IntegrationController::class, 'index'])->name('integration.index');
     Route::get('/integration/export/csv', [IntegrationController::class, 'exportCsv'])->name('integration.export.csv');
