@@ -56,7 +56,7 @@ export default function Index({ batches, purposes }) {
     const deleteBatch = (batch) => {
         if (!window.confirm(`Hapus batch ${batch.batch_no}? Data preview dan error validasi akan dihapus permanen.`)) return;
         setDeletingId(batch.id);
-        window.axios.delete(route('apps.setup.manual-purchase-integration.imports.destroy', batch.id))
+        window.axios.post(route('apps.setup.manual-purchase-integration.imports.discard', batch.id))
             .then(() => window.location.reload())
             .catch((error) => window.alert(error.response?.data?.message ?? 'Hapus batch gagal.'))
             .finally(() => setDeletingId(null));

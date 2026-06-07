@@ -290,6 +290,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::post('/setup/manual-purchase-integration/imports', [ManualPurchaseIntegrationController::class, 'store'])->name('setup.manual-purchase-integration.imports.store');
     Route::get('/setup/manual-purchase-integration/imports/{batch}', [ManualPurchaseIntegrationController::class, 'show'])->name('setup.manual-purchase-integration.imports.show');
     Route::post('/setup/manual-purchase-integration/imports/{batch}/retry', [ManualPurchaseIntegrationController::class, 'retry'])->name('setup.manual-purchase-integration.imports.retry');
+    Route::post('/setup/manual-purchase-integration/imports/{batch}/discard', [ManualPurchaseIntegrationController::class, 'discard'])->name('setup.manual-purchase-integration.imports.discard');
     Route::delete('/setup/manual-purchase-integration/imports/{batch}', [ManualPurchaseIntegrationController::class, 'destroy'])->name('setup.manual-purchase-integration.imports.destroy');
     Route::post('/setup/manual-purchase-integration/imports/{batch}/commit', [ManualPurchaseIntegrationController::class, 'commit'])->name('setup.manual-purchase-integration.imports.commit');
 

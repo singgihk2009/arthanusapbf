@@ -158,18 +158,30 @@ class ManualPurchaseIntegrationController extends Controller
             ->with('batch_id', $batch);
     }
 
+    public function discard(int $batch): RedirectResponse
+    {
+        $this->deleteValidationFailedBatch($batch);
+
+        return to_route('apps.setup.manual-purchase-integration.index')
+            ->with('success', 'Batch validation failed berhasil dihapus.');
+    }
+
     public function destroy(int $batch): RedirectResponse
+    {
+        return $this->discard($batch);
+    }
+
+    private function deleteValidationFailedBatch(int $batch): void
     {
         DB::transaction(function () use ($batch): void {
             $header = DB::table('manual_purchase_integration_batches')->where('id', $batch)->lockForUpdate()->first();
             abort_unless($header, 404);
             abort_if($header->status !== 'validation_failed', 422, 'Hanya batch validation_failed yang bisa dihapus dari action ini.');
 
+            DB::table('manual_purchase_integration_document_links')->where('batch_id', $batch)->delete();
+            DB::table('manual_purchase_integration_rows')->where('batch_id', $batch)->delete();
             DB::table('manual_purchase_integration_batches')->where('id', $batch)->delete();
         });
-
-        return to_route('apps.setup.manual-purchase-integration.index')
-            ->with('success', 'Batch validation failed berhasil dihapus.');
     }
 
     public function commit(Request $request, int $batch): RedirectResponse
