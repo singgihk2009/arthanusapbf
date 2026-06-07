@@ -7,11 +7,17 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        // This migration may be retried after a failed unique-index creation on
+        // older MySQL/utf8mb4 configurations, so clear any partial tables first.
+        Schema::dropIfExists('manual_purchase_integration_document_links');
+        Schema::dropIfExists('manual_purchase_integration_rows');
+        Schema::dropIfExists('manual_purchase_integration_batches');
+
         Schema::create('manual_purchase_integration_batches', function (Blueprint $table) {
             $table->id();
             $table->string('batch_no')->unique();
-            $table->string('source_system');
-            $table->string('source_branch_code');
+            $table->string('source_system', 80);
+            $table->string('source_branch_code', 80);
             $table->string('import_purpose')->default('BRANCH_INTEGRATION');
             $table->string('file_name')->nullable();
             $table->string('file_hash', 64)->nullable();
@@ -45,10 +51,10 @@ return new class extends Migration {
         Schema::create('manual_purchase_integration_document_links', function (Blueprint $table) {
             $table->id();
             $table->foreignId('batch_id')->constrained('manual_purchase_integration_batches')->cascadeOnDelete();
-            $table->string('source_system');
-            $table->string('source_branch_code');
+            $table->string('source_system', 80);
+            $table->string('source_branch_code', 80);
             $table->string('document_type', 60);
-            $table->string('document_no');
+            $table->string('document_no', 120);
             $table->string('target_table', 80);
             $table->unsignedBigInteger('target_id');
             $table->timestamps();
