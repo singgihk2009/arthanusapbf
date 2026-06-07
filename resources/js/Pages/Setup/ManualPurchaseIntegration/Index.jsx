@@ -1,6 +1,6 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 const inputClassName = 'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-800 dark:bg-gray-950';
 const buttonClassName = 'rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50';
@@ -8,6 +8,10 @@ const buttonClassName = 'rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium te
 export default function Index({ batches, purposes }) {
     const { flash } = usePage().props;
     const [committingId, setCommittingId] = useState(null);
+    const [deletingId, setDeletingId] = useState(null);
+    const [repairBatch, setRepairBatch] = useState(null);
+    const uploadSectionRef = useRef(null);
+    const fileInputRef = useRef(null);
     const { data, setData, post, processing, errors, reset } = useForm({
         source_system: '',
         source_branch_code: '',
@@ -17,10 +21,45 @@ export default function Index({ batches, purposes }) {
 
     const handleSubmit = (event) => {
         event.preventDefault();
-        post(route('apps.setup.manual-purchase-integration.imports.store'), {
+        const submitRoute = repairBatch
+            ? route('apps.setup.manual-purchase-integration.imports.retry', repairBatch.id)
+            : route('apps.setup.manual-purchase-integration.imports.store');
+
+        post(submitRoute, {
             forceFormData: true,
-            onSuccess: () => reset('file'),
+            onSuccess: () => {
+                reset('file');
+                setRepairBatch(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            },
         });
+    };
+
+    const startRepair = (batch) => {
+        setRepairBatch(batch);
+        setData({
+            source_system: batch.source_system ?? '',
+            source_branch_code: batch.source_branch_code ?? '',
+            import_purpose: batch.import_purpose ?? 'BRANCH_INTEGRATION',
+            file: null,
+        });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    const cancelRepair = () => {
+        setRepairBatch(null);
+        reset('file');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const deleteBatch = (batch) => {
+        if (!window.confirm(`Hapus batch ${batch.batch_no}? Data preview dan error validasi akan dihapus permanen.`)) return;
+        setDeletingId(batch.id);
+        window.axios.post(route('apps.setup.manual-purchase-integration.imports.discard', batch.id))
+            .then(() => window.location.reload())
+            .catch((error) => window.alert(error.response?.data?.message ?? 'Hapus batch gagal.'))
+            .finally(() => setDeletingId(null));
     };
 
     const commitBatch = (batchId) => {
@@ -47,11 +86,16 @@ export default function Index({ batches, purposes }) {
                 {flash?.success && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{flash.success}</div>}
                 {flash?.error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{flash.error}</div>}
 
-                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-900 dark:bg-gray-950">
+                <div ref={uploadSectionRef} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-900 dark:bg-gray-950">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h2 className="text-base font-semibold">Download Template & Upload Import</h2>
                             <p className="text-sm text-gray-600 dark:text-gray-400">Upload akan membuat batch validasi terlebih dahulu. Commit hanya aktif jika tidak ada blocking error.</p>
+                            {repairBatch && (
+                                <p className="mt-1 text-sm font-medium text-amber-700">
+                                    Mode perbaiki data untuk batch {repairBatch.batch_no}. Upload file yang sudah diperbaiki untuk mengganti hasil validasi batch ini.
+                                </p>
+                            )}
                         </div>
                         <a href={route('apps.setup.manual-purchase-integration.template.excel')} className="rounded-lg border border-indigo-500 px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30">
                             Download Template Excel
@@ -64,8 +108,11 @@ export default function Index({ batches, purposes }) {
                         <select value={data.import_purpose} onChange={(e) => setData('import_purpose', e.target.value)} className={inputClassName}>
                             {purposes.map((purpose) => <option key={purpose} value={purpose}>{purpose}</option>)}
                         </select>
-                        <input type="file" accept=".xlsx" onChange={(e) => setData('file', e.target.files?.[0] ?? null)} className={inputClassName} />
-                        <button type="submit" disabled={processing} className={buttonClassName}>{processing ? 'Uploading...' : 'Upload & Validate'}</button>
+                        <input ref={fileInputRef} type="file" accept=".xlsx" onChange={(e) => setData('file', e.target.files?.[0] ?? null)} className={inputClassName} />
+                        <div className="flex gap-2">
+                            <button type="submit" disabled={processing} className={buttonClassName}>{processing ? 'Uploading...' : (repairBatch ? 'Upload Perbaikan' : 'Upload & Validate')}</button>
+                            {repairBatch && <button type="button" onClick={cancelRepair} disabled={processing} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50">Batal</button>}
+                        </div>
                     </form>
                     <div className="mt-2 space-y-1 text-xs text-red-600">
                         {Object.entries(errors).map(([key, value]) => <p key={key}>{value}</p>)}
@@ -105,9 +152,15 @@ export default function Index({ batches, purposes }) {
                                             <td className="px-3 py-2 text-red-600">{batch.errors?.length ?? 0}{batch.errors?.[0] && <div className="max-w-sm truncate text-xs">{batch.errors[0].sheet} row {batch.errors[0].row}: {batch.errors[0].message}</div>}</td>
                                             <td className="px-3 py-2">{batch.created_at}</td>
                                             <td className="px-3 py-2">
-                                                <div className="flex justify-center gap-2">
+                                                <div className="flex flex-wrap justify-center gap-2">
                                                     <button type="button" onClick={() => window.open(route('apps.setup.manual-purchase-integration.imports.show', batch.id), '_blank')} className="rounded border border-gray-300 px-2 py-1 text-xs">JSON Detail</button>
                                                     {batch.status === 'validated' && <button type="button" disabled={committingId === batch.id} onClick={() => commitBatch(batch.id)} className="rounded border border-emerald-500 px-2 py-1 text-xs font-medium text-emerald-700">{committingId === batch.id ? 'Committing...' : 'Commit'}</button>}
+                                                    {batch.status === 'validation_failed' && (
+                                                        <>
+                                                            <button type="button" disabled={processing || deletingId === batch.id} onClick={() => startRepair(batch)} className="rounded border border-amber-500 px-2 py-1 text-xs font-medium text-amber-700">Perbaiki Data</button>
+                                                            <button type="button" disabled={deletingId === batch.id} onClick={() => deleteBatch(batch)} className="rounded border border-red-500 px-2 py-1 text-xs font-medium text-red-700">{deletingId === batch.id ? 'Menghapus...' : 'Hapus Data'}</button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
