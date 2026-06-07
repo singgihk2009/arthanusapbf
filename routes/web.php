@@ -42,6 +42,7 @@ use App\Http\Controllers\Apps\DocumentMonitoringController;
 use App\Http\Controllers\Apps\DocumentCenterDocumentController;
 use App\Http\Controllers\Apps\CompanyProfileController;
 use App\Http\Controllers\Apps\Setup\ManualPurchaseIntegrationController;
+use App\Http\Controllers\Apps\Setup\ManualSalesIntegrationController;
 use App\Http\Controllers\ProfileController;
 
 use App\Http\Controllers\Apps\CustomerController;
@@ -293,6 +294,15 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::post('/setup/manual-purchase-integration/imports/{batch}/discard', [ManualPurchaseIntegrationController::class, 'discard'])->name('setup.manual-purchase-integration.imports.discard');
     Route::delete('/setup/manual-purchase-integration/imports/{batch}', [ManualPurchaseIntegrationController::class, 'destroy'])->name('setup.manual-purchase-integration.imports.destroy');
     Route::post('/setup/manual-purchase-integration/imports/{batch}/commit', [ManualPurchaseIntegrationController::class, 'commit'])->name('setup.manual-purchase-integration.imports.commit');
+
+    Route::get('/setup/manual-sales-integration', [ManualSalesIntegrationController::class, 'index'])->name('setup.manual-sales-integration.index');
+    Route::get('/setup/manual-sales-integration/template/excel', [ManualSalesIntegrationController::class, 'downloadTemplate'])->name('setup.manual-sales-integration.template.excel');
+    Route::post('/setup/manual-sales-integration/imports', [ManualSalesIntegrationController::class, 'store'])->name('setup.manual-sales-integration.imports.store');
+    Route::get('/setup/manual-sales-integration/imports/{batch}', [ManualSalesIntegrationController::class, 'show'])->name('setup.manual-sales-integration.imports.show');
+    Route::post('/setup/manual-sales-integration/imports/{batch}/retry', [ManualSalesIntegrationController::class, 'retry'])->name('setup.manual-sales-integration.imports.retry');
+    Route::post('/setup/manual-sales-integration/imports/{batch}/discard', [ManualSalesIntegrationController::class, 'discard'])->name('setup.manual-sales-integration.imports.discard');
+    Route::delete('/setup/manual-sales-integration/imports/{batch}', [ManualSalesIntegrationController::class, 'destroy'])->name('setup.manual-sales-integration.imports.destroy');
+    Route::post('/setup/manual-sales-integration/imports/{batch}/commit', [ManualSalesIntegrationController::class, 'commit'])->name('setup.manual-sales-integration.imports.commit');
 
     Route::get('/integration', [IntegrationController::class, 'index'])->name('integration.index');
     Route::get('/integration/export/csv', [IntegrationController::class, 'exportCsv'])->name('integration.export.csv');

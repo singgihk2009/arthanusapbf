@@ -126,6 +126,7 @@ export default function Menu() {
             details: [
                 { title: 'Company Profile', href: '/apps/setup/company-profile', icon: <IconBuilding size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/setup/company-profile'), permissions: true },
                 { title: 'Manual Purchase Integration', href: '/apps/setup/manual-purchase-integration', icon: <IconFileImport size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/setup/manual-purchase-integration'), permissions: true },
+                { title: 'Manual Sales Integration', href: '/apps/setup/manual-sales-integration', icon: <IconFileImport size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/setup/manual-sales-integration'), permissions: true },
                 { title: 'User Management', href: '/apps/users', icon: <IconUsers size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/users'), permissions: true },
             ],
         },
