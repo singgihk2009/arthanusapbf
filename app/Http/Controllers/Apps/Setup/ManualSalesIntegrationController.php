@@ -233,12 +233,34 @@ class ManualSalesIntegrationController extends Controller
 
         $this->requireHeaders($sheets, 'so_headers', ['so_no', 'so_date', 'customer_code', 'warehouse_code', 'status'], $errors);
         $this->requireHeaders($sheets, 'so_lines', ['so_no', 'line_no', 'item_sku', 'uom_code', 'qty_ordered', 'unit_price'], $errors);
-        $this->requireHeaders($sheets, 'fulfillment_headers', ['fulfillment_no', 'fulfillment_date', 'so_no', 'customer_code', 'warehouse_code', 'status'], $errors);
-        $this->requireHeaders($sheets, 'fulfillment_lines', ['fulfillment_no', 'line_no', 'so_no', 'so_line_no', 'item_sku', 'uom_code', 'qty_fulfilled'], $errors);
-        $this->requireHeaders($sheets, 'invoice_headers', ['invoice_no', 'invoice_date', 'due_date', 'customer_code', 'status', 'grand_total'], $errors);
-        $this->requireHeaders($sheets, 'invoice_lines', ['invoice_no', 'line_no', 'item_sku', 'qty_invoiced', 'unit_price', 'line_total'], $errors);
-        $this->requireHeaders($sheets, 'collection_headers', ['collection_no', 'collection_date', 'customer_code', 'payment_method', 'status'], $errors);
-        $this->requireHeaders($sheets, 'collection_lines', ['collection_no', 'line_no', 'invoice_no', 'collection_amount'], $errors);
+
+        $hasFulfillmentHeaders = ($summary['fulfillment_headers']['rows'] ?? 0) > 0;
+        $hasFulfillmentLines = ($summary['fulfillment_lines']['rows'] ?? 0) > 0;
+        $hasInvoiceHeaders = ($summary['invoice_headers']['rows'] ?? 0) > 0;
+        $hasInvoiceLines = ($summary['invoice_lines']['rows'] ?? 0) > 0;
+        $hasCollectionHeaders = ($summary['collection_headers']['rows'] ?? 0) > 0;
+        $hasCollectionLines = ($summary['collection_lines']['rows'] ?? 0) > 0;
+
+        if ($hasFulfillmentHeaders || $hasFulfillmentLines) {
+            $this->requireHeaders($sheets, 'fulfillment_headers', ['fulfillment_no', 'fulfillment_date', 'so_no', 'customer_code', 'warehouse_code', 'status'], $errors);
+            $this->requireHeaders($sheets, 'fulfillment_lines', ['fulfillment_no', 'line_no', 'so_no', 'so_line_no', 'item_sku', 'uom_code', 'qty_fulfilled'], $errors);
+            if (! $hasFulfillmentHeaders) $this->addMessage($errors, 'fulfillment_headers', null, 'fulfillment_headers wajib diisi jika fulfillment_lines diisi.');
+            if (! $hasFulfillmentLines) $this->addMessage($errors, 'fulfillment_lines', null, 'fulfillment_lines wajib diisi jika fulfillment_headers diisi.');
+        }
+
+        if ($hasInvoiceHeaders || $hasInvoiceLines) {
+            $this->requireHeaders($sheets, 'invoice_headers', ['invoice_no', 'invoice_date', 'due_date', 'customer_code', 'status', 'grand_total'], $errors);
+            $this->requireHeaders($sheets, 'invoice_lines', ['invoice_no', 'line_no', 'item_sku', 'qty_invoiced', 'unit_price', 'line_total'], $errors);
+            if (! $hasInvoiceHeaders) $this->addMessage($errors, 'invoice_headers', null, 'invoice_headers wajib diisi jika invoice_lines diisi.');
+            if (! $hasInvoiceLines) $this->addMessage($errors, 'invoice_lines', null, 'invoice_lines wajib diisi jika invoice_headers diisi.');
+        }
+
+        if ($hasCollectionHeaders || $hasCollectionLines) {
+            $this->requireHeaders($sheets, 'collection_headers', ['collection_no', 'collection_date', 'customer_code', 'payment_method', 'status'], $errors);
+            $this->requireHeaders($sheets, 'collection_lines', ['collection_no', 'line_no', 'invoice_no', 'collection_amount'], $errors);
+            if (! $hasCollectionHeaders) $this->addMessage($errors, 'collection_headers', null, 'collection_headers wajib diisi jika collection_lines diisi.');
+            if (! $hasCollectionLines) $this->addMessage($errors, 'collection_lines', null, 'collection_lines wajib diisi jika collection_headers diisi.');
+        }
 
         $soNos = [];
         foreach ($this->sheetRows($sheets, 'so_headers') as $index => $row) {
@@ -340,7 +362,9 @@ class ManualSalesIntegrationController extends Controller
             if (($collectionByInvoice[$invoiceNo] ?? 0) > $this->decimal($row, 'grand_total') + 0.0001) $this->addMessage($errors, 'invoice_headers', $index + 2, 'Total collection lines melebihi grand total invoice.');
         }
 
-        if (($summary['fulfillment_headers']['rows'] ?? 0) === 0) $warnings[] = ['sheet' => 'fulfillment_headers', 'row' => null, 'message' => 'Tidak ada fulfillment; shipment tidak akan dibuat.'];
+        if (! $hasFulfillmentHeaders) $warnings[] = ['sheet' => 'fulfillment_headers', 'row' => null, 'message' => 'Tidak ada fulfillment; shipment tidak akan dibuat.'];
+        if (! $hasInvoiceHeaders) $warnings[] = ['sheet' => 'invoice_headers', 'row' => null, 'message' => 'Tidak ada invoice; customer invoice tidak akan dibuat.'];
+        if (! $hasCollectionHeaders) $warnings[] = ['sheet' => 'collection_headers', 'row' => null, 'message' => 'Tidak ada collection; invoice akan tetap outstanding/open.'];
 
         return [$errors, $warnings, $summary];
     }
@@ -633,7 +657,7 @@ class ManualSalesIntegrationController extends Controller
         return [
             'README' => [
                 ['manual_sales_integration_template', 'v1'],
-                ['Catatan', 'Master customer/item/uom/warehouse harus sudah ada. Flow: SO -> Fulfillment/Shipment -> Customer Invoice -> Collection. Tidak membuat jurnal akunting.'],
+                ['Catatan', 'Master customer/item/uom/warehouse harus sudah ada. Flow dapat diproses parsial dari kiri ke kanan: SO saja, SO + Fulfillment, SO + Fulfillment + Invoice, atau lengkap sampai Collection. Untuk invoice tanpa collection, isi amount_paid = 0 dan balance_due = grand_total; kosongkan sheet collection. Tidak membuat jurnal akunting.'],
             ],
             'so_headers' => [
                 ['so_no', 'so_date', 'expected_delivery_date', 'customer_code', 'warehouse_code', 'status', 'subtotal', 'discount_total', 'tax_total', 'grand_total', 'notes'],
@@ -653,7 +677,7 @@ class ManualSalesIntegrationController extends Controller
             ],
             'invoice_headers' => [
                 ['invoice_no', 'invoice_date', 'due_date', 'customer_code', 'so_no', 'fulfillment_no', 'status', 'subtotal', 'discount_total', 'tax_total', 'freight_amount', 'grand_total', 'amount_paid', 'balance_due', 'notes'],
-                ['CI-LAMA-001', '2026-01-09', '2026-02-08', 'CUST-001', 'SO-LAMA-001', 'SHP-LAMA-001', 'paid', '1000000', '0', '110000', '0', '1110000', '0', '1110000', 'Contoh invoice'],
+                ['CI-LAMA-001', '2026-01-09', '2026-02-08', 'CUST-001', 'SO-LAMA-001', 'SHP-LAMA-001', 'posted', '1000000', '0', '110000', '0', '1110000', '0', '1110000', 'Contoh invoice outstanding tanpa collection'],
             ],
             'invoice_lines' => [
                 ['invoice_no', 'line_no', 'so_no', 'so_line_no', 'fulfillment_no', 'fulfillment_line_no', 'item_sku', 'description', 'uom_code', 'qty_invoiced', 'unit_price', 'discount_percent', 'discount_amount', 'tax_percent', 'tax_amount', 'line_total'],
@@ -661,11 +685,9 @@ class ManualSalesIntegrationController extends Controller
             ],
             'collection_headers' => [
                 ['collection_no', 'collection_date', 'customer_code', 'payment_method', 'cash_account_code', 'status', 'amount', 'bank_charge', 'discount_taken', 'wht_amount', 'other_deduction_amount', 'gross_settlement_amount', 'notes'],
-                ['COL-LAMA-001', '2026-01-20', 'CUST-001', 'transfer', '', 'posted', '1110000', '0', '0', '0', '0', '1110000', 'Contoh collection'],
             ],
             'collection_lines' => [
                 ['collection_no', 'line_no', 'invoice_no', 'collection_amount', 'discount_taken', 'wht_amount', 'other_deduction_amount', 'writeoff_amount', 'notes'],
-                ['COL-LAMA-001', '1', 'CI-LAMA-001', '1110000', '0', '0', '0', '0', 'Pelunasan invoice'],
             ],
         ];
     }
@@ -830,7 +852,15 @@ class ManualSalesIntegrationController extends Controller
     private function documentLinkExists(string $sourceSystem, string $sourceBranchCode, string $type, string $no): bool { return DB::table('manual_sales_integration_document_links')->where('source_system', $sourceSystem)->where('source_branch_code', $sourceBranchCode)->where('document_type', $type)->where('document_no', $no)->exists(); }
     private function normalizeSoStatus(string $status): string { $status = strtolower(trim($status)); return in_array($status, ['draft', 'submitted', 'approved', 'posted', 'completed', 'cancelled'], true) ? $status : 'approved'; }
     private function normalizeFulfillmentStatus(string $status): string { $status = strtolower(trim($status)); return in_array($status, ['draft', 'picked', 'packed', 'shipped', 'delivered', 'cancelled', 'posted'], true) ? $status : 'posted'; }
-    private function normalizeInvoiceStatus(string $status, float $paid, float $balance): string { $status = strtolower(trim($status)); if (in_array($status, ['draft', 'posted', 'partially_paid', 'paid', 'overdue', 'cancelled'], true)) return $status; return $balance <= 0 ? 'paid' : ($paid > 0 ? 'partially_paid' : 'posted'); }
+    private function normalizeInvoiceStatus(string $status, float $paid, float $balance): string
+    {
+        $status = strtolower(trim($status));
+        if ($status === 'paid' && $balance > 0.0001) return $paid > 0 ? 'partially_paid' : 'posted';
+        if ($status === 'partially_paid' && $paid <= 0.0001) return 'posted';
+        if (in_array($status, ['draft', 'posted', 'partially_paid', 'paid', 'overdue', 'cancelled'], true)) return $status;
+
+        return $balance <= 0 ? 'paid' : ($paid > 0 ? 'partially_paid' : 'posted');
+    }
     private function normalizeCollectionStatus(string $status): string { $status = strtolower(trim($status)); return in_array($status, ['draft', 'posted', 'cancelled'], true) ? $status : 'posted'; }
     private function filterColumns(string $table, array $payload): array { $validColumns = array_flip(Schema::getColumnListing($table)); return array_filter($payload, fn (string $column): bool => isset($validColumns[$column]), ARRAY_FILTER_USE_KEY); }
     private function isRowEmpty(array $row): bool { foreach ($row as $value) if (trim((string) $value) !== '') return false; return true; }

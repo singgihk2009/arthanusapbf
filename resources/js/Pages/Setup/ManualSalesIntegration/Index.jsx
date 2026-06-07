@@ -79,7 +79,7 @@ export default function Index({ batches, purposes }) {
                     <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Manual Sales Integration</h1>
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         Import siklus historis/manual SO → Fulfillment → Customer Invoice → Collection dari cabang atau sistem eksternal.
-                        Fulfillment masuk ke shipment, invoice masuk ke customer invoice, dan collection masuk ke customer payment allocation tanpa jurnal akunting.
+                        Flow bisa parsial dari kiri ke kanan; jika belum ada collection, kosongkan sheet collection dan invoice akan tetap outstanding/open.
                     </p>
                 </div>
 
@@ -90,7 +90,7 @@ export default function Index({ batches, purposes }) {
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h2 className="text-base font-semibold">Download Template & Upload Import</h2>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Upload akan membuat batch validasi terlebih dahulu. Commit hanya aktif jika tidak ada blocking error.</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Upload akan membuat batch validasi terlebih dahulu. Collection bersifat optional; commit hanya aktif jika tidak ada blocking error.</p>
                             {repairBatch && (
                                 <p className="mt-1 text-sm font-medium text-amber-700">
                                     Mode perbaiki data untuk batch {repairBatch.batch_no}. Upload file yang sudah diperbaiki untuk mengganti hasil validasi batch ini.
