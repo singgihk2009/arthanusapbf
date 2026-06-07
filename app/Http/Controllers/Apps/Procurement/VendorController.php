@@ -29,6 +29,21 @@ use App\Services\WarehouseAccessService;
 
 class VendorController extends Controller
 {
+    private const VENDOR_IMPORT_HEADERS = [
+        'vendor_code',
+        'vendor_name',
+        'vendor_type',
+        'id_kemenkes',
+        'qualification_status',
+        'status',
+        'address',
+        'city',
+        'province',
+        'postal_code',
+        'phone',
+        'email',
+    ];
+
     public function __construct(
         private readonly WarehouseAccessService $warehouseAccessService
     ) {}
@@ -59,7 +74,7 @@ class VendorController extends Controller
     public function downloadTemplateExcel()
     {
         $rows = [
-            ['vendor_code', 'vendor_name', 'vendor_type', 'id_kemenkes', 'qualification_status', 'status', 'address', 'city', 'province', 'postal_code', 'phone', 'email'],
+            self::VENDOR_IMPORT_HEADERS,
             ['VND-001', 'PT Contoh Vendor', 'Distributor', 'KEMENKES-VND-001', 'draft', 'ACTIVE', 'Jl. Contoh 123', 'Jakarta', 'DKI Jakarta', '12345', '021123456', 'vendor@example.com'],
         ];
         $tempPath = storage_path('app/vendor-master-template-'.now()->format('YmdHis').'.xlsx');
@@ -71,9 +86,8 @@ class VendorController extends Controller
     {
         $request->validate(['file' => ['required', 'file', 'mimes:xlsx,csv,txt']]);
         $rows = $this->parseImportRows($request->file('file'));
-        $requiredHeaders = ['vendor_code', 'vendor_name'];
-        if ($rows->isNotEmpty() && ! $this->hasRequiredHeaders($rows->first(), $requiredHeaders)) {
-            return back()->withErrors(['import' => 'Header tidak valid. Gunakan template impor vendor.']);
+        if ($rows->isNotEmpty() && ! $this->hasTemplateHeaders($rows->first())) {
+            return back()->withErrors(['import' => 'Header tidak valid. Gunakan template impor vendor. Pastikan urutan kolom sesuai template.']);
         }
         foreach ($rows as $row) {
             if ($this->isRowEmpty($row)) continue;
@@ -102,9 +116,7 @@ class VendorController extends Controller
 
     public function exportExcel()
     {
-        $rows = [[
-            'vendor_code', 'vendor_name', 'vendor_type', 'id_kemenkes', 'qualification_status', 'status', 'address', 'city', 'province', 'postal_code', 'phone', 'email',
-        ]];
+        $rows = [self::VENDOR_IMPORT_HEADERS];
 
         foreach (Vendor::query()->orderBy('vendor_code')->get() as $vendor) {
             $rows[] = [
@@ -726,7 +738,7 @@ class VendorController extends Controller
         return collect($data);
     }
     private function isRowEmpty(array $row): bool { foreach ($row as $v) if ($v !== null && trim((string) $v) !== '') return false; return true; }
-    private function hasRequiredHeaders(array $row, array $requiredHeaders): bool { return collect($requiredHeaders)->every(fn ($h) => array_key_exists($h, $row)); }
+    private function hasTemplateHeaders(array $row): bool { return array_keys($row) === self::VENDOR_IMPORT_HEADERS; }
     private function buildTemplateXlsx(string $path, array $rows): void
     {
         $escape = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES | ENT_XML1);
