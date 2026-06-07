@@ -96,20 +96,7 @@ class ManualPurchaseIntegrationController extends Controller
                 'updated_at' => now(),
             ]);
 
-            foreach ($sheets as $sheetName => $rows) {
-                foreach ($rows as $index => $row) {
-                    DB::table('manual_purchase_integration_rows')->insert([
-                        'batch_id' => $batchId,
-                        'sheet_name' => $sheetName,
-                        'row_number' => $index + 2,
-                        'status' => $this->rowHasError($errors, $sheetName, $index + 2) ? 'error' : 'valid',
-                        'row_data_json' => json_encode($row),
-                        'messages_json' => json_encode($this->messagesForRow($errors, $warnings, $sheetName, $index + 2)),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                }
-            }
+            $this->insertPreviewRows($batchId, $sheets, $errors, $warnings);
 
             return $batchId;
         });
@@ -121,6 +108,68 @@ class ManualPurchaseIntegrationController extends Controller
         return to_route('apps.setup.manual-purchase-integration.index')
             ->with(count($errors) > 0 ? 'error' : 'success', $message)
             ->with('batch_id', $batchId);
+    }
+
+    public function retry(Request $request, int $batch): RedirectResponse
+    {
+        $validated = $request->validate([
+            'source_system' => ['required', 'string', 'max:80'],
+            'source_branch_code' => ['required', 'string', 'max:80'],
+            'import_purpose' => ['required', 'string', 'max:80'],
+            'file' => ['required', 'file', 'mimes:xlsx', 'max:20480'],
+        ]);
+
+        /** @var UploadedFile $file */
+        $file = $request->file('file');
+        $sheets = $this->parseWorkbook($file->getRealPath());
+        [$errors, $warnings, $summary] = $this->validateWorkbook($sheets, $validated['source_system'], $validated['source_branch_code']);
+
+        DB::transaction(function () use ($batch, $validated, $file, $sheets, $errors, $warnings, $summary, $request): void {
+            $header = DB::table('manual_purchase_integration_batches')->where('id', $batch)->lockForUpdate()->first();
+            abort_unless($header, 404);
+            abort_if($header->status !== 'validation_failed', 422, 'Hanya batch validation_failed yang bisa diperbaiki dengan upload ulang.');
+
+            DB::table('manual_purchase_integration_rows')->where('batch_id', $batch)->delete();
+
+            DB::table('manual_purchase_integration_batches')->where('id', $batch)->update([
+                'source_system' => $validated['source_system'],
+                'source_branch_code' => $validated['source_branch_code'],
+                'import_purpose' => $validated['import_purpose'],
+                'file_name' => $file->getClientOriginalName(),
+                'file_hash' => hash_file('sha256', $file->getRealPath()) ?: null,
+                'status' => count($errors) > 0 ? 'validation_failed' : 'validated',
+                'summary_json' => json_encode($summary),
+                'errors_json' => json_encode($errors),
+                'warnings_json' => json_encode($warnings),
+                'preview_json' => json_encode($sheets),
+                'uploaded_by' => $request->user()?->id,
+                'updated_at' => now(),
+            ]);
+
+            $this->insertPreviewRows($batch, $sheets, $errors, $warnings);
+        });
+
+        $message = count($errors) > 0
+            ? 'Upload perbaikan masih memiliki error validasi. Silakan perbaiki data dan upload ulang, atau hapus batch jika tidak digunakan.'
+            : 'Upload perbaikan berhasil divalidasi. Batch siap di-review dan commit.';
+
+        return to_route('apps.setup.manual-purchase-integration.index')
+            ->with(count($errors) > 0 ? 'error' : 'success', $message)
+            ->with('batch_id', $batch);
+    }
+
+    public function destroy(int $batch): RedirectResponse
+    {
+        DB::transaction(function () use ($batch): void {
+            $header = DB::table('manual_purchase_integration_batches')->where('id', $batch)->lockForUpdate()->first();
+            abort_unless($header, 404);
+            abort_if($header->status !== 'validation_failed', 422, 'Hanya batch validation_failed yang bisa dihapus dari action ini.');
+
+            DB::table('manual_purchase_integration_batches')->where('id', $batch)->delete();
+        });
+
+        return to_route('apps.setup.manual-purchase-integration.index')
+            ->with('success', 'Batch validation failed berhasil dihapus.');
     }
 
     public function commit(Request $request, int $batch): RedirectResponse
@@ -172,6 +221,29 @@ class ManualPurchaseIntegrationController extends Controller
             'rows' => DB::table('manual_purchase_integration_rows')->where('batch_id', $batch)->orderBy('sheet_name')->orderBy('row_number')->limit(500)->get(),
             'links' => DB::table('manual_purchase_integration_document_links')->where('batch_id', $batch)->orderBy('id')->get(),
         ]);
+    }
+
+    /**
+     * @param array<string, array<int, array<string, string>>> $sheets
+     * @param array<int, array{sheet: string, row: int, message: string}> $errors
+     * @param array<int, array{sheet: string, row: int, message: string}> $warnings
+     */
+    private function insertPreviewRows(int $batchId, array $sheets, array $errors, array $warnings): void
+    {
+        foreach ($sheets as $sheetName => $rows) {
+            foreach ($rows as $index => $row) {
+                DB::table('manual_purchase_integration_rows')->insert([
+                    'batch_id' => $batchId,
+                    'sheet_name' => $sheetName,
+                    'row_number' => $index + 2,
+                    'status' => $this->rowHasError($errors, $sheetName, $index + 2) ? 'error' : 'valid',
+                    'row_data_json' => json_encode($row),
+                    'messages_json' => json_encode($this->messagesForRow($errors, $warnings, $sheetName, $index + 2)),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
     }
 
     /** @param array<string, array<int, array<string, string>>> $sheets */
