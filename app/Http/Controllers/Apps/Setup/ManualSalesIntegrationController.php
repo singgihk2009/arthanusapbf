@@ -446,14 +446,14 @@ class ManualSalesIntegrationController extends Controller
                 'warehouse_id' => $this->warehouseId($this->string($row, 'warehouse_code')),
                 'shipment_date' => $this->date($row, 'fulfillment_date') ?: now()->toDateString(),
                 'status' => $status,
-                'delivery_status' => in_array($status, ['posted', 'shipped', 'delivered'], true) ? 'shipped' : 'pending',
+                'delivery_status' => in_array($status, ['shipped', 'delivered'], true) ? 'shipped' : 'pending',
                 'driver_name' => $this->string($row, 'driver_name') ?: null,
                 'vehicle_no' => $this->string($row, 'vehicle_no') ?: null,
                 'courier_name' => $this->string($row, 'courier_name') ?: null,
                 'tracking_number' => $this->string($row, 'tracking_number') ?: null,
                 'notes' => $this->string($row, 'notes') ?: null,
-                'posted_by' => in_array($status, ['posted', 'shipped', 'delivered'], true) ? $userId : null,
-                'posted_at' => in_array($status, ['posted', 'shipped', 'delivered'], true) ? now() : null,
+                'posted_by' => in_array($status, ['shipped', 'delivered'], true) ? $userId : null,
+                'posted_at' => in_array($status, ['shipped', 'delivered'], true) ? now() : null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]));
@@ -669,7 +669,7 @@ class ManualSalesIntegrationController extends Controller
             ],
             'fulfillment_headers' => [
                 ['fulfillment_no', 'fulfillment_date', 'so_no', 'customer_code', 'warehouse_code', 'status', 'driver_name', 'vehicle_no', 'courier_name', 'tracking_number', 'notes'],
-                ['SHP-LAMA-001', '2026-01-08', 'SO-LAMA-001', 'CUST-001', 'WH-UTAMA', 'posted', '', '', 'Kurir ABC', 'TRK001', 'Contoh fulfillment posted'],
+                ['SHP-LAMA-001', '2026-01-08', 'SO-LAMA-001', 'CUST-001', 'WH-UTAMA', 'shipped', '', '', 'Kurir ABC', 'TRK001', 'Contoh fulfillment shipped/posted'],
             ],
             'fulfillment_lines' => [
                 ['fulfillment_no', 'line_no', 'so_no', 'so_line_no', 'item_sku', 'batch_number', 'expired_date', 'uom_code', 'qty_fulfilled', 'qty_base', 'notes'],
@@ -850,8 +850,21 @@ class ManualSalesIntegrationController extends Controller
     private function cashAccountId(string $code): ?int { return $code === '' || ! Schema::hasTable('cash_accounts') ? null : DB::table('cash_accounts')->where('code', $code)->value('id'); }
     private function facilitySchemeId(string $code): ?int { return $code === '' || ! Schema::hasTable('facility_schemes') ? null : DB::table('facility_schemes')->where('code', $code)->orWhere('name', $code)->value('id'); }
     private function documentLinkExists(string $sourceSystem, string $sourceBranchCode, string $type, string $no): bool { return DB::table('manual_sales_integration_document_links')->where('source_system', $sourceSystem)->where('source_branch_code', $sourceBranchCode)->where('document_type', $type)->where('document_no', $no)->exists(); }
-    private function normalizeSoStatus(string $status): string { $status = strtolower(trim($status)); return in_array($status, ['draft', 'submitted', 'approved', 'posted', 'completed', 'cancelled'], true) ? $status : 'approved'; }
-    private function normalizeFulfillmentStatus(string $status): string { $status = strtolower(trim($status)); return in_array($status, ['draft', 'picked', 'packed', 'shipped', 'delivered', 'cancelled', 'posted'], true) ? $status : 'posted'; }
+    private function normalizeSoStatus(string $status): string
+    {
+        $status = strtolower(trim($status));
+        if ($status === 'completed') return 'closed';
+
+        return in_array($status, ['draft', 'submitted', 'approved', 'posted', 'cancelled', 'partially_shipped', 'fully_shipped', 'fully_invoiced', 'closed'], true) ? $status : 'approved';
+    }
+
+    private function normalizeFulfillmentStatus(string $status): string
+    {
+        $status = strtolower(trim($status));
+        if ($status === 'posted') return 'shipped';
+
+        return in_array($status, ['draft', 'picked', 'packed', 'shipped', 'delivered', 'cancelled'], true) ? $status : 'shipped';
+    }
     private function normalizeInvoiceStatus(string $status, float $paid, float $balance): string
     {
         $status = strtolower(trim($status));
