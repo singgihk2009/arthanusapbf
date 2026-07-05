@@ -330,9 +330,21 @@ class RegulatoryProductController extends Controller {
   return $ext==='xlsx' ? $this->parseXlsxRows($file->getRealPath()) : $this->parseCsvRows($file->getRealPath());
  }
  private function parseCsvRows(string $path): Collection {
-  $rows=[]; $handle=fopen($path,'r'); if(! $handle) return collect(); $header=null;
-  while(($data=fgetcsv($handle))!==false){if(! $header){$header=array_map(fn($x)=>trim((string)$x),$data); continue;} $rows[]=collect($header)->mapWithKeys(fn($key,$index)=>[$key=>trim((string)($data[$index]??''))])->all();}
+  $rows=[]; $handle=fopen($path,'r'); if(! $handle) return collect(); $header=null; $delimiter=$this->detectCsvDelimiter($path);
+  while(($data=fgetcsv($handle,0,$delimiter))!==false){if(! $header){$header=array_map(fn($x)=>$this->normalizeImportHeader((string)$x),$data); continue;} $rows[]=collect($header)->filter(fn($key)=>$key!=='')->mapWithKeys(fn($key,$index)=>[$key=>trim((string)($data[$index]??''))])->all();}
   fclose($handle); return collect($rows);
+ }
+ private function detectCsvDelimiter(string $path): string {
+  $sample=(string)file_get_contents($path,false,null,0,4096);
+  $firstLine=strtok($sample,"\r\n");
+  if($firstLine===false) return ',';
+  $delimiters=[","=>substr_count($firstLine,","),"\t"=>substr_count($firstLine,"\t"),";"=>substr_count($firstLine,";")];
+  arsort($delimiters);
+  $delimiter=(string)array_key_first($delimiters);
+  return ($delimiters[$delimiter] ?? 0)>0 ? $delimiter : ',';
+ }
+ private function normalizeImportHeader(string $header): string {
+  return trim(preg_replace('/^\xEF\xBB\xBF/', '', $header) ?? '');
  }
  private function parseXlsxRows(string $path): Collection {
   $zip=new ZipArchive(); if($zip->open($path)!==true) return collect();
@@ -382,7 +394,7 @@ class RegulatoryProductController extends Controller {
   $headerRow=$table[0] ?? [];
   $header=[];
   foreach($headerRow as $index => $value){
-   $header[$index]=trim((string)$value);
+   $header[$index]=$this->normalizeImportHeader((string)$value);
   }
 
   $validHeaderIndexes=array_keys(array_filter($header, fn($value)=>$value!==''));
