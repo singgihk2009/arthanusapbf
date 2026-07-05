@@ -23,7 +23,7 @@ return new class extends Migration {
             $add('sub_category', fn () => $table->string('sub_category')->nullable()->after('brand'));
             $add('device_type', fn () => $table->string('device_type')->nullable()->after('sub_category'));
             $add('product_group', fn () => $table->string('product_group')->nullable()->after('device_type'));
-            $add('model_type', fn () => $table->string('model_type')->nullable()->after('product_group'));
+            $add('model_type', fn () => $table->text('model_type')->nullable()->after('product_group'));
             $add('device_class', fn () => $table->string('device_class')->nullable()->after('model_type'));
             $add('risk_class', fn () => $table->string('risk_class')->nullable()->after('device_class'));
             $add('registrant_name', fn () => $table->string('registrant_name')->nullable()->after('risk_class'));
