@@ -62,7 +62,7 @@ export default function Create() {
                         {errors.source_id && <small className='text-xs text-red-500'>{errors.source_id}</small>}
                     </div>
                     <Input label="NIE" type="text" value={data.nie} onChange={(e) => setData('nie', e.target.value)} errors={errors.nie} />
-                    <Input label="Kode BPOM" type="text" value={data.source_code} onChange={(e) => setData('source_code', e.target.value)} errors={errors.source_code} />
+                    <Input label="Kode Obat Jadi / Kode Varian" type="text" value={data.source_code} onChange={(e) => setData('source_code', e.target.value)} errors={errors.source_code} />
                     {data.product_type === 'DRUG' ? (
                         <>
                             <Input label="Nama Produk (Source)" type="text" value={data.product_name_source} onChange={(e) => setData('product_name_source', e.target.value)} errors={errors.product_name_source} />

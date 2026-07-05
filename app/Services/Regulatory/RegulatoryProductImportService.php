@@ -12,10 +12,10 @@ class RegulatoryProductImportService {
     public function importKemenkesAlkes(string $path): int { return $this->importCsv($path,'KEMENKES',',', fn($r)=>$this->normalizeAlkesRow($r), null); }
     private function importCsv(string $path,string $sourceName,string $separator, callable $map, ?string $compositionSeparator): int {
         $source=RegulatorySource::firstOrCreate(['source_name'=>$sourceName]); $h=fopen($path,'r'); $headers=fgetcsv($h,0,$separator); $count=0;
-        while(($row=fgetcsv($h,0,$separator))!==false){$assoc=array_combine($headers,$row); $data=$map($assoc); if(empty($data['nie'])) continue; $data['source_id']=$source->id; $data['raw_payload']=$assoc; $p=RegulatoryProduct::updateOrCreate(['source_id'=>$source->id,'nie'=>$data['nie']],$data); if($compositionSeparator){ $p->compositions()->delete(); foreach($this->parseCompositions((string)($data['raw_composition_text']??''),$compositionSeparator) as $sub){ ProductComposition::create(['regulatory_product_id'=>$p->id,'substance_name'=>$sub]); }} $p->packagings()->delete(); ProductPackaging::create(['regulatory_product_id'=>$p->id,'description_raw'=>$data['raw_packaging_text']??null]+$this->parsePackaging((string)($data['raw_packaging_text']??''))); $count++; }
+        while(($row=fgetcsv($h,0,$separator))!==false){$assoc=array_combine($headers,$row); $data=$map($assoc); if(empty($data['nie'])) continue; $data['source_id']=$source->id; $data['raw_payload']=$assoc; $p=RegulatoryProduct::updateOrCreate($this->identityFor($data),$data); if($compositionSeparator){ $p->compositions()->delete(); foreach($this->parseCompositions((string)($data['raw_composition_text']??''),$compositionSeparator) as $sub){ ProductComposition::create(['regulatory_product_id'=>$p->id,'substance_name'=>$sub]); }} $p->packagings()->delete(); ProductPackaging::create(['regulatory_product_id'=>$p->id,'description_raw'=>$data['raw_packaging_text']??null]+$this->parsePackaging((string)($data['raw_packaging_text']??''))); $count++; }
         fclose($h); return $count;
     }
-    public function normalizeDrugRow(array $r, string $source): array { return ['product_type'=>RegulatoryProduct::TYPE_DRUG,'nie'=>RegulatoryProduct::normalizeNie($r['NIE']??null),'product_name_source'=>$this->cleanHtmlText($r['Nama Obat Jadi'] ?? $r['NAMA PRODUK'] ?? ''),'industry_name'=>$this->cleanHtmlText($r['Produsen'] ?? $r['NAMA INDUSTRI'] ?? null),'dosage_form'=>$r['Sediaan'] ?? null,'strength'=>$r['Kekuatan'] ?? null,'commodity_type'=>$r['Jenis Komoditi'] ?? null,'raw_packaging_text'=>$this->cleanHtmlText($r['Kemasan'] ?? $r['PRODUK KEMASAN'] ?? null),'raw_composition_text'=>$this->cleanHtmlText($r['Bahan Obat'] ?? $r['KOMPOSISI'] ?? null)]; }
+    public function normalizeDrugRow(array $r, string $source): array { $nie=RegulatoryProduct::normalizeNie($r['NIE']??null); return ['product_type'=>RegulatoryProduct::TYPE_DRUG,'nie'=>$nie,'source_code'=>$this->cleanHtmlText($r['Kode Obat Jadi'] ?? $r['Kode Obat Ja'] ?? $r['source_code'] ?? $r['KODE OBAT JADI'] ?? $nie),'product_name_source'=>$this->cleanHtmlText($r['Nama Obat Jadi'] ?? $r['NAMA PRODUK'] ?? ''),'industry_name'=>$this->cleanHtmlText($r['Produsen'] ?? $r['NAMA INDUSTRI'] ?? null),'dosage_form'=>$r['Sediaan'] ?? null,'strength'=>$r['Kekuatan'] ?? null,'commodity_type'=>$r['Jenis Komoditi'] ?? null,'raw_packaging_text'=>$this->cleanHtmlText($r['Kemasan'] ?? $r['PRODUK KEMASAN'] ?? null),'raw_composition_text'=>$this->cleanHtmlText($r['Bahan Obat'] ?? $r['KOMPOSISI'] ?? null)]; }
     public function normalizeAlkesRow(array $r): array {
         $nie = RegulatoryProduct::normalizeNie($r['nie'] ?? ($r['NOMOR'] ?? null));
         $brand = $this->cleanHtmlText($r['brand'] ?? ($r['MERK'] ?? null));
@@ -24,6 +24,7 @@ class RegulatoryProductImportService {
         return [
             'product_type' => RegulatoryProduct::TYPE_MEDICAL_DEVICE,
             'nie' => $nie,
+            'source_code' => $this->cleanHtmlText($r['source_code'] ?? ($r['TIPE'] ?? null)) ?: $nie,
             'license_type' => $licenseType !== '' ? $licenseType : $this->detectLicenseType($nie),
             'registration_date' => $this->normalizeDate($r['registration_date'] ?? ($r['TGL TERBIT'] ?? null)),
             'expiry_date' => $this->normalizeDate($r['expiry_date'] ?? ($r['TGL EXP'] ?? null)),
@@ -42,6 +43,7 @@ class RegulatoryProductImportService {
             'manufacturer_name_2' => $r['manufacturer_name_2'] ?? ($r['PABRIK2'] ?? null),
         ];
     }
+    private function identityFor(array $data): array { return ['source_id'=>$data['source_id'],'product_type'=>$data['product_type'] ?? RegulatoryProduct::TYPE_DRUG,'nie'=>$data['nie'],'source_code'=>$data['source_code'] ?? $data['nie']]; }
     public function parseCompositions(?string $text,string $separator=','): array { return array_values(array_filter(array_map('trim',explode($separator,(string)$text)))); }
     public function parsePackaging(?string $text): array { return ['packaging_type'=>trim((string)$text)?:null]; }
     public function cleanHtmlText($value): ?string { if($value===null) return null; $v=strip_tags((string)$value); $v=preg_replace('/\s+/', ' ', $v); return trim($v) ?: null; }
