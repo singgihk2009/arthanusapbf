@@ -38,19 +38,23 @@ export default function Edit() {
         const regulatoryNie = product.nie ?? '';
         const combinedName = [product.product_name_source, product.raw_packaging_text].filter(Boolean).join(' - ');
 
-        setData((prevData) => ({
-            ...prevData,
-            regulatory_product_id: product.id,
-            name: combinedName,
-            nie: regulatoryNie,
-            sku: regulatoryNie,
-            manufacturer_name: product.industry_name ?? '',
-            composition_text: product.raw_composition_text ?? '',
-            packing_text: product.raw_packaging_text ?? '',
-            regulatory_class: product.commodity_type ?? '',
-            dosage_form: product.dosage_form ?? '',
-            strength: product.strength ?? '',
-        }));
+        setData((prevData) => {
+            const currentName = (prevData.name ?? '').trim();
+
+            return {
+                ...prevData,
+                regulatory_product_id: product.id,
+                name: currentName === '' ? combinedName : prevData.name,
+                nie: regulatoryNie,
+                sku: regulatoryNie,
+                manufacturer_name: product.industry_name ?? '',
+                composition_text: product.raw_composition_text ?? '',
+                packing_text: product.raw_packaging_text ?? '',
+                regulatory_class: product.commodity_type ?? '',
+                dosage_form: product.dosage_form ?? '',
+                strength: product.strength ?? '',
+            };
+        });
     };
 
     const clearRegulatory = () => { setSelectedRegulatory(null); setData('regulatory_product_id', ''); };
