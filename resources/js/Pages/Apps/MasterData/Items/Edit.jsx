@@ -97,7 +97,7 @@ export default function Edit() {
                 <div className="mt-6 md:col-span-2">
                     <div className="mb-2 flex items-center justify-between">
                         <h3 className="text-sm font-semibold">Linked Regulatory Products</h3>
-                        <Button type="button" label="Add regulatory link" onClick={mapRegulatory} />
+                        <Button type="button" label="Add regulatory link" onClick={mapRegulatory} variant="blue" />
                     </div>
                     <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-800">
                         <table className="min-w-full text-sm">
