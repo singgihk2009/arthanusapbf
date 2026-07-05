@@ -2,7 +2,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import Button from '@/Components/Button';
 import Card from '@/Components/Card';
 import Input from '@/Components/Input';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { IconBox, IconPencilPlus } from '@tabler/icons-react';
 import React, { useState } from 'react';
 import RegulatoryProductSearch from '@/Components/RegulatoryProductSearch';
@@ -62,8 +62,7 @@ export default function Edit() {
 
     const mapRegulatory = () => {
         if (!data.regulatory_product_id) return;
-        post(route('apps.master-data.regulatory-products.mapping.attach'), {
-            data: { item_id: item.id, regulatory_product_id: data.regulatory_product_id },
+        router.post(route('apps.master-data.regulatory-products.mapping.attach'), { item_id: item.id, regulatory_product_id: data.regulatory_product_id }, {
             preserveScroll: true,
             onSuccess: () => {
                 setSelectedRegulatory(null);
@@ -72,8 +71,8 @@ export default function Edit() {
         });
     };
 
-    const setPrimary = (regulatoryProductId) => post(route('apps.master-data.regulatory-products.mapping.set-primary'), { data: { item_id: item.id, regulatory_product_id: regulatoryProductId }, preserveScroll: true });
-    const detachRegulatory = (regulatoryProductId) => post(route('apps.master-data.regulatory-products.mapping.detach'), { data: { item_id: item.id, regulatory_product_id: regulatoryProductId }, preserveScroll: true });
+    const setPrimary = (regulatoryProductId) => router.post(route('apps.master-data.regulatory-products.mapping.set-primary'), { item_id: item.id, regulatory_product_id: regulatoryProductId }, { preserveScroll: true });
+    const detachRegulatory = (regulatoryProductId) => router.post(route('apps.master-data.regulatory-products.mapping.detach'), { item_id: item.id, regulatory_product_id: regulatoryProductId }, { preserveScroll: true });
 
     return (
         <>
