@@ -218,7 +218,8 @@ class RegulatoryProductController extends Controller {
     $upsertRows[]=[
       'source_id'=>$sourceId,
       'nie'=>$data['nie'],
-      'source_code'=>$data['source_code'] ?: null,
+      'product_type'=>RegulatoryProduct::TYPE_DRUG,
+      'source_code'=>$data['source_code'] ?: $data['nie'],
       'product_name_source'=>$data['product_name_source'],
       'industry_name'=>$data['industry_name'] ?: null,
       'dosage_form'=>$data['dosage_form'] ?: null,
@@ -236,10 +237,10 @@ class RegulatoryProductController extends Controller {
   if(!empty($errors)) return response()->json(['message'=>'Import regulatory product gagal, periksa data file.','errors'=>$errors],422);
 
   foreach(array_chunk($upsertRows,1000) as $chunk){
-   RegulatoryProduct::query()->upsert($chunk,['source_id','nie'],['source_code','product_name_source','industry_name','dosage_form','strength','commodity_type','raw_packaging_text','raw_composition_text','updated_at']);
+   RegulatoryProduct::query()->upsert($chunk,['source_id','product_type','nie','source_code'],['product_name_source','industry_name','dosage_form','strength','commodity_type','raw_packaging_text','raw_composition_text','updated_at']);
   }
 
-  return response()->json(['message'=>"Import regulatory product berhasil melalui upsert. {$processed} data diproses (unik berdasarkan source_name + NIE, sehingga aman untuk import ulang jika sebelumnya gagal)."]);
+  return response()->json(['message'=>"Import regulatory product berhasil melalui upsert. {$processed} data diproses (unik berdasarkan source_name + product_type + NIE + Kode Obat Jadi, sehingga aman untuk import ulang jika sebelumnya gagal)."]);
  }
  public function importBpom(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importBpom($request->file('file')->getRealPath());return back()->with('success',"Import BPOM berhasil: {$count}");}
  public function importKemenkes(Request $request, RegulatoryProductImportService $s){$request->validate(['file'=>['required','file','mimes:csv,txt']]);$count=$s->importKemenkes($request->file('file')->getRealPath());return back()->with('success',"Import KEMENKES berhasil: {$count}");}
@@ -290,7 +291,7 @@ class RegulatoryProductController extends Controller {
   foreach(array_chunk($upsertRows, 1000) as $chunk){
    RegulatoryProduct::query()->upsert(
     $chunk,
-    ['source_id','nie'],
+    ['source_id','product_type','nie','source_code'],
     ['product_type','license_type','registration_date','expiry_date','brand','product_name_source','sub_category','device_type','product_group','model_type','device_class','risk_class','registrant_name','registrant_address','manufacturer_name','manufacturer_address','manufacturer_name_2','raw_payload','updated_at']
    );
   }
@@ -304,6 +305,7 @@ class RegulatoryProductController extends Controller {
  public function candidates(RegulatoryProduct $regulatoryProduct, ProductMatchingService $service){ return response()->json($service->candidates($regulatoryProduct)); }
  private function normalizePayload(array $data): array {
   $data['nie']=RegulatoryProduct::normalizeNie($data['nie'] ?? null);
+  if(empty($data['source_code'])) $data['source_code']=$data['nie'];
   if(($data['product_type'] ?? null)===RegulatoryProduct::TYPE_MEDICAL_DEVICE){
    if(empty($data['product_name_source']) && !empty($data['brand'])) $data['product_name_source']=$data['brand'];
    if(empty($data['license_type']) && isset($data['nie'])){
