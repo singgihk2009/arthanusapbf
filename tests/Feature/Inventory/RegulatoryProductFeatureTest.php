@@ -5,6 +5,7 @@ use App\Models\Regulatory\RegulatoryProduct;
 use App\Models\Regulatory\RegulatorySource;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\UploadedFile;
 
 it('can create regulatory product', function () {
     $user = User::factory()->create();
@@ -76,4 +77,26 @@ it('exports medical device columns for alkes export', function () {
         ->and($lines[0])->toContain('Kelas Risiko')
         ->and($lines[1])->toContain('AKD-001')
         ->and($lines[1])->toContain('Brand Alkes');
+});
+
+it('imports tab separated regulatory products exported from spreadsheet apps', function () {
+    $user = User::factory()->create();
+    RegulatorySource::firstOrCreate(['source_name' => 'BPOM']);
+    $path = tempnam(sys_get_temp_dir(), 'bpom-import-');
+    file_put_contents($path, implode("\n", [
+        implode("\t", ['source_name', 'nie', 'source_code', 'product_name_source', 'industry_name', 'dosage_form', 'strength', 'commodity_type', 'raw_packaging_text', 'raw_composition_text']),
+        implode("\t", ['BPOM', 'DBL8905006110A1', '2', 'BOSKA - DUS , 2 BLISTER @ 10 tablet', 'PT Dexa Medica - Indonesia', 'TABLET - 500/30 MG', '-', 'Obat Bebas', '-', 'CAFFEINE, PARACETAMOL']),
+    ]));
+
+    $file = new UploadedFile($path, 'importdatamasterbpom1.csv', 'text/csv', null, true);
+
+    $this->actingAs($user)
+        ->postJson('/apps/master-data/regulatory-products/import/excel', ['file' => $file])
+        ->assertOk();
+
+    $this->assertDatabaseHas('regulatory_products', [
+        'nie' => 'DBL8905006110A1',
+        'source_code' => '2',
+        'product_name_source' => 'BOSKA - DUS , 2 BLISTER @ 10 tablet',
+    ]);
 });
