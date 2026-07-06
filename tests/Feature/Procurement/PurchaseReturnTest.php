@@ -3,8 +3,10 @@
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
 
 use function Pest\Laravel\actingAs;
+use function Pest\Laravel\get;
 use function Pest\Laravel\post;
 
 uses(RefreshDatabase::class);
@@ -19,15 +21,23 @@ beforeEach(function () {
     $this->vendorId = DB::table('vendors')->insertGetId(['company_id' => 1, 'vendor_code' => 'V-PRR', 'vendor_name' => 'Vendor Return', 'name' => 'Vendor Return', 'currency_code' => 'IDR', 'status' => 'ACTIVE', 'created_at' => now(), 'updated_at' => now()]);
     $this->supplierId = DB::table('suppliers')->insertGetId(['code' => 'S-PRR', 'name' => 'Supplier Return', 'created_at' => now(), 'updated_at' => now()]);
     $this->poId = DB::table('purchase_orders')->insertGetId(['number' => 'PO-PRR-001', 'po_number' => 'PO-PRR-001', 'warehouse_id' => $this->warehouseId, 'supplier_id' => $this->supplierId, 'vendor_id' => $this->vendorId, 'document_date' => '2026-07-01', 'order_date' => '2026-07-01', 'status' => 'approved', 'created_at' => now(), 'updated_at' => now()]);
-    $this->poItemId = DB::table('purchase_order_items')->insertGetId(['purchase_order_id' => $this->poId, 'product_id' => $this->itemId, 'item_id' => $this->itemId, 'qty_ordered' => 10, 'received_qty' => 10, 'remaining_qty' => 0, 'uom_id' => $this->uomId, 'unit_price' => 25000, 'created_at' => now(), 'updated_at' => now()]);
-    $this->goodsReceiptId = DB::table('goods_receipts')->insertGetId(['business_id' => 1, 'number' => 'GR-PRR-001', 'gr_number' => 'GR-PRR-001', 'purchase_order_id' => $this->poId, 'warehouse_id' => $this->warehouseId, 'supplier_id' => $this->supplierId, 'vendor_id' => $this->vendorId, 'document_date' => '2026-07-02', 'received_date' => '2026-07-02', 'status' => 'posted', 'created_at' => now(), 'updated_at' => now()]);
-    $this->goodsReceiptItemId = DB::table('goods_receipt_items')->insertGetId(['goods_receipt_id' => $this->goodsReceiptId, 'purchase_order_item_id' => $this->poItemId, 'product_id' => $this->itemId, 'warehouse_id' => $this->warehouseId, 'ordered_qty' => 10, 'previously_received_qty' => 0, 'received_qty' => 10, 'remaining_qty' => 0, 'uom_id' => $this->uomId, 'po_unit_price' => 25000, 'inventory_unit_cost' => 25000, 'inventory_total_cost' => 250000, 'batch_number' => 'B-EXP', 'expired_date' => '2026-07-31', 'condition_status' => 'good', 'created_at' => now(), 'updated_at' => now()]);
+    $this->receivingEntryId = DB::table('receiving_entries')->insertGetId(['number' => 'RCV-PBL-20260704-0001', 'warehouse_id' => $this->warehouseId, 'transaction_date' => '2026-07-02', 'transaction_code' => 'PEMBELIAN', 'source_type' => 'purchase_order', 'source_id' => $this->poId, 'reference' => 'PO-PRR-001', 'vendor_name' => 'Vendor Return', 'vendor_id' => $this->vendorId, 'total_value' => 250000, 'status' => 'posted', 'posted_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+    $this->receivingEntryLineId = DB::table('receiving_entry_lines')->insertGetId(['receiving_entry_id' => $this->receivingEntryId, 'source_item_id' => 1, 'item_id' => $this->itemId, 'qty' => 10, 'uom_id' => $this->uomId, 'price' => 25000, 'value' => 250000, 'batch_number' => 'B-EXP', 'expired_date' => '2026-07-31', 'inventory_unit_cost' => 25000, 'inventory_total_cost' => 250000, 'created_at' => now(), 'updated_at' => now()]);
+});
+
+it('lists posted receiving entries on purchase return create page', function () {
+    get(route('apps.procurement.purchase-returns.create'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Apps/Procurement/PurchaseReturns/Form')
+            ->where('receivingEntries.0.number', 'RCV-PBL-20260704-0001')
+        );
 });
 
 it('posts purchase return, records stock out, and creates invoice deduction', function () {
     $invoiceId = DB::table('vendor_invoices')->insertGetId(['company_id' => 1, 'vendor_id' => $this->vendorId, 'invoice_no_internal' => 'VI-PRR-001', 'vendor_invoice_no' => 'SUP-PRR-001', 'invoice_date' => '2026-07-03', 'due_date' => '2026-08-03', 'currency_code' => 'IDR', 'exchange_rate' => 1, 'subtotal' => 250000, 'tax_amount' => 0, 'discount_amount' => 0, 'freight_amount' => 0, 'grand_total' => 250000, 'net_payable_amount' => 250000, 'paid_amount' => 0, 'outstanding_amount' => 250000, 'status' => 'POSTED', 'payment_status' => 'unpaid', 'created_at' => now(), 'updated_at' => now()]);
 
-    post(route('apps.procurement.purchase-returns.store'), ['goods_receipt_id' => $this->goodsReceiptId, 'return_date' => '2026-07-04', 'reason_category' => 'EXPIRED', 'lines' => [['goods_receipt_item_id' => $this->goodsReceiptItemId, 'qty_returned' => 2, 'reason' => 'EXPIRED', 'condition_notes' => 'Expired saat inspeksi']]])->assertRedirect();
+    post(route('apps.procurement.purchase-returns.store'), ['receiving_entry_id' => $this->receivingEntryId, 'return_date' => '2026-07-04', 'reason_category' => 'EXPIRED', 'lines' => [['receiving_entry_line_id' => $this->receivingEntryLineId, 'qty_returned' => 2, 'reason' => 'EXPIRED', 'condition_notes' => 'Expired saat inspeksi']]])->assertRedirect();
 
     $returnId = DB::table('purchase_returns')->value('id');
     post(route('apps.procurement.purchase-returns.approve', $returnId))->assertRedirect();
@@ -41,6 +51,6 @@ it('posts purchase return, records stock out, and creates invoice deduction', fu
 });
 
 it('rejects purchase return quantity above received balance', function () {
-    post(route('apps.procurement.purchase-returns.store'), ['goods_receipt_id' => $this->goodsReceiptId, 'return_date' => '2026-07-04', 'reason_category' => 'DAMAGED', 'lines' => [['goods_receipt_item_id' => $this->goodsReceiptItemId, 'qty_returned' => 11, 'reason' => 'DAMAGED']]])
+    post(route('apps.procurement.purchase-returns.store'), ['receiving_entry_id' => $this->receivingEntryId, 'return_date' => '2026-07-04', 'reason_category' => 'DAMAGED', 'lines' => [['receiving_entry_line_id' => $this->receivingEntryLineId, 'qty_returned' => 11, 'reason' => 'DAMAGED']]])
         ->assertSessionHasErrors('lines.0.qty_returned');
 });

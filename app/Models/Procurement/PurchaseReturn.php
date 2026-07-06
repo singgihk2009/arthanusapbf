@@ -20,7 +20,6 @@ class PurchaseReturn extends Model
     ];
 
     public function vendor() { return $this->belongsTo(Vendor::class); }
-    public function goodsReceipt() { return $this->belongsTo(GoodsReceipt::class); }
     public function warehouse() { return $this->belongsTo(Warehouse::class); }
     public function lines() { return $this->hasMany(PurchaseReturnLine::class); }
     public function deduction() { return $this->hasOne(VendorInvoiceDeduction::class); }

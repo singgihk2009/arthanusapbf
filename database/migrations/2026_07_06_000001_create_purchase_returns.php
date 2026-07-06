@@ -12,7 +12,7 @@ return new class extends Migration {
             $table->string('return_no')->unique();
             $table->date('return_date');
             $table->foreignId('vendor_id')->constrained('vendors')->restrictOnDelete();
-            $table->foreignId('goods_receipt_id')->constrained('goods_receipts')->restrictOnDelete();
+            $table->foreignId('receiving_entry_id')->constrained('receiving_entries')->restrictOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
             $table->enum('status', ['DRAFT', 'SUBMITTED', 'APPROVED', 'POSTED', 'CANCELLED', 'VOID'])->default('DRAFT');
             $table->enum('reason_category', ['DAMAGED', 'EXPIRED', 'NEAR_EXPIRED', 'WRONG_ITEM', 'WRONG_BATCH', 'WRONG_QTY', 'QUALITY_REJECTED', 'RECALL', 'OTHER'])->default('DAMAGED');
@@ -34,7 +34,7 @@ return new class extends Migration {
         Schema::create('purchase_return_lines', function (Blueprint $table) {
             $table->id();
             $table->foreignId('purchase_return_id')->constrained('purchase_returns')->cascadeOnDelete();
-            $table->foreignId('goods_receipt_item_id')->constrained('goods_receipt_items')->restrictOnDelete();
+            $table->foreignId('receiving_entry_line_id')->constrained('receiving_entry_lines')->restrictOnDelete();
             $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
             $table->string('batch_number')->nullable();

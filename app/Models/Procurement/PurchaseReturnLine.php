@@ -16,7 +16,6 @@ class PurchaseReturnLine extends Model
     ];
 
     public function purchaseReturn() { return $this->belongsTo(PurchaseReturn::class); }
-    public function goodsReceiptItem() { return $this->belongsTo(GoodsReceiptItem::class); }
     public function item() { return $this->belongsTo(Item::class); }
     public function warehouse() { return $this->belongsTo(Warehouse::class); }
     public function uom() { return $this->belongsTo(Uom::class); }

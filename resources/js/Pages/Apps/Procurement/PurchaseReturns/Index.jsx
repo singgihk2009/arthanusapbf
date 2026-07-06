@@ -39,9 +39,9 @@ export default function Index({ purchaseReturns, filters = {}, reasons = [] }) {
                 <td className="px-3 py-2">{purchaseReturns.from ? purchaseReturns.from + idx : idx + 1}</td>
                 <td className="px-3 py-2 font-medium">{row.return_no}</td>
                 <td className="px-3 py-2">{row.return_date}</td>
-                <td className="px-3 py-2">{row.vendor?.vendor_name || row.vendor?.name || '-'}</td>
-                <td className="px-3 py-2">{row.goods_receipt?.gr_number || row.goods_receipt?.number || '-'}</td>
-                <td className="px-3 py-2">{row.warehouse?.code || row.warehouse?.name || '-'}</td>
+                <td className="px-3 py-2">{row.vendor_label || '-'}</td>
+                <td className="px-3 py-2">{row.receiving_number || '-'}</td>
+                <td className="px-3 py-2">{row.warehouse_label || '-'}</td>
                 <td className="px-3 py-2">{row.reason_category}</td>
                 <td className="px-3 py-2 text-right">{money(row.total_qty)}</td>
                 <td className="px-3 py-2 text-right">{money(row.total_amount)}</td>
