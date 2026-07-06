@@ -31,6 +31,7 @@ use App\Http\Controllers\Apps\Integration\IntegrationController;
 use App\Http\Controllers\Apps\Procurement\VendorController;
 use App\Http\Controllers\Apps\Procurement\PurchaseOrderController;
 use App\Http\Controllers\Apps\Procurement\GoodsReceiptController;
+use App\Http\Controllers\Apps\Procurement\PurchaseReturnController;
 use App\Http\Controllers\Apps\Procurement\VendorInvoiceController;
 use App\Http\Controllers\Apps\Procurement\VendorPaymentController;
 use App\Http\Controllers\Apps\Procurement\VendorLedgerController;
@@ -418,6 +419,10 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
         Route::get('/purchase-orders/{purchaseOrder}/goods-receipts/create', [GoodsReceiptController::class, 'createFromPO'])->name('goods-receipts.create-from-po');
         Route::post('/goods-receipts/{goodsReceipt}/post', [GoodsReceiptController::class, 'post'])->name('goods-receipts.post');
         Route::resource('/goods-receipts', GoodsReceiptController::class);
+        Route::post('/purchase-returns/{purchaseReturn}/submit', [PurchaseReturnController::class, 'submit'])->name('purchase-returns.submit');
+        Route::post('/purchase-returns/{purchaseReturn}/approve', [PurchaseReturnController::class, 'approve'])->name('purchase-returns.approve');
+        Route::post('/purchase-returns/{purchaseReturn}/post', [PurchaseReturnController::class, 'post'])->name('purchase-returns.post');
+        Route::resource('/purchase-returns', PurchaseReturnController::class)->except(['edit', 'update']);
         Route::post('/vendor-invoices/{vendorInvoice}/approve', [VendorInvoiceController::class, 'approve'])->name('vendor-invoices.approve');
         Route::resource('/vendor-invoices', VendorInvoiceController::class);
         Route::resource('/vendor-payments', VendorPaymentController::class);
