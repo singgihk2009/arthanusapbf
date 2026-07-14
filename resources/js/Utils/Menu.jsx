@@ -64,6 +64,7 @@ export default function Menu() {
                 { title: 'Regulatory Document', href: '/apps/master-data/regulatory-documents', icon: <IconFileDescription size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/regulatory-documents'), permissions: true },
                 { title: 'Minimum Stock', href: '/apps/master-data/min-stocks', icon: <IconListCheck size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/min-stocks'), permissions: true },
                 { title: 'Fasilitas', href: '/apps/master-data/facility-schemes', icon: <IconBuildingFactory2 size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/facility-schemes'), permissions: true },
+                { title: 'Vendor/Customer Type', href: '/apps/master-data/party-types', icon: <IconUsers size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/master-data/party-types'), permissions: true },
             ],
         },
         {

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreCustomerRequest extends FormRequest
 {
@@ -13,7 +14,7 @@ class StoreCustomerRequest extends FormRequest
         return [
             'customer_code' => ['nullable','string','max:50','unique:customers,customer_code'],
             'customer_name' => ['required','string','max:255'],
-            'customer_type' => ['nullable','string','max:100'],
+            'customer_type' => ['required','string','max:100', Rule::exists('party_types', 'code')->where('category', 'customer')->where('is_active', true)],
             'id_kemenkes' => ['nullable','string','max:100'],
             'contact_person' => ['nullable','string','max:150'],
             'phone' => ['nullable','string','max:50'],

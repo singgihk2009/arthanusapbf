@@ -18,6 +18,7 @@ use App\Http\Controllers\Apps\MasterData\RegulatorySourceController;
 use App\Http\Controllers\Apps\MasterData\RegulatoryDocumentController;
 use App\Http\Controllers\Apps\MasterData\CashAccountController;
 use App\Http\Controllers\Apps\MasterData\ChartOfAccountController;
+use App\Http\Controllers\Apps\MasterData\PartyTypeController;
 use App\Http\Controllers\Apps\Reports\InventoryReportPageController;
 use App\Http\Controllers\Apps\Regulatory\BpomMovementReportController;
 use App\Http\Controllers\Apps\Inbound\ReceivingEntryController;
@@ -115,6 +116,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
         Route::post('/items/import/excel', [ItemController::class, 'importExcel'])->name('items.import.excel');
         Route::resource('/items', ItemController::class);
         Route::resource('/facility-schemes', FacilitySchemeController::class)->except(['create','edit','show']);
+        Route::resource('/party-types', PartyTypeController::class)->except(['create', 'edit', 'show']);
         Route::redirect('/facility-scheme', '/apps/master-data/facility-schemes', 301);
         Route::redirect('/facilities', '/apps/master-data/facility-schemes', 301);
         Route::redirect('/fasilitas', '/apps/master-data/facility-schemes', 301);

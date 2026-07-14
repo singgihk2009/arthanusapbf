@@ -14,9 +14,9 @@ class StoreVendorRequest extends FormRequest
         $vendorId = $this->route('vendor')?->id;
 
         return [
-            'vendor_code' => ['required', 'string', 'max:100', Rule::unique('vendors', 'vendor_code')->ignore($vendorId)],
+            'vendor_code' => ['nullable', 'string', 'max:100', Rule::unique('vendors', 'vendor_code')->ignore($vendorId)],
             'vendor_name' => ['required', 'string', 'max:255'],
-            'vendor_type' => ['required', 'string', 'max:100'],
+            'vendor_type' => ['required', 'string', 'max:100', Rule::exists('party_types', 'code')->where('category', 'vendor')->where('is_active', true)],
             'id_kemenkes' => ['nullable', 'string', 'max:100'],
             'address' => ['required', 'string'],
             'province' => ['nullable', 'string', 'max:255'],
