@@ -19,6 +19,7 @@ use App\Http\Controllers\Apps\MasterData\RegulatoryDocumentController;
 use App\Http\Controllers\Apps\MasterData\CashAccountController;
 use App\Http\Controllers\Apps\MasterData\ChartOfAccountController;
 use App\Http\Controllers\Apps\Reports\InventoryReportPageController;
+use App\Http\Controllers\Apps\Regulatory\BpomMovementReportController;
 use App\Http\Controllers\Apps\Inbound\ReceivingEntryController;
 use App\Http\Controllers\Apps\Outbound\InternalUsageController;
 use App\Http\Controllers\Apps\Outbound\StockAdjustmentController;
@@ -157,6 +158,9 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
         Route::delete('/items/{item}/regulatory-products/{regulatoryProduct}', [ItemController::class, 'removeRegulatoryProduct'])->name('items.regulatory-products.detach');
         Route::patch('/items/{item}/regulatory-products/{regulatoryProduct}/set-primary', [ItemController::class, 'setPrimaryRegulatoryProduct'])->name('items.regulatory-products.set-primary');
     });
+
+    Route::get('/regulatory/bpom-movement-reports', [BpomMovementReportController::class, 'index'])->name('regulatory.bpom-movement-reports.index');
+    Route::get('/regulatory/bpom-movement-reports/export', [BpomMovementReportController::class, 'export'])->name('regulatory.bpom-movement-reports.export');
 
     // inventory report page
     Route::get('/reports/inventory', InventoryReportPageController::class)->name('reports.inventory.index');
