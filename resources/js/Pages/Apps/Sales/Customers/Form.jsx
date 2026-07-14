@@ -4,7 +4,7 @@ import Card from '@/Components/Card';
 import Input from '@/Components/Input';
 import { Head, router, useForm } from '@inertiajs/react';
 
-export default function Form({ customer }) {
+export default function Form({ customer, partyTypes = [] }) {
   const isEdit = Boolean(customer);
 
   const initialData = {
@@ -53,9 +53,9 @@ export default function Form({ customer }) {
         )}
       >
         <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
-          <Input label='Customer Code' value={data.customer_code} onChange={(e) => setData('customer_code', e.target.value)} errors={errors.customer_code} />
+          <Input label='Customer Code' value={data.customer_code} onChange={(e) => setData('customer_code', e.target.value)} errors={errors.customer_code} readOnly={!isEdit} placeholder={!isEdit ? 'Auto generate saat simpan' : ''} />
           <Input label='Customer Name' value={data.customer_name} onChange={(e) => setData('customer_name', e.target.value)} errors={errors.customer_name} />
-          <Input label='Customer Type' value={data.customer_type} onChange={(e) => setData('customer_type', e.target.value)} errors={errors.customer_type} />
+          <div className='flex flex-col gap-2'><label className='text-gray-600 text-sm'>Customer Type</label><select value={data.customer_type} onChange={(e) => setData('customer_type', e.target.value)} className='w-full px-3 py-1.5 border text-sm rounded-md focus:outline-none focus:ring-0 bg-white text-gray-700 focus:border-gray-200 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-gray-700 dark:border-gray-800'><option value=''>Pilih Customer Type</option>{partyTypes.map((type) => <option key={type.code} value={type.code}>{type.name} ({type.prefix}-001)</option>)}</select>{errors.customer_type && <small className='text-xs text-red-500'>{errors.customer_type}</small>}</div>
           <Input label='ID Kemenkes' value={data.id_kemenkes} onChange={(e) => setData('id_kemenkes', e.target.value)} errors={errors.id_kemenkes} />
           <Input label='Contact Person' value={data.contact_person} onChange={(e) => setData('contact_person', e.target.value)} errors={errors.contact_person} />
           <Input label='Phone' value={data.phone} onChange={(e) => setData('phone', e.target.value)} errors={errors.phone} />

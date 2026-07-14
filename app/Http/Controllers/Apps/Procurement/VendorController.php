@@ -7,6 +7,7 @@ use App\Http\Requests\Procurement\StoreVendorRequest;
 use App\Http\Requests\Procurement\UpdateVendorRequest;
 use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\Vendor;
+use App\Models\PartyType;
 use App\Models\Procurement\DocumentType;
 use App\Models\Document;
 use App\Models\DocumentRequirement;
@@ -559,9 +560,9 @@ class VendorController extends Controller
     }
     public function auditLogs(Vendor $vendor) { return response()->json(['audit_logs' => [['action' => 'Vendor created/updated', 'at' => $vendor->updated_at, 'by' => $vendor->updated_by]]]); }
 
-    public function create(){ return Inertia::render('Apps/Procurement/Vendors/Form'); }
-    public function store(StoreVendorRequest $request){ DB::transaction(function () use ($request) { $validated = $request->validated(); $vendorPayload = Arr::except($validated, ['company_director', 'technical_responsible_person', 'documents']); $vendorPayload['status'] = $this->normalizeStatus($vendorPayload['status'] ?? null); $vendorPayload['name'] = $vendorPayload['vendor_name'] ?? ($vendorPayload['name'] ?? $vendorPayload['vendor_code'] ?? 'UNKNOWN'); $vendor = Vendor::query()->create(array_merge($vendorPayload, ['created_by' => auth()->id(), 'updated_by' => auth()->id()])); $this->upsertContacts($vendor, $validated); }); return redirect('/apps/procurement/vendors'); }
-    public function edit(Vendor $vendor){ $vendor->load('contacts', 'documents'); return Inertia::render('Apps/Procurement/Vendors/Form', compact('vendor')); }
+    public function create(){ return Inertia::render('Apps/Procurement/Vendors/Form', ['partyTypes' => $this->activePartyTypes('vendor')]); }
+    public function store(StoreVendorRequest $request){ DB::transaction(function () use ($request) { $validated = $request->validated(); $vendorPayload = Arr::except($validated, ['company_director', 'technical_responsible_person', 'documents']); if (blank($vendorPayload['vendor_code'] ?? null)) { $vendorPayload['vendor_code'] = $this->nextPartyCode('vendor', $vendorPayload['vendor_type']); } $vendorPayload['status'] = $this->normalizeStatus($vendorPayload['status'] ?? null); $vendorPayload['name'] = $vendorPayload['vendor_name'] ?? ($vendorPayload['name'] ?? $vendorPayload['vendor_code'] ?? 'UNKNOWN'); $vendor = Vendor::query()->create(array_merge($vendorPayload, ['created_by' => auth()->id(), 'updated_by' => auth()->id()])); $this->upsertContacts($vendor, $validated); }); return redirect('/apps/procurement/vendors'); }
+    public function edit(Vendor $vendor){ $vendor->load('contacts', 'documents'); return Inertia::render('Apps/Procurement/Vendors/Form', ['vendor' => $vendor, 'partyTypes' => $this->partyTypesForEdit('vendor', $vendor->vendor_type)]); }
     public function update(UpdateVendorRequest $request, Vendor $vendor){ DB::transaction(function () use ($request, $vendor) { $validated = $request->validated(); $vendorPayload = Arr::except($validated, ['company_director', 'technical_responsible_person', 'documents']); $vendorPayload['status'] = $this->normalizeStatus($vendorPayload['status'] ?? null); $vendorPayload['name'] = $vendorPayload['vendor_name'] ?? ($vendorPayload['name'] ?? $vendorPayload['vendor_code'] ?? 'UNKNOWN'); $vendor->update(array_merge($vendorPayload, ['updated_by' => auth()->id()])); $this->upsertContacts($vendor, $validated); }); return redirect('/apps/procurement/vendors'); }
 
     public function submitQualification(Vendor $vendor){ $vendor->update(['qualification_status' => 'submitted', 'submitted_by' => auth()->id(), 'submitted_at' => now()]); return back(); }
@@ -739,6 +740,40 @@ class VendorController extends Controller
     }
     private function isRowEmpty(array $row): bool { foreach ($row as $v) if ($v !== null && trim((string) $v) !== '') return false; return true; }
     private function hasTemplateHeaders(array $row): bool { return array_keys($row) === self::VENDOR_IMPORT_HEADERS; }
+    private function activePartyTypes(string $category): Collection
+    {
+        return PartyType::query()
+            ->where('category', $category)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['code', 'name', 'prefix']);
+    }
+
+    private function partyTypesForEdit(string $category, ?string $currentCode): Collection
+    {
+        return PartyType::query()
+            ->where('category', $category)
+            ->where(fn ($query) => $query->where('is_active', true)->orWhere('code', $currentCode))
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['code', 'name', 'prefix']);
+    }
+
+    private function nextPartyCode(string $category, string $typeCode): string
+    {
+        $type = PartyType::query()->where('category', $category)->where('code', $typeCode)->lockForUpdate()->firstOrFail();
+        $prefix = $type->prefix;
+        $max = Vendor::query()
+            ->where('vendor_code', 'like', $prefix.'-%')
+            ->lockForUpdate()
+            ->pluck('vendor_code')
+            ->map(fn ($code) => preg_match('/^'.preg_quote($prefix, '/').'-(\d+)$/', (string) $code, $m) ? (int) $m[1] : 0)
+            ->max() ?? 0;
+
+        return $prefix.'-'.str_pad((string) ($max + 1), 3, '0', STR_PAD_LEFT);
+    }
+
     private function buildTemplateXlsx(string $path, array $rows): void
     {
         $escape = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES | ENT_XML1);

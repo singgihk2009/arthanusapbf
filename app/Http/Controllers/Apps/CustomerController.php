@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCustomerRequest;
 use App\Http\Requests\UpdateCustomerRequest;
 use App\Models\DocumentType;
+use App\Models\PartyType;
 use App\Models\Sales\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -139,14 +140,14 @@ class CustomerController extends Controller
 
     public function create()
     {
-        return Inertia::render('Apps/Sales/Customers/Form', ['customer' => null]);
+        return Inertia::render('Apps/Sales/Customers/Form', ['customer' => null, 'partyTypes' => $this->activePartyTypes('customer')]);
     }
 
     public function store(StoreCustomerRequest $request)
     {
         $data = $request->validated();
         if (blank($data['customer_code'] ?? null)) {
-            $data['customer_code'] = $this->nextCustomerCode();
+            $data['customer_code'] = $this->nextCustomerCode($data['customer_type']);
         }
         if (Schema::hasColumn('customers', 'code') && blank($data['code'] ?? null)) {
             $data['code'] = $data['customer_code'];
@@ -334,7 +335,7 @@ class CustomerController extends Controller
 
     public function edit(Customer $customer)
     {
-        return Inertia::render('Apps/Sales/Customers/Form', ['customer' => $customer]);
+        return Inertia::render('Apps/Sales/Customers/Form', ['customer' => $customer, 'partyTypes' => $this->partyTypesForEdit('customer', $customer->customer_type)]);
     }
 
     public function update(UpdateCustomerRequest $request, Customer $customer)
@@ -369,12 +370,39 @@ class CustomerController extends Controller
         return response()->json($rows);
     }
 
-    private function nextCustomerCode(): string
+    private function activePartyTypes(string $category): Collection
     {
-        return DB::transaction(function () {
-            $last = Customer::query()->lockForUpdate()->orderByDesc('id')->first();
-            $lastNumber = $last ? (int) preg_replace('/\D/', '', (string) $last->customer_code) : 0;
-            return 'CUST-'.str_pad((string) ($lastNumber + 1), 6, '0', STR_PAD_LEFT);
+        return PartyType::query()
+            ->where('category', $category)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['code', 'name', 'prefix']);
+    }
+
+    private function partyTypesForEdit(string $category, ?string $currentCode): Collection
+    {
+        return PartyType::query()
+            ->where('category', $category)
+            ->where(fn ($query) => $query->where('is_active', true)->orWhere('code', $currentCode))
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['code', 'name', 'prefix']);
+    }
+
+    private function nextCustomerCode(string $typeCode): string
+    {
+        return DB::transaction(function () use ($typeCode) {
+            $type = PartyType::query()->where('category', 'customer')->where('code', $typeCode)->lockForUpdate()->firstOrFail();
+            $prefix = $type->prefix;
+            $max = Customer::query()
+                ->where('customer_code', 'like', $prefix.'-%')
+                ->lockForUpdate()
+                ->pluck('customer_code')
+                ->map(fn ($code) => preg_match('/^'.preg_quote($prefix, '/').'-(\d+)$/', (string) $code, $m) ? (int) $m[1] : 0)
+                ->max() ?? 0;
+
+            return $prefix.'-'.str_pad((string) ($max + 1), 3, '0', STR_PAD_LEFT);
         });
     }
 
