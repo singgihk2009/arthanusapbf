@@ -118,6 +118,7 @@ export default function Menu() {
             permissions: true,
             details: [
                 { title: 'Barang Masuk', href: '/apps/reports/inventory?type=incoming-items', icon: <IconReportAnalytics size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/reports/inventory') && url.includes('incoming-items'), permissions: true },
+                { title: 'Laporan BPOM', href: '/apps/regulatory/bpom-movement-reports', icon: <IconReportAnalytics size={20} strokeWidth={1.5} />, active: url.startsWith('/apps/regulatory/bpom-movement-reports'), permissions: true },
             ],
         },
         {
