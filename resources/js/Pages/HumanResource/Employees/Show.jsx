@@ -1,5 +1,5 @@
 import AppLayout from '@/Layouts/AppLayout';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 const formatDate = (value) => {
@@ -39,8 +39,22 @@ const getEmployeeStatusBadgeClass = (isActive) => (
 const toLabel = (value) => safeValue(value, '-').toString().replaceAll('_', ' ').replace(/\b\w/g, (s) => s.toUpperCase());
 
 export default function Show() {
-    const { employee, summary } = usePage().props;
+    const { employee, summary, signerProfiles = [], poTypes = {} } = usePage().props;
     const [activeTab, setActiveTab] = useState('overview');
+    const signerForm = useForm({
+        po_type: 'precursor',
+        role: 'requester',
+        print_name: employee.full_name || '',
+        print_title: employee.position?.name || '',
+        license_no: summary?.primary_license?.license_number || '',
+    });
+    const submitSignerProfile = (event) => {
+        event.preventDefault();
+        signerForm.post(route('apps.human-resource.employees.po-signers.store', employee.id), {
+            preserveScroll: true,
+            onSuccess: () => signerForm.reset('license_no'),
+        });
+    };
 
     const licenses = employee.licenses || [];
     const tabs = [
@@ -48,6 +62,7 @@ export default function Show() {
         ['licenses', 'Licenses & Certifications'],
         ['documents', 'Documents'],
         ['login', 'Login Account'],
+        ['signers', 'PO Signers'],
         ['activity', 'Activity'],
     ];
 
@@ -116,7 +131,7 @@ export default function Show() {
                 {[['Basic Information', [['Employee Code', employee.employee_code], ['Full Name', employee.full_name], ['NIK', employee.nik], ['Gender', employee.gender], ['Birth Place', employee.birth_place], ['Birth Date', formatDate(employee.birth_date)]]],
                     ['Employment Information', [['Department', employee.department?.name], ['Position', employee.position?.name], ['Join Date', formatDate(employee.join_date)], ['Employment Status', employee.employment_status], ['Warehouse', employee.warehouse?.name ?? employee.warehouse_name], ['Company', employee.company?.name ?? employee.company_name]]],
                     ['Contact Information', [['Email', employee.email], ['Phone', employee.phone], ['Address', employee.address]]],
-                    ['Document Signature Profile', [['Signature Status', employee.signature_path ? 'Available' : 'Not Available'], ['Name for Document', employee.signature_name ?? employee.full_name], ['Position for Document', employee.signature_position ?? employee.position?.name], ['Primary License Number', summary?.primary_license?.license_number]]],
+                    ['Document Signature Profile', [['Signature Status', employee.signature_path ? 'Available' : 'Not Available'], ['Name for Document', employee.signature_name ?? employee.full_name], ['Position for Document', employee.signature_position ?? employee.position?.name], ['Primary License Number', summary?.primary_license?.license_number], ['Linked PO Signer Profiles', summary?.signer_profile_count ?? 0]]],
                 ].map(([title, rows]) => <div key={title} className='rounded-xl border border-gray-200 bg-white p-4 shadow-sm'>
                     <h2 className='text-sm font-semibold uppercase tracking-wide text-gray-500'>{title}</h2>
                     <div className='mt-3 space-y-2'>
@@ -170,6 +185,58 @@ export default function Show() {
                     <div><span className='text-gray-500'>Last Login:</span> <span className='font-medium text-gray-900'>{formatDate(employee.user?.last_login_at)}</span></div>
                 </div>
                 {!employee.user && <button type='button' disabled className='cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400'>Create / Link User Login</button>}
+            </div>}
+
+
+            {activeTab === 'signers' && <div className='rounded-xl border border-gray-200 bg-white p-4 shadow-sm'>
+                <div className='mb-3 flex items-start justify-between gap-3'>
+                    <div>
+                        <h2 className='text-lg font-semibold text-gray-900'>PO Signer Profiles</h2>
+                        <p className='text-sm text-gray-500'>Employee ini dapat dipakai sebagai penanda tangan PO bila tercantum sebagai requester atau approver di master purchase_order_signers.</p>
+                    </div>
+                </div>
+                <form onSubmit={submitSignerProfile} className='mb-4 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 md:grid-cols-6'>
+                    <div>
+                        <label className='mb-1 block text-xs font-semibold text-gray-500'>Jenis PO</label>
+                        <select value={signerForm.data.po_type} onChange={(e) => signerForm.setData('po_type', e.target.value)} className='w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-sm'>
+                            {Object.entries(poTypes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className='mb-1 block text-xs font-semibold text-gray-500'>Role Signer</label>
+                        <select value={signerForm.data.role} onChange={(e) => signerForm.setData('role', e.target.value)} className='w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-sm'>
+                            <option value='requester'>Requester / Pemohon</option>
+                            <option value='approver'>Approver / Persetujuan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className='mb-1 block text-xs font-semibold text-gray-500'>Nama Cetak</label>
+                        <input value={signerForm.data.print_name} onChange={(e) => signerForm.setData('print_name', e.target.value)} className='w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-sm' />
+                    </div>
+                    <div>
+                        <label className='mb-1 block text-xs font-semibold text-gray-500'>Jabatan Cetak</label>
+                        <input value={signerForm.data.print_title} onChange={(e) => signerForm.setData('print_title', e.target.value)} className='w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-sm' />
+                    </div>
+                    <div>
+                        <label className='mb-1 block text-xs font-semibold text-gray-500'>No Lisensi/SIPA</label>
+                        <input value={signerForm.data.license_no} onChange={(e) => signerForm.setData('license_no', e.target.value)} className='w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-sm' />
+                    </div>
+                    <div className='flex items-end'>
+                        <button type='submit' disabled={signerForm.processing} className='w-full rounded-lg border border-blue-500 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60'>Link Signer</button>
+                    </div>
+                </form>
+                {signerProfiles.length === 0 ? <div className='rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500'>Belum terhubung ke signer profile PO. Isi form di atas untuk membuat signer profile dan menghubungkan employee ini ke dokumen PO.</div> : <div className='overflow-x-auto'>
+                    <table className='min-w-full text-sm'>
+                        <thead><tr className='border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500'><th className='px-3 py-2'>Jenis PO</th><th className='px-3 py-2'>Role</th><th className='px-3 py-2'>Nama Cetak</th><th className='px-3 py-2'>Jabatan Cetak</th><th className='px-3 py-2'>No Lisensi</th><th className='px-3 py-2'>Status</th></tr></thead>
+                        <tbody>{signerProfiles.map((profile) => {
+                            const role = profile.requester_employee_id === employee.id ? 'Requester / Pemohon' : 'Approver / Persetujuan';
+                            const name = profile.requester_employee_id === employee.id ? profile.requester_name : profile.approver_name;
+                            const title = profile.requester_employee_id === employee.id ? profile.requester_title : profile.approver_title;
+                            const licenseNo = profile.requester_employee_id === employee.id ? profile.requester_license_no : profile.approver_license_no;
+                            return <tr key={profile.id} className='border-b border-gray-100'><td className='px-3 py-2'>{poTypes[profile.po_type] || profile.po_type}</td><td className='px-3 py-2'>{role}</td><td className='px-3 py-2'>{safeValue(name, employee.full_name)}</td><td className='px-3 py-2'>{safeValue(title, employee.position?.name)}</td><td className='px-3 py-2'>{safeValue(licenseNo)}</td><td className='px-3 py-2'>{profile.is_active ? 'Active' : 'Inactive'}</td></tr>;
+                        })}</tbody>
+                    </table>
+                </div>}
             </div>}
 
             {activeTab === 'activity' && <div className='rounded-xl border border-gray-200 bg-white p-4 shadow-sm'>

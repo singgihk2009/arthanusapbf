@@ -4,7 +4,7 @@ import Card from '@/Components/Card';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
-const emptyItem = (defaultFacilitySchemeId = '') => ({ product_id: '', product_name: '', uom_id: '', facility_scheme_id: defaultFacilitySchemeId, facility_reference_no: '', facility_reference_date: '', facility_reference_note: '', qty_ordered: 1, unit_price: 0, discount_amount: 0, tax_amount: 0, line_total: 0, notes: '' });
+const emptyItem = (defaultFacilitySchemeId = '') => ({ product_id: '', product_name: '', active_ingredient: '', dosage_form_strength: '', regulatory_note: '', uom_id: '', facility_scheme_id: defaultFacilitySchemeId, facility_reference_no: '', facility_reference_date: '', facility_reference_note: '', qty_ordered: 1, unit_price: 0, discount_amount: 0, tax_amount: 0, line_total: 0, notes: '' });
 const normalizeFacilityId = (value, fallback = '') => {
     const resolved = value ?? fallback;
     return resolved === null || resolved === undefined || resolved === '' ? '' : String(resolved);
@@ -36,7 +36,7 @@ const toDateInputValue = (value) => {
 
 const emptyDocument = () => ({ document_type_id: '', title: '', document_number: '', file: null });
 
-export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], facilitySchemes = [], documentTypes = [], uploadedDocuments = [], defaultFacilitySchemeId = '', defaultVendorId = null, returnTo = '' }) {
+export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], facilitySchemes = [], poTypes = {}, signerProfiles = [], documentTypes = [], uploadedDocuments = [], defaultFacilitySchemeId = '', defaultVendorId = null, returnTo = '' }) {
     const [notice, setNotice] = useState(null);
     const isEdit = !!purchaseOrder;
     const initialHeaderFacilitySchemeId = normalizeFacilityId(
@@ -48,6 +48,10 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
         : [emptyItem(String(initialHeaderFacilitySchemeId || defaultFacilitySchemeId || ''))];
     const { data, setData, post, transform, processing, errors, isDirty } = useForm({
         vendor_id: purchaseOrder?.vendor_id || defaultVendorId || '',
+        po_type: purchaseOrder?.po_type || 'regular',
+        signer_profile_id: purchaseOrder?.signer_profile_id || '',
+        usage_purpose: purchaseOrder?.usage_purpose || '',
+        warehouse_address: purchaseOrder?.warehouse_address || '',
         po_date: toDateInputValue(purchaseOrder?.po_date),
         expected_delivery_date: toDateInputValue(purchaseOrder?.expected_delivery_date),
         notes: purchaseOrder?.notes || '',
@@ -61,6 +65,8 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
 
     const productUomMap = useMemo(() => Object.fromEntries(products.map((p) => [String(p.id), p.base_uom_id ? String(p.base_uom_id) : ''])), [products]);
     const facilityMap = useMemo(() => Object.fromEntries(facilitySchemes.map((f) => [String(f.id), f])), [facilitySchemes]);
+    const signerOptions = useMemo(() => signerProfiles.filter((profile) => !data.po_type || profile.po_type === data.po_type), [signerProfiles, data.po_type]);
+    const needsRegulatoryFields = ['precursor', 'oot'].includes(data.po_type);
 
     const setItem = (index, key, value) => {
         const items = [...data.items];
@@ -127,18 +133,22 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
             {notice && <div className={`mb-3 rounded border px-3 py-2 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{notice.text}</div>}
             <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Vendor</label><select value={data.vendor_id} onChange={(e) => setData('vendor_id', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300'><option value=''>-</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select>{errors.vendor_id && <small className='text-xs text-red-500'>{errors.vendor_id}</small>}</div>
+                <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Jenis PO</label><select value={data.po_type} onChange={(e) => setData('po_type', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300'>{Object.entries(poTypes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{errors.po_type && <small className='text-xs text-red-500'>{errors.po_type}</small>}</div>
+                <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Signer Profile</label><select value={data.signer_profile_id} onChange={(e) => setData('signer_profile_id', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300'><option value=''>Default aktif</option>{signerOptions.map((profile) => <option key={profile.id} value={profile.id}>{profile.requester_name || profile.requester_title || profile.po_type} / {profile.approver_name || profile.approver_title || '-'}</option>)}</select></div>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>PO Date</label><input type='date' value={data.po_date} onChange={(e) => setData('po_date', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' />{errors.po_date && <small className='text-xs text-red-500'>{errors.po_date}</small>}</div>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Expected Date</label><input type='date' value={data.expected_delivery_date} onChange={(e) => setData('expected_delivery_date', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' /></div>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Facility</label><select value={data.facility_scheme_id} onChange={(e) => setData('facility_scheme_id', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700'><option value=''>-</option>{facilitySchemes.map((f)=><option key={f.id} value={f.id}>{f.code} - {f.name}</option>)}</select></div>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>No Referensi Facility</label><input value={data.facility_reference_no} onChange={(e) => setData('facility_reference_no', e.target.value)} placeholder={(facilityMap[String(data.facility_scheme_id)]?.code === 'KEK_VAT_EXEMPT') ? 'No Referensi PPKEK' : 'No Referensi'} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' /></div>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Tanggal Facility</label><input type='date' value={data.facility_reference_date} onChange={(e) => setData('facility_reference_date', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' /></div>
+                {needsRegulatoryFields && <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Tujuan Penggunaan</label><input value={data.usage_purpose} onChange={(e) => setData('usage_purpose', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' /></div>}
+                {needsRegulatoryFields && <div className='flex flex-col gap-2 md:col-span-2'><label className='text-sm text-gray-600'>Alamat Gudang/Kebutuhan</label><input value={data.warehouse_address} onChange={(e) => setData('warehouse_address', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' /></div>}
                 <div className='flex flex-col gap-2 md:col-span-3'><label className='text-sm text-gray-600'>Notes</label><textarea value={data.notes} onChange={(e) => setData('notes', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' /></div>
             </div>
             <div className='mt-4 space-y-2'>
                 <div className='hidden md:grid md:grid-cols-8 md:gap-2 px-2 text-xs font-semibold text-gray-600'>
                     <div className='px-1'>Produk Master</div>
                     <div className='px-1'>Nama Produk</div>
-                    <div className='px-1'>UoM</div>
+                    <div className='px-1'>{needsRegulatoryFields ? 'Zat Aktif' : 'UoM'}</div>
                     <div className='px-1'>Qty</div>
                     <div className='px-1'>Harga</div>
                     <div className='px-1'>Pajak</div>
@@ -148,7 +158,8 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
                 {data.items.map((it, i) => <div key={i} className='grid grid-cols-1 gap-2 rounded border border-gray-200 p-2 md:grid-cols-8 dark:border-gray-800'>
                     <select value={it.product_id || ''} onChange={(e) => setItem(i, 'product_id', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900'><option value=''>Product</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
                     <input value={it.product_name || ''} onChange={(e) => setItem(i, 'product_name', e.target.value)} placeholder='Nama produk' className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
-                    <select value={it.uom_id || ''} onChange={(e) => setItem(i, 'uom_id', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900'><option value=''>UOM</option>{uoms.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
+                    {needsRegulatoryFields ? <input value={it.active_ingredient || ''} onChange={(e) => setItem(i, 'active_ingredient', e.target.value)} placeholder='Zat aktif/prekursor' className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' /> : <select value={it.uom_id || ''} onChange={(e) => setItem(i, 'uom_id', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900'><option value=''>UOM</option>{uoms.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>}
+                    {needsRegulatoryFields && <input value={it.dosage_form_strength || ''} onChange={(e) => setItem(i, 'dosage_form_strength', e.target.value)} placeholder='Bentuk & kekuatan' className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900 md:col-span-2' />}
                     <input type='number' value={it.qty_ordered} onChange={(e) => setItem(i, 'qty_ordered', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                     <input type='number' value={it.unit_price} onChange={(e) => setItem(i, 'unit_price', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                     <input type='number' value={it.tax_amount} onChange={(e) => setItem(i, 'tax_amount', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />

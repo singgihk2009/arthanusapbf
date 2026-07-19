@@ -14,6 +14,13 @@ class PurchaseOrder extends Model
 
     public const STATUSES = ['draft', 'pending_approval', 'approved', 'rejected', 'cancelled', 'closed'];
     public const FULFILLMENT_STATUSES = ['not_received', 'partially_received', 'fully_received', 'closed'];
+    public const TYPES = ['regular', 'precursor', 'oot', 'alkes'];
+    public const TYPE_LABELS = [
+        'regular' => 'PO Reguler',
+        'precursor' => 'PO Prekursor',
+        'oot' => 'PO OOT',
+        'alkes' => 'PO Alkes',
+    ];
 
     protected $casts = [
         'po_date' => 'date',
@@ -27,6 +34,7 @@ class PurchaseOrder extends Model
     public function vendor(){ return $this->belongsTo(Vendor::class); }
     public function createdBy(){ return $this->belongsTo(User::class, 'created_by'); }
     public function approvedBy(){ return $this->belongsTo(User::class, 'approved_by'); }
+    public function signerProfile(){ return $this->belongsTo(PurchaseOrderSigner::class, 'signer_profile_id'); }
 
     public function recalculateTotals(): void
     {

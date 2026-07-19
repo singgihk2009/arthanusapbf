@@ -2,6 +2,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import Card from '@/Components/Card';
 import Table from '@/Components/Table';
 import { Head, router } from '@inertiajs/react';
+import { getPurchaseOrderPrintTemplate, getSignerDisplay } from './PrintTemplates';
 
 export default function Show({ purchaseOrder, company = null }) {
     const canCancel = purchaseOrder.items.every((i) => +i.qty_received === 0);
@@ -10,6 +11,10 @@ export default function Show({ purchaseOrder, company = null }) {
     const fulfillmentStatus = String(purchaseOrder.fulfillment_status || 'not_received').toLowerCase();
     const fulfillmentStatusClass = { not_received: 'bg-gray-100 text-gray-700', partially_received: 'bg-amber-100 text-amber-700', fully_received: 'bg-green-100 text-green-700', closed: 'bg-purple-100 text-purple-700' }[fulfillmentStatus] || 'bg-gray-100';
     const fulfillmentLabel = { not_received: 'Not Received', partially_received: 'Partial Receipt', fully_received: 'Fully Received', closed: 'Closed' }[fulfillmentStatus] || fulfillmentStatus;
+    const poTypeLabel = { regular: 'PO Reguler', precursor: 'PO Prekursor', oot: 'PO OOT', alkes: 'PO Alkes' }[purchaseOrder.po_type] || 'PO Reguler';
+    const printTemplate = getPurchaseOrderPrintTemplate(purchaseOrder.po_type);
+    const requesterSigner = getSignerDisplay(purchaseOrder.signer_profile, 'requester');
+    const approverSigner = getSignerDisplay(purchaseOrder.signer_profile, 'approver');
 
     const hasOutstanding = purchaseOrder.items.some((i) => Number(i.remaining_qty ?? (Number(i.qty_ordered) - Number(i.received_qty ?? i.qty_received ?? 0))) > 0);
     const canCreateGoodsReceiving = poStatus === 'approved' && !['fully_received'].includes(fulfillmentStatus) && !['cancelled', 'closed'].includes(poStatus) && hasOutstanding;
@@ -130,7 +135,7 @@ export default function Show({ purchaseOrder, company = null }) {
             return `
                 <tr>
                     <td class="center">${index + 1}</td>
-                    <td>${productName}</td>
+                    <td>${productName}${item.active_ingredient ? `<br/><small>Zat aktif: ${escapeHtml(item.active_ingredient)}</small>` : ''}${item.dosage_form_strength ? `<br/><small>Bentuk/kekuatan: ${escapeHtml(item.dosage_form_strength)}</small>` : ''}</td>
                     <td class="center">${qty}</td>
                     <td class="center">${unit}</td>
                     <td class="center">${qty} ${unit}</td>
@@ -156,7 +161,7 @@ export default function Show({ purchaseOrder, company = null }) {
             <html>
                 <head>
                     <meta charset="utf-8" />
-                    <title>Purchase Order ${escapeHtml(purchaseOrder.po_number)}</title>
+                    <title>${escapeHtml(poTypeLabel)} ${escapeHtml(purchaseOrder.po_number)}</title>
                     <style>
                         @page { size: A4 portrait; margin: 10mm 9mm 12mm; }
                         * { box-sizing: border-box; }
@@ -226,7 +231,7 @@ export default function Show({ purchaseOrder, company = null }) {
                         </div>
                         <div class="rule"></div>
 
-                        <h1 class="title">PURCHASE ORDER</h1>
+                        <h1 class="title">${escapeHtml(printTemplate.title)}</h1>
 
                         <section class="meta">
                             <div>
@@ -235,6 +240,7 @@ export default function Show({ purchaseOrder, company = null }) {
                                 <div>${escapeHtml(vendorAddress || 'di Tempat')}</div>
                             </div>
                             <div>
+                                <div><span class="label">Jenis</span>: ${escapeHtml(poTypeLabel)}</div>
                                 <div><span class="label">Nomor</span>: ${escapeHtml(purchaseOrder.po_number)}</div>
                                 <div><span class="label">Tanggal</span>: ${escapeHtml(formatDisplayDate(purchaseOrder.po_date))}</div>
                             </div>
@@ -259,15 +265,15 @@ export default function Show({ purchaseOrder, company = null }) {
 
                         <section class="signatures">
                             <div class="sign-box">
-                                <div class="sign-title">Pemohon,</div>
+                                <div class="sign-title">${escapeHtml(printTemplate.requesterLabel)},</div>
                                 <div class="sign-line"></div>
-                                <div class="sign-name-space"></div>
+                                <div class="sign-name-space">${escapeHtml(requesterSigner.name || '-')}<br/>${escapeHtml(requesterSigner.title || '')}<br/>${escapeHtml(requesterSigner.licenseNo || '')}</div>
                             </div>
                             <div class="middle-logo"><span class="logo-symbol">✚</span><span><strong>artha</strong><br/>nusa</span></div>
                             <div class="sign-box">
-                                <div class="sign-title">Persetujuan,</div>
+                                <div class="sign-title">${escapeHtml(printTemplate.approverLabel)},</div>
                                 <div class="sign-line"></div>
-                                <div class="sign-name-space"></div>
+                                <div class="sign-name-space">${escapeHtml(approverSigner.name || '-')}<br/>${escapeHtml(approverSigner.title || '')}<br/>${escapeHtml(approverSigner.licenseNo || '')}</div>
                             </div>
                         </section>
                     </main>
@@ -305,7 +311,7 @@ export default function Show({ purchaseOrder, company = null }) {
     return (
         <>
             <Head title={`PO ${purchaseOrder.po_number}`} />
-            <Card title={`Purchase Order ${purchaseOrder.po_number}`}>
+            <Card title={`${poTypeLabel} ${purchaseOrder.po_number}`}>
                 <div className='mb-4 flex flex-wrap items-center gap-2'>
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${approvalStatusClass}`}>Approval: {poStatus}</span>
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${fulfillmentStatusClass}`}>Receiving: {fulfillmentLabel}</span>
@@ -333,6 +339,10 @@ export default function Show({ purchaseOrder, company = null }) {
                     <div><span className='font-semibold'>PO Approved By:</span> {approvedBy}</div>
                     <div><span className='font-semibold'>Received By:</span> {receivedBy}</div>
                     <div><span className='font-semibold'>Warehouse:</span> {warehouseInfo}</div>
+                    <div><span className='font-semibold'>Signer Pemohon:</span> {requesterSigner.name || '-'}</div>
+                    <div><span className='font-semibold'>Signer Persetujuan:</span> {approverSigner.name || '-'}</div>
+                    {purchaseOrder.usage_purpose && <div><span className='font-semibold'>Tujuan Penggunaan:</span> {purchaseOrder.usage_purpose}</div>}
+                    {purchaseOrder.warehouse_address && <div><span className='font-semibold'>Alamat Gudang/Kebutuhan:</span> {purchaseOrder.warehouse_address}</div>}
                 </div>
 
                 <h3 className='mt-6 mb-2 text-sm font-semibold'>Detail PO</h3>
@@ -340,6 +350,8 @@ export default function Show({ purchaseOrder, company = null }) {
                     <Table.Thead>
                         <tr>
                             <Table.Th>Product</Table.Th>
+                            <Table.Th>Zat Aktif</Table.Th>
+                            <Table.Th>Bentuk/Kekuatan</Table.Th>
                             <Table.Th>Fasilitas</Table.Th>
                             <Table.Th>Nomor Fasilitas</Table.Th>
                             <Table.Th>Batch Number</Table.Th>
@@ -354,6 +366,8 @@ export default function Show({ purchaseOrder, company = null }) {
                         {purchaseOrder.items.map((i) => (
                             <tr key={i.id}>
                                 <Table.Td>{i.product?.name || i.product_name || '-'}</Table.Td>
+                                <Table.Td>{i.active_ingredient || '-'}</Table.Td>
+                                <Table.Td>{i.dosage_form_strength || '-'}</Table.Td>
                                 <Table.Td>{i.facility_name || i.facility_type || i.facility_scheme_name || '-'}</Table.Td>
                                 <Table.Td>{i.facility_reference_no || i.facility_number || '-'}</Table.Td>
                                 <Table.Td>{i.batch_number || i.batch_no || '-'}</Table.Td>
