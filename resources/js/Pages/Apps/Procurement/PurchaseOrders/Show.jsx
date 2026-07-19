@@ -10,6 +10,7 @@ export default function Show({ purchaseOrder, company = null }) {
     const fulfillmentStatus = String(purchaseOrder.fulfillment_status || 'not_received').toLowerCase();
     const fulfillmentStatusClass = { not_received: 'bg-gray-100 text-gray-700', partially_received: 'bg-amber-100 text-amber-700', fully_received: 'bg-green-100 text-green-700', closed: 'bg-purple-100 text-purple-700' }[fulfillmentStatus] || 'bg-gray-100';
     const fulfillmentLabel = { not_received: 'Not Received', partially_received: 'Partial Receipt', fully_received: 'Fully Received', closed: 'Closed' }[fulfillmentStatus] || fulfillmentStatus;
+    const poTypeLabel = { regular: 'PO Reguler', precursor: 'PO Prekursor', oot: 'PO OOT', alkes: 'PO Alkes' }[purchaseOrder.po_type] || 'PO Reguler';
 
     const hasOutstanding = purchaseOrder.items.some((i) => Number(i.remaining_qty ?? (Number(i.qty_ordered) - Number(i.received_qty ?? i.qty_received ?? 0))) > 0);
     const canCreateGoodsReceiving = poStatus === 'approved' && !['fully_received'].includes(fulfillmentStatus) && !['cancelled', 'closed'].includes(poStatus) && hasOutstanding;
@@ -156,7 +157,7 @@ export default function Show({ purchaseOrder, company = null }) {
             <html>
                 <head>
                     <meta charset="utf-8" />
-                    <title>Purchase Order ${escapeHtml(purchaseOrder.po_number)}</title>
+                    <title>${escapeHtml(poTypeLabel)} ${escapeHtml(purchaseOrder.po_number)}</title>
                     <style>
                         @page { size: A4 portrait; margin: 10mm 9mm 12mm; }
                         * { box-sizing: border-box; }
@@ -226,7 +227,7 @@ export default function Show({ purchaseOrder, company = null }) {
                         </div>
                         <div class="rule"></div>
 
-                        <h1 class="title">PURCHASE ORDER</h1>
+                        <h1 class="title">${purchaseOrder.po_type === 'precursor' ? 'SURAT PESANAN PREKURSOR' : purchaseOrder.po_type === 'oot' ? 'PURCHASE ORDER OOT' : purchaseOrder.po_type === 'alkes' ? 'PURCHASE ORDER ALKES' : 'PURCHASE ORDER'}</h1>
 
                         <section class="meta">
                             <div>
@@ -235,6 +236,7 @@ export default function Show({ purchaseOrder, company = null }) {
                                 <div>${escapeHtml(vendorAddress || 'di Tempat')}</div>
                             </div>
                             <div>
+                                <div><span class="label">Jenis</span>: ${escapeHtml(poTypeLabel)}</div>
                                 <div><span class="label">Nomor</span>: ${escapeHtml(purchaseOrder.po_number)}</div>
                                 <div><span class="label">Tanggal</span>: ${escapeHtml(formatDisplayDate(purchaseOrder.po_date))}</div>
                             </div>
@@ -305,7 +307,7 @@ export default function Show({ purchaseOrder, company = null }) {
     return (
         <>
             <Head title={`PO ${purchaseOrder.po_number}`} />
-            <Card title={`Purchase Order ${purchaseOrder.po_number}`}>
+            <Card title={`${poTypeLabel} ${purchaseOrder.po_number}`}>
                 <div className='mb-4 flex flex-wrap items-center gap-2'>
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${approvalStatusClass}`}>Approval: {poStatus}</span>
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${fulfillmentStatusClass}`}>Receiving: {fulfillmentLabel}</span>
