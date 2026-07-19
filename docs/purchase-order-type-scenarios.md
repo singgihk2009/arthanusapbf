@@ -27,6 +27,6 @@ Struktur header `purchase_orders` + detail `purchase_order_items` tetap mencukup
 
 ## Rekomendasi lanjutan
 
-- Tambahkan master signer/employee per jenis PO jika nama, SIPA/SIPTTK, atau jabatan harus dicetak otomatis.
-- Tambahkan field khusus prekursor/OOT bila regulasi internal membutuhkan zat aktif, bentuk/kekuatan sediaan, tujuan penggunaan, atau alamat gudang yang terstruktur per baris.
-- Jadikan template cetak sebagai komponen terpisah per jenis agar perubahan layout tidak saling memengaruhi.
+- Master signer/employee per jenis PO sudah disiapkan melalui `purchase_order_signers` dan dapat ditautkan ke header PO memakai `signer_profile_id`.
+- Field khusus prekursor/OOT sudah disiapkan: `usage_purpose`, `warehouse_address`, serta line `active_ingredient`, `dosage_form_strength`, dan `regulatory_note`.
+- Konfigurasi template cetak sudah dipisahkan ke modul `PrintTemplates` agar judul/label/signature per jenis dapat diubah tanpa mengubah seluruh halaman detail.
