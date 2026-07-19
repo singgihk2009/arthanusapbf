@@ -1,11 +1,178 @@
 <?php
+
 namespace App\Http\Controllers\Apps\HumanResource;
-use App\Http\Controllers\Controller;use App\Models\{Department,Employee,Position,User,EmployeeLicense};use Illuminate\Http\Request;use Illuminate\Support\Facades\Hash;use Inertia\Inertia;use Carbon\Carbon;
-class EmployeeController extends Controller { /* trimmed for brevity */
- public function index(Request $r){$cid=(int)($r->user()->company_id??1);$q=Employee::with(['department','position','licenses'])->where('company_id',$cid); if($s=$r->get('search')){$q->where(fn($w)=>$w->where('full_name','like',"%$s%")->orWhere('nik','like',"%$s%")->orWhere('employee_code','like',"%$s%"));} if($r->filled('department_id'))$q->where('department_id',$r->department_id); if($r->filled('position_id'))$q->where('position_id',$r->position_id); if($r->filled('status'))$q->where('is_active',$r->status==='active'); return Inertia::render('HumanResource/Employees/Index',['employees'=>$q->latest()->paginate(10)->withQueryString(),'departments'=>Department::where('company_id',$cid)->get(),'positions'=>Position::where('company_id',$cid)->get(),'filters'=>$r->only(['search','department_id','position_id','status']),'stats'=>['total'=>Employee::where('company_id',$cid)->count(),'active'=>Employee::where('company_id',$cid)->where('is_active',1)->count(),'expiring_soon'=>EmployeeLicense::where('company_id',$cid)->whereBetween('expired_date',[now(),now()->addDays(90)])->count(),'expired'=>EmployeeLicense::where('company_id',$cid)->whereDate('expired_date','<',now())->count()]]);}
- public function create(Request $r){$cid=(int)($r->user()->company_id??1);return Inertia::render('HumanResource/Employees/Create',['departments'=>Department::where('company_id',$cid)->get(),'positions'=>Position::where('company_id',$cid)->get()]);}
- public function store(Request $r){$cid=(int)($r->user()->company_id??1);$data=$r->validate(['employee_code'=>"required|max:100|unique:employees,employee_code,NULL,id,company_id,$cid",'nik'=>"nullable|max:100|unique:employees,nik,NULL,id,company_id,$cid",'full_name'=>'required|max:255','email'=>'nullable|email','phone'=>'nullable|max:30','department_id'=>'nullable|exists:departments,id','position_id'=>'nullable|exists:positions,id','employment_status'=>'nullable|max:100','is_active'=>'boolean','create_login'=>'nullable|boolean','login_email'=>'nullable|email|unique:users,email','login_password'=>'nullable|min:6']);$data['company_id']=$cid;$emp=Employee::create($data);if($r->boolean('create_login')) User::create(['name'=>$emp->full_name,'email'=>$r->login_email,'password'=>Hash::make($r->login_password ?? 'password123'),'company_id'=>$cid,'employee_id'=>$emp->id]);return redirect()->route('apps.human-resource.employees.show',$emp)->with('success','Employee created');}
- public function show(Request $r, Employee $employee){$cid=(int)($r->user()->company_id??1);abort_unless((int)$employee->company_id===$cid,404);$today=Carbon::today();$expiringLimit=Carbon::today()->addDays(90);$employee->load(['department','position','licenses.licenseType','user.roles']);$licenses=collect($employee->licenses)->map(function($license) use ($today,$expiringLimit){$status=strtolower((string)($license->status ?? ''));if(in_array($status,['suspended','revoked'],true)){$computed=$status;}else{$expiredDate=$license->expired_date ? Carbon::parse($license->expired_date) : null;if($expiredDate && $expiredDate->lt($today)){$computed='expired';}elseif($expiredDate && $expiredDate->lte($expiringLimit)){$computed='expiring_soon';}else{$computed='active';}}$license->setAttribute('computed_status',$computed);return $license;});$primaryLicense=$licenses->first(fn($l)=>(bool)$l->is_primary) ?? $licenses->first();$summary=['total_licenses'=>$licenses->count(),'active_licenses'=>$licenses->where('computed_status','active')->count(),'expiring_soon_licenses'=>$licenses->where('computed_status','expiring_soon')->count(),'expired_licenses'=>$licenses->where('computed_status','expired')->count(),'has_login_account'=>$employee->user!==null,'primary_license'=>$primaryLicense,];return Inertia::render('HumanResource/Employees/Show',['employee'=>$employee,'summary'=>$summary]);}
- public function edit(Request $r, Employee $employee){$cid=(int)($r->user()->company_id??1);abort_unless((int)$employee->company_id===$cid,404);return Inertia::render('HumanResource/Employees/Edit',['employee'=>$employee->load('user'),'departments'=>Department::where('company_id',$cid)->get(),'positions'=>Position::where('company_id',$cid)->get()]);}
- public function update(Request $r, Employee $employee){$cid=(int)($r->user()->company_id??1);abort_unless((int)$employee->company_id===$cid,404);$data=$r->validate(['employee_code'=>"required|max:100|unique:employees,employee_code,$employee->id,id,company_id,$cid",'nik'=>"nullable|max:100|unique:employees,nik,$employee->id,id,company_id,$cid",'full_name'=>'required|max:255','email'=>'nullable|email','phone'=>'nullable|max:30','department_id'=>'nullable|exists:departments,id','position_id'=>'nullable|exists:positions,id','employment_status'=>'nullable|max:100','is_active'=>'boolean']);$employee->update($data);return back()->with('success','Employee updated');}
- public function destroy(Request $r, Employee $employee){abort_unless((int)$employee->company_id===(int)($r->user()->company_id??1),404);$employee->update(['is_active'=>false]);return back()->with('success','Employee deactivated');}}
+
+use App\Http\Controllers\Controller;
+use App\Models\Department;
+use App\Models\Employee;
+use App\Models\EmployeeLicense;
+use App\Models\Position;
+use App\Models\Procurement\PurchaseOrder;
+use App\Models\Procurement\PurchaseOrderSigner;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Inertia\Inertia;
+
+class EmployeeController extends Controller
+{
+    public function index(Request $request)
+    {
+        $companyId = (int) ($request->user()->company_id ?? 1);
+        $query = Employee::with(['department', 'position', 'licenses'])->where('company_id', $companyId);
+
+        if ($search = $request->get('search')) {
+            $query->where(fn ($q) => $q->where('full_name', 'like', "%{$search}%")
+                ->orWhere('nik', 'like', "%{$search}%")
+                ->orWhere('employee_code', 'like', "%{$search}%"));
+        }
+        if ($request->filled('department_id')) $query->where('department_id', $request->department_id);
+        if ($request->filled('position_id')) $query->where('position_id', $request->position_id);
+        if ($request->filled('status')) $query->where('is_active', $request->status === 'active');
+
+        return Inertia::render('HumanResource/Employees/Index', [
+            'employees' => $query->latest()->paginate(10)->withQueryString(),
+            'departments' => Department::where('company_id', $companyId)->get(),
+            'positions' => Position::where('company_id', $companyId)->get(),
+            'filters' => $request->only(['search', 'department_id', 'position_id', 'status']),
+            'stats' => [
+                'total' => Employee::where('company_id', $companyId)->count(),
+                'active' => Employee::where('company_id', $companyId)->where('is_active', 1)->count(),
+                'expiring_soon' => EmployeeLicense::where('company_id', $companyId)->whereBetween('expired_date', [now(), now()->addDays(90)])->count(),
+                'expired' => EmployeeLicense::where('company_id', $companyId)->whereDate('expired_date', '<', now())->count(),
+            ],
+        ]);
+    }
+
+    public function create(Request $request)
+    {
+        $companyId = (int) ($request->user()->company_id ?? 1);
+
+        return Inertia::render('HumanResource/Employees/Create', [
+            'departments' => Department::where('company_id', $companyId)->orderBy('name')->get(),
+            'positions' => Position::where('company_id', $companyId)->orderBy('name')->get(),
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $companyId = (int) ($request->user()->company_id ?? 1);
+        $data = $this->validateEmployee($request, $companyId);
+        $data['company_id'] = $companyId;
+        $employee = Employee::create($data);
+
+        if ($request->boolean('create_login')) {
+            User::create([
+                'name' => $employee->full_name,
+                'email' => $request->login_email,
+                'password' => Hash::make($request->login_password ?? 'password123'),
+                'company_id' => $companyId,
+                'employee_id' => $employee->id,
+            ]);
+        }
+
+        return redirect()->route('apps.human-resource.employees.show', $employee)->with('success', 'Employee created');
+    }
+
+    public function show(Request $request, Employee $employee)
+    {
+        $companyId = (int) ($request->user()->company_id ?? 1);
+        abort_unless((int) $employee->company_id === $companyId, 404);
+
+        $today = Carbon::today();
+        $expiringLimit = Carbon::today()->addDays(90);
+        $employee->load(['department', 'position', 'licenses.licenseType', 'user.roles']);
+        $licenses = collect($employee->licenses)->map(function ($license) use ($today, $expiringLimit) {
+            $status = strtolower((string) ($license->status ?? ''));
+            if (in_array($status, ['suspended', 'revoked'], true)) {
+                $computed = $status;
+            } else {
+                $expiredDate = $license->expired_date ? Carbon::parse($license->expired_date) : null;
+                if ($expiredDate && $expiredDate->lt($today)) $computed = 'expired';
+                elseif ($expiredDate && $expiredDate->lte($expiringLimit)) $computed = 'expiring_soon';
+                else $computed = 'active';
+            }
+            $license->setAttribute('computed_status', $computed);
+
+            return $license;
+        });
+        $primaryLicense = $licenses->first(fn ($license) => (bool) $license->is_primary) ?? $licenses->first();
+        $signerProfiles = PurchaseOrderSigner::query()
+            ->where(function ($q) use ($employee) {
+                $q->where('requester_employee_id', $employee->id)
+                    ->orWhere('approver_employee_id', $employee->id);
+            })
+            ->orderBy('po_type')
+            ->get();
+
+        return Inertia::render('HumanResource/Employees/Show', [
+            'employee' => $employee,
+            'summary' => [
+                'total_licenses' => $licenses->count(),
+                'active_licenses' => $licenses->where('computed_status', 'active')->count(),
+                'expiring_soon_licenses' => $licenses->where('computed_status', 'expiring_soon')->count(),
+                'expired_licenses' => $licenses->where('computed_status', 'expired')->count(),
+                'has_login_account' => $employee->user !== null,
+                'primary_license' => $primaryLicense,
+                'signer_profile_count' => $signerProfiles->count(),
+            ],
+            'signerProfiles' => $signerProfiles,
+            'poTypes' => PurchaseOrder::TYPE_LABELS,
+        ]);
+    }
+
+    public function edit(Request $request, Employee $employee)
+    {
+        $companyId = (int) ($request->user()->company_id ?? 1);
+        abort_unless((int) $employee->company_id === $companyId, 404);
+
+        return Inertia::render('HumanResource/Employees/Edit', [
+            'employee' => $employee->load(['user', 'department', 'position']),
+            'departments' => Department::where('company_id', $companyId)->orderBy('name')->get(),
+            'positions' => Position::where('company_id', $companyId)->orderBy('name')->get(),
+        ]);
+    }
+
+    public function update(Request $request, Employee $employee)
+    {
+        $companyId = (int) ($request->user()->company_id ?? 1);
+        abort_unless((int) $employee->company_id === $companyId, 404);
+        $employee->update($this->validateEmployee($request, $companyId, $employee));
+
+        return redirect()->route('apps.human-resource.employees.show', $employee)->with('success', 'Employee updated');
+    }
+
+    public function destroy(Request $request, Employee $employee)
+    {
+        abort_unless((int) $employee->company_id === (int) ($request->user()->company_id ?? 1), 404);
+        $employee->update(['is_active' => false]);
+
+        return back()->with('success', 'Employee deactivated');
+    }
+
+    private function validateEmployee(Request $request, int $companyId, ?Employee $employee = null): array
+    {
+        $employeeId = $employee?->id ?? 'NULL';
+
+        return $request->validate([
+            'employee_code' => "required|max:100|unique:employees,employee_code,{$employeeId},id,company_id,{$companyId}",
+            'nik' => "nullable|max:100|unique:employees,nik,{$employeeId},id,company_id,{$companyId}",
+            'full_name' => ['required', 'max:255'],
+            'gender' => ['nullable', 'max:20'],
+            'birth_place' => ['nullable', 'max:255'],
+            'birth_date' => ['nullable', 'date'],
+            'email' => ['nullable', 'email'],
+            'phone' => ['nullable', 'max:30'],
+            'address' => ['nullable', 'string'],
+            'department_id' => ['nullable', 'exists:departments,id'],
+            'position_id' => ['nullable', 'exists:positions,id'],
+            'join_date' => ['nullable', 'date'],
+            'employment_status' => ['nullable', 'max:100'],
+            'is_active' => ['nullable', 'boolean'],
+            'create_login' => ['nullable', 'boolean'],
+            'login_email' => ['nullable', 'email', 'unique:users,email'],
+            'login_password' => ['nullable', 'min:6'],
+        ]);
+    }
+}

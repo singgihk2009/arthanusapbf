@@ -19,6 +19,8 @@ const FULFILLMENT_STATUS_STYLES = {
     closed: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
 };
 
+const formatPoType = (type) => ({ regular: 'PO Reguler', precursor: 'PO Prekursor', oot: 'PO OOT', alkes: 'PO Alkes' }[type] || type || '-');
+
 const formatFulfillmentStatus = (status) => ({ not_received: 'Not Received', partially_received: 'Partial Receipt', fully_received: 'Fully Received', closed: 'Closed' }[status] || status || '-');
 
 const toRows = (purchaseOrders) => {
@@ -89,6 +91,7 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
                         <Table.Th className={compact ? 'text-xs' : ''}>Approve</Table.Th>
                         <Table.Th className={compact ? 'text-xs' : ''}>PO Number</Table.Th>
                         {showVendor && <Table.Th className={compact ? 'text-xs' : ''}>Vendor</Table.Th>}
+                        <Table.Th className={compact ? 'text-xs' : ''}>Jenis</Table.Th>
                         <Table.Th className={compact ? 'text-xs' : ''}>PO Date</Table.Th>
                         <Table.Th className={compact ? 'text-xs' : ''}>Expected Date</Table.Th>
                         <Table.Th className={compact ? 'text-xs' : ''}>Grand Total</Table.Th>
@@ -99,7 +102,7 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
                 </Table.Thead>
                 <Table.Tbody>
                     {loading ? (
-                        <tr><Table.Td colSpan={showVendor ? 9 : 8}>Loading...</Table.Td></tr>
+                        <tr><Table.Td colSpan={showVendor ? 10 : 9}>Loading...</Table.Td></tr>
                     ) : rows.length ? rows.map((po) => {
                         const status = String(po.status ?? '').toLowerCase();
                         const fulfillmentStatus = String(po.fulfillment_status ?? 'not_received').toLowerCase();
@@ -115,6 +118,7 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
                                 <Table.Td className={compact ? 'p-3 text-xs' : ''}>{isDraft ? <input type='checkbox' checked={selectedIds.includes(po.id)} onChange={() => toggleDraftSelection(po.id)} /> : '-'}</Table.Td>
                                 <Table.Td className={compact ? 'p-3 text-xs' : ''}>{po.po_number ?? po.number ?? '-'}</Table.Td>
                                 {showVendor && <Table.Td className={compact ? 'p-3 text-xs' : ''}>{po.vendor_id ? <Link href={`/apps/procurement/vendors/${po.vendor_id}?tab=overview`} className='text-indigo-600 hover:underline'>{vendorName}</Link> : vendorName}</Table.Td>}
+                                <Table.Td className={compact ? 'p-3 text-xs' : ''}>{formatPoType(po.po_type)}</Table.Td>
                                 <Table.Td className={compact ? 'p-3 text-xs' : ''}>{formatDate(po?.po_date ?? po?.document_date)}</Table.Td>
                                 <Table.Td className={compact ? 'p-3 text-xs' : ''}>{formatDate(po.expected_delivery_date ?? po.expected_date)}</Table.Td>
                                 <Table.Td className={compact ? 'p-3 text-xs' : ''}>{formatCurrency(po.grand_total)}</Table.Td>
@@ -130,7 +134,7 @@ export default function PurchaseOrderTable({ purchaseOrders, showVendor = true, 
                                 </Table.Td>
                             </tr>
                         );
-                    }) : <Table.Empty colSpan={showVendor ? 9 : 8} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>{emptyMessage}</span></>} />}
+                    }) : <Table.Empty colSpan={showVendor ? 10 : 9} message={<><IconDatabaseOff size={24} strokeWidth={1.5} className='mx-auto mb-2 text-gray-500 dark:text-white' /><span className='text-gray-500'>{emptyMessage}</span></>} />}
                 </Table.Tbody>
             </Table>
         </div>

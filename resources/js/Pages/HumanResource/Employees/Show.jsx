@@ -39,7 +39,7 @@ const getEmployeeStatusBadgeClass = (isActive) => (
 const toLabel = (value) => safeValue(value, '-').toString().replaceAll('_', ' ').replace(/\b\w/g, (s) => s.toUpperCase());
 
 export default function Show() {
-    const { employee, summary } = usePage().props;
+    const { employee, summary, signerProfiles = [], poTypes = {} } = usePage().props;
     const [activeTab, setActiveTab] = useState('overview');
 
     const licenses = employee.licenses || [];
@@ -48,6 +48,7 @@ export default function Show() {
         ['licenses', 'Licenses & Certifications'],
         ['documents', 'Documents'],
         ['login', 'Login Account'],
+        ['signers', 'PO Signers'],
         ['activity', 'Activity'],
     ];
 
@@ -116,7 +117,7 @@ export default function Show() {
                 {[['Basic Information', [['Employee Code', employee.employee_code], ['Full Name', employee.full_name], ['NIK', employee.nik], ['Gender', employee.gender], ['Birth Place', employee.birth_place], ['Birth Date', formatDate(employee.birth_date)]]],
                     ['Employment Information', [['Department', employee.department?.name], ['Position', employee.position?.name], ['Join Date', formatDate(employee.join_date)], ['Employment Status', employee.employment_status], ['Warehouse', employee.warehouse?.name ?? employee.warehouse_name], ['Company', employee.company?.name ?? employee.company_name]]],
                     ['Contact Information', [['Email', employee.email], ['Phone', employee.phone], ['Address', employee.address]]],
-                    ['Document Signature Profile', [['Signature Status', employee.signature_path ? 'Available' : 'Not Available'], ['Name for Document', employee.signature_name ?? employee.full_name], ['Position for Document', employee.signature_position ?? employee.position?.name], ['Primary License Number', summary?.primary_license?.license_number]]],
+                    ['Document Signature Profile', [['Signature Status', employee.signature_path ? 'Available' : 'Not Available'], ['Name for Document', employee.signature_name ?? employee.full_name], ['Position for Document', employee.signature_position ?? employee.position?.name], ['Primary License Number', summary?.primary_license?.license_number], ['Linked PO Signer Profiles', summary?.signer_profile_count ?? 0]]],
                 ].map(([title, rows]) => <div key={title} className='rounded-xl border border-gray-200 bg-white p-4 shadow-sm'>
                     <h2 className='text-sm font-semibold uppercase tracking-wide text-gray-500'>{title}</h2>
                     <div className='mt-3 space-y-2'>
@@ -170,6 +171,28 @@ export default function Show() {
                     <div><span className='text-gray-500'>Last Login:</span> <span className='font-medium text-gray-900'>{formatDate(employee.user?.last_login_at)}</span></div>
                 </div>
                 {!employee.user && <button type='button' disabled className='cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400'>Create / Link User Login</button>}
+            </div>}
+
+
+            {activeTab === 'signers' && <div className='rounded-xl border border-gray-200 bg-white p-4 shadow-sm'>
+                <div className='mb-3 flex items-start justify-between gap-3'>
+                    <div>
+                        <h2 className='text-lg font-semibold text-gray-900'>PO Signer Profiles</h2>
+                        <p className='text-sm text-gray-500'>Employee ini dapat dipakai sebagai penanda tangan PO bila tercantum sebagai requester atau approver di master purchase_order_signers.</p>
+                    </div>
+                </div>
+                {signerProfiles.length === 0 ? <div className='rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500'>Belum terhubung ke signer profile PO. Buat profile signer untuk jenis PO terkait dan pilih employee ini sebagai requester/approver.</div> : <div className='overflow-x-auto'>
+                    <table className='min-w-full text-sm'>
+                        <thead><tr className='border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500'><th className='px-3 py-2'>Jenis PO</th><th className='px-3 py-2'>Role</th><th className='px-3 py-2'>Nama Cetak</th><th className='px-3 py-2'>Jabatan Cetak</th><th className='px-3 py-2'>No Lisensi</th><th className='px-3 py-2'>Status</th></tr></thead>
+                        <tbody>{signerProfiles.map((profile) => {
+                            const role = profile.requester_employee_id === employee.id ? 'Requester / Pemohon' : 'Approver / Persetujuan';
+                            const name = profile.requester_employee_id === employee.id ? profile.requester_name : profile.approver_name;
+                            const title = profile.requester_employee_id === employee.id ? profile.requester_title : profile.approver_title;
+                            const licenseNo = profile.requester_employee_id === employee.id ? profile.requester_license_no : profile.approver_license_no;
+                            return <tr key={profile.id} className='border-b border-gray-100'><td className='px-3 py-2'>{poTypes[profile.po_type] || profile.po_type}</td><td className='px-3 py-2'>{role}</td><td className='px-3 py-2'>{safeValue(name, employee.full_name)}</td><td className='px-3 py-2'>{safeValue(title, employee.position?.name)}</td><td className='px-3 py-2'>{safeValue(licenseNo)}</td><td className='px-3 py-2'>{profile.is_active ? 'Active' : 'Inactive'}</td></tr>;
+                        })}</tbody>
+                    </table>
+                </div>}
             </div>}
 
             {activeTab === 'activity' && <div className='rounded-xl border border-gray-200 bg-white p-4 shadow-sm'>
