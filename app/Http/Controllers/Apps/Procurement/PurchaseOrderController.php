@@ -11,6 +11,7 @@ use App\Models\Inventory\Warehouse;
 use App\Models\Inventory\FacilityScheme;
 use App\Models\Procurement\GoodsReceipt;
 use App\Models\Procurement\PurchaseOrder;
+use App\Models\Procurement\PurchaseOrderSigner;
 use App\Models\Procurement\Vendor;
 use App\Services\Inventory\FacilityReferenceValidationService;
 use Illuminate\Http\Request;
@@ -46,6 +47,7 @@ class PurchaseOrderController extends Controller
             'purchaseOrders' => $query->paginate(10)->withQueryString(),
             'filters' => $request->only(['status', 'search']),
             'statuses' => PurchaseOrder::STATUSES,
+            'poTypes' => PurchaseOrder::TYPE_LABELS,
         ]);
     }
 
@@ -59,6 +61,8 @@ class PurchaseOrderController extends Controller
             'returnTo' => $request->string('return_to')->toString(),
             'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('code')->get(['id','code','name','is_restricted','requires_reference_no']),
             'defaultFacilitySchemeId' => FacilityScheme::query()->where('code', 'REGULAR')->value('id'),
+            'poTypes' => PurchaseOrder::TYPE_LABELS,
+            'signerProfiles' => PurchaseOrderSigner::query()->where('is_active', true)->orderBy('po_type')->orderBy('requester_name')->get(),
             'documentTypes' => DocumentType::query()
                 ->where('is_active', true)
                 ->where(function ($query) {
@@ -79,14 +83,17 @@ class PurchaseOrderController extends Controller
             : null;
 
         $po = DB::transaction(function () use ($data, $request, $poDate, $expectedDeliveryDate, $documentVersioningService) {
-            $poNumber = $this->generateNumber();
+            $poNumber = $this->generateNumber($data['po_type'] ?? 'regular');
             $warehouseId = Warehouse::query()->value('id');
             $supplierId = $this->resolveSupplierId((int) $data['vendor_id']);
+            $signerProfileId = $this->resolveSignerProfileId($data['po_type'] ?? 'regular', $data['signer_profile_id'] ?? null);
 
             $po = PurchaseOrder::create([
                 'number' => $poNumber,
                 'po_number' => $poNumber,
                 'vendor_id' => $data['vendor_id'],
+                'po_type' => $data['po_type'] ?? 'regular',
+                'signer_profile_id' => $signerProfileId,
                 'supplier_id' => $supplierId,
                 'warehouse_id' => $warehouseId,
                 'document_date' => $poDate,
@@ -96,6 +103,8 @@ class PurchaseOrderController extends Controller
                 'status' => 'draft',
                 'fulfillment_status' => 'not_received',
                 'notes' => $data['notes'] ?? null,
+                'usage_purpose' => $data['usage_purpose'] ?? null,
+                'warehouse_address' => $data['warehouse_address'] ?? null,
                 'created_by' => $request->user()?->id,
             ]);
             $defaultFacilitySchemeId = (int) (FacilityScheme::query()->where('code', 'REGULAR')->value('id') ?? 0);
@@ -153,7 +162,7 @@ class PurchaseOrderController extends Controller
 
     public function show(PurchaseOrder $purchaseOrder)
     {
-        $purchaseOrder->load(['vendor:id,name,address,city,province,phone','items.product:id,name','items.uom:id,name']);
+        $purchaseOrder->load(['vendor:id,name,address,city,province,phone','items.product:id,name','items.uom:id,name','signerProfile.requesterEmployee.position','signerProfile.approverEmployee.position']);
         $purchaseOrderDocuments = Document::query()
             ->with('documentType:id,name,code')
             ->where('owner_type', 'purchase_order')
@@ -271,6 +280,8 @@ class PurchaseOrderController extends Controller
             'returnTo' => $request->string('return_to')->toString(),
             'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('code')->get(['id','code','name','is_restricted','requires_reference_no']),
             'defaultFacilitySchemeId' => FacilityScheme::query()->where('code', 'REGULAR')->value('id'),
+            'poTypes' => PurchaseOrder::TYPE_LABELS,
+            'signerProfiles' => PurchaseOrderSigner::query()->where('is_active', true)->orderBy('po_type')->orderBy('requester_name')->get(),
             'documentTypes' => DocumentType::query()
                 ->where('is_active', true)
                 ->where(function ($query) {
@@ -299,15 +310,26 @@ class PurchaseOrderController extends Controller
 
         DB::transaction(function () use ($purchaseOrder, $data, $poDate, $expectedDeliveryDate, $documentVersioningService) {
             $supplierId = $this->resolveSupplierId((int) $data['vendor_id']);
-            $purchaseOrder->update([
+            $poType = $data['po_type'] ?? 'regular';
+            $signerProfileId = $this->resolveSignerProfileId($poType, $data['signer_profile_id'] ?? null);
+            $headerPayload = [
                 'vendor_id' => $data['vendor_id'],
+                'po_type' => $poType,
+                'signer_profile_id' => $signerProfileId,
                 'supplier_id' => $supplierId,
                 'po_date' => $poDate,
                 'document_date' => $poDate,
                 'expected_delivery_date' => $expectedDeliveryDate,
                 'expected_date' => $expectedDeliveryDate,
                 'notes' => $data['notes'] ?? null,
-            ]);
+                'usage_purpose' => $data['usage_purpose'] ?? null,
+                'warehouse_address' => $data['warehouse_address'] ?? null,
+            ];
+            if ($poType !== ($purchaseOrder->po_type ?? 'regular')) {
+                $headerPayload['number'] = $this->generateNumber($poType);
+                $headerPayload['po_number'] = $headerPayload['number'];
+            }
+            $purchaseOrder->update($headerPayload);
             $purchaseOrder->items()->delete();
             $defaultFacilitySchemeId = (int) (FacilityScheme::query()->where('code', 'REGULAR')->value('id') ?? 0);
             $supportsFacilityScheme = $this->purchaseOrderItemHasFacilitySchemeColumn();
@@ -382,12 +404,19 @@ class PurchaseOrderController extends Controller
     {
         return $request->validate([
             'vendor_id' => ['required','exists:vendors,id'],
+            'po_type' => ['required', 'in:'.implode(',', PurchaseOrder::TYPES)],
             'po_date' => ['required','date'],
             'expected_delivery_date' => ['nullable','date'],
             'notes' => ['nullable','string'],
+            'signer_profile_id' => ['nullable', 'exists:purchase_order_signers,id'],
+            'usage_purpose' => ['nullable', 'string', 'max:255'],
+            'warehouse_address' => ['nullable', 'string'],
             'items' => ['required','array','min:1'],
             'items.*.product_id' => ['nullable','exists:items,id'],
             'items.*.product_name' => ['nullable','string'],
+            'items.*.active_ingredient' => ['nullable','string','max:255'],
+            'items.*.dosage_form_strength' => ['nullable','string','max:255'],
+            'items.*.regulatory_note' => ['nullable','string'],
             'items.*.uom_id' => ['nullable','exists:uoms,id'],
             'items.*.qty_ordered' => ['required','numeric','gt:0'],
             'items.*.unit_price' => ['required','numeric','min:0'],
@@ -450,9 +479,9 @@ class PurchaseOrderController extends Controller
         return $columns;
     }
 
-    private function generateNumber(): string
+    private function generateNumber(string $poType = 'regular'): string
     {
-        $prefix = 'PO-'.now()->format('Ym').'-';
+        $prefix = $this->numberPrefix($poType).now()->format('Ym').'-';
         $last = PurchaseOrder::withTrashed()
             ->where('po_number', 'like', $prefix.'%')
             ->orderByDesc('po_number')
@@ -467,6 +496,29 @@ class PurchaseOrderController extends Controller
         } while ($exists);
 
         return $number;
+    }
+
+    private function resolveSignerProfileId(string $poType, mixed $requestedSignerProfileId = null): ?int
+    {
+        if ($requestedSignerProfileId) {
+            return (int) $requestedSignerProfileId;
+        }
+
+        return PurchaseOrderSigner::query()
+            ->where('po_type', $poType)
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->value('id');
+    }
+
+    private function numberPrefix(string $poType): string
+    {
+        return match ($poType) {
+            'precursor' => 'POMedPre-',
+            'oot' => 'POMedOOT-',
+            'alkes' => 'POAlk-',
+            default => 'POMed-',
+        };
     }
 
     private function resolveSupplierId(int $vendorId): int
