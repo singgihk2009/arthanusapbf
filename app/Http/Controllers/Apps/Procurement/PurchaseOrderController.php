@@ -46,6 +46,7 @@ class PurchaseOrderController extends Controller
             'purchaseOrders' => $query->paginate(10)->withQueryString(),
             'filters' => $request->only(['status', 'search']),
             'statuses' => PurchaseOrder::STATUSES,
+            'poTypes' => PurchaseOrder::TYPE_LABELS,
         ]);
     }
 
@@ -59,6 +60,7 @@ class PurchaseOrderController extends Controller
             'returnTo' => $request->string('return_to')->toString(),
             'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('code')->get(['id','code','name','is_restricted','requires_reference_no']),
             'defaultFacilitySchemeId' => FacilityScheme::query()->where('code', 'REGULAR')->value('id'),
+            'poTypes' => PurchaseOrder::TYPE_LABELS,
             'documentTypes' => DocumentType::query()
                 ->where('is_active', true)
                 ->where(function ($query) {
@@ -79,7 +81,7 @@ class PurchaseOrderController extends Controller
             : null;
 
         $po = DB::transaction(function () use ($data, $request, $poDate, $expectedDeliveryDate, $documentVersioningService) {
-            $poNumber = $this->generateNumber();
+            $poNumber = $this->generateNumber($data['po_type'] ?? 'regular');
             $warehouseId = Warehouse::query()->value('id');
             $supplierId = $this->resolveSupplierId((int) $data['vendor_id']);
 
@@ -87,6 +89,7 @@ class PurchaseOrderController extends Controller
                 'number' => $poNumber,
                 'po_number' => $poNumber,
                 'vendor_id' => $data['vendor_id'],
+                'po_type' => $data['po_type'] ?? 'regular',
                 'supplier_id' => $supplierId,
                 'warehouse_id' => $warehouseId,
                 'document_date' => $poDate,
@@ -271,6 +274,7 @@ class PurchaseOrderController extends Controller
             'returnTo' => $request->string('return_to')->toString(),
             'facilitySchemes' => FacilityScheme::query()->where('is_active', true)->orderBy('code')->get(['id','code','name','is_restricted','requires_reference_no']),
             'defaultFacilitySchemeId' => FacilityScheme::query()->where('code', 'REGULAR')->value('id'),
+            'poTypes' => PurchaseOrder::TYPE_LABELS,
             'documentTypes' => DocumentType::query()
                 ->where('is_active', true)
                 ->where(function ($query) {
@@ -299,15 +303,22 @@ class PurchaseOrderController extends Controller
 
         DB::transaction(function () use ($purchaseOrder, $data, $poDate, $expectedDeliveryDate, $documentVersioningService) {
             $supplierId = $this->resolveSupplierId((int) $data['vendor_id']);
-            $purchaseOrder->update([
+            $poType = $data['po_type'] ?? 'regular';
+            $headerPayload = [
                 'vendor_id' => $data['vendor_id'],
+                'po_type' => $poType,
                 'supplier_id' => $supplierId,
                 'po_date' => $poDate,
                 'document_date' => $poDate,
                 'expected_delivery_date' => $expectedDeliveryDate,
                 'expected_date' => $expectedDeliveryDate,
                 'notes' => $data['notes'] ?? null,
-            ]);
+            ];
+            if ($poType !== ($purchaseOrder->po_type ?? 'regular')) {
+                $headerPayload['number'] = $this->generateNumber($poType);
+                $headerPayload['po_number'] = $headerPayload['number'];
+            }
+            $purchaseOrder->update($headerPayload);
             $purchaseOrder->items()->delete();
             $defaultFacilitySchemeId = (int) (FacilityScheme::query()->where('code', 'REGULAR')->value('id') ?? 0);
             $supportsFacilityScheme = $this->purchaseOrderItemHasFacilitySchemeColumn();
@@ -382,6 +393,7 @@ class PurchaseOrderController extends Controller
     {
         return $request->validate([
             'vendor_id' => ['required','exists:vendors,id'],
+            'po_type' => ['required', 'in:'.implode(',', PurchaseOrder::TYPES)],
             'po_date' => ['required','date'],
             'expected_delivery_date' => ['nullable','date'],
             'notes' => ['nullable','string'],
@@ -450,9 +462,9 @@ class PurchaseOrderController extends Controller
         return $columns;
     }
 
-    private function generateNumber(): string
+    private function generateNumber(string $poType = 'regular'): string
     {
-        $prefix = 'PO-'.now()->format('Ym').'-';
+        $prefix = $this->numberPrefix($poType).now()->format('Ym').'-';
         $last = PurchaseOrder::withTrashed()
             ->where('po_number', 'like', $prefix.'%')
             ->orderByDesc('po_number')
@@ -467,6 +479,16 @@ class PurchaseOrderController extends Controller
         } while ($exists);
 
         return $number;
+    }
+
+    private function numberPrefix(string $poType): string
+    {
+        return match ($poType) {
+            'precursor' => 'POMedPre-',
+            'oot' => 'POMedOOT-',
+            'alkes' => 'POAlk-',
+            default => 'POMed-',
+        };
     }
 
     private function resolveSupplierId(int $vendorId): int

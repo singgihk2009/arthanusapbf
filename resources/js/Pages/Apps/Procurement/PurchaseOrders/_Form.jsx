@@ -36,7 +36,7 @@ const toDateInputValue = (value) => {
 
 const emptyDocument = () => ({ document_type_id: '', title: '', document_number: '', file: null });
 
-export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], facilitySchemes = [], documentTypes = [], uploadedDocuments = [], defaultFacilitySchemeId = '', defaultVendorId = null, returnTo = '' }) {
+export default function Form({ purchaseOrder = null, vendors = [], products = [], uoms = [], facilitySchemes = [], poTypes = {}, documentTypes = [], uploadedDocuments = [], defaultFacilitySchemeId = '', defaultVendorId = null, returnTo = '' }) {
     const [notice, setNotice] = useState(null);
     const isEdit = !!purchaseOrder;
     const initialHeaderFacilitySchemeId = normalizeFacilityId(
@@ -48,6 +48,7 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
         : [emptyItem(String(initialHeaderFacilitySchemeId || defaultFacilitySchemeId || ''))];
     const { data, setData, post, transform, processing, errors, isDirty } = useForm({
         vendor_id: purchaseOrder?.vendor_id || defaultVendorId || '',
+        po_type: purchaseOrder?.po_type || 'regular',
         po_date: toDateInputValue(purchaseOrder?.po_date),
         expected_delivery_date: toDateInputValue(purchaseOrder?.expected_delivery_date),
         notes: purchaseOrder?.notes || '',
@@ -127,6 +128,7 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
             {notice && <div className={`mb-3 rounded border px-3 py-2 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{notice.text}</div>}
             <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Vendor</label><select value={data.vendor_id} onChange={(e) => setData('vendor_id', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300'><option value=''>-</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select>{errors.vendor_id && <small className='text-xs text-red-500'>{errors.vendor_id}</small>}</div>
+                <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Jenis PO</label><select value={data.po_type} onChange={(e) => setData('po_type', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300'>{Object.entries(poTypes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{errors.po_type && <small className='text-xs text-red-500'>{errors.po_type}</small>}</div>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>PO Date</label><input type='date' value={data.po_date} onChange={(e) => setData('po_date', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' />{errors.po_date && <small className='text-xs text-red-500'>{errors.po_date}</small>}</div>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Expected Date</label><input type='date' value={data.expected_delivery_date} onChange={(e) => setData('expected_delivery_date', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' /></div>
                 <div className='flex flex-col gap-2'><label className='text-sm text-gray-600'>Facility</label><select value={data.facility_scheme_id} onChange={(e) => setData('facility_scheme_id', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700'><option value=''>-</option>{facilitySchemes.map((f)=><option key={f.id} value={f.id}>{f.code} - {f.name}</option>)}</select></div>
