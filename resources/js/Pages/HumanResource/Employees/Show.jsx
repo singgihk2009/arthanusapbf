@@ -1,5 +1,5 @@
 import AppLayout from '@/Layouts/AppLayout';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 const formatDate = (value) => {
@@ -41,6 +41,20 @@ const toLabel = (value) => safeValue(value, '-').toString().replaceAll('_', ' ')
 export default function Show() {
     const { employee, summary, signerProfiles = [], poTypes = {} } = usePage().props;
     const [activeTab, setActiveTab] = useState('overview');
+    const signerForm = useForm({
+        po_type: 'precursor',
+        role: 'requester',
+        print_name: employee.full_name || '',
+        print_title: employee.position?.name || '',
+        license_no: summary?.primary_license?.license_number || '',
+    });
+    const submitSignerProfile = (event) => {
+        event.preventDefault();
+        signerForm.post(route('apps.human-resource.employees.po-signers.store', employee.id), {
+            preserveScroll: true,
+            onSuccess: () => signerForm.reset('license_no'),
+        });
+    };
 
     const licenses = employee.licenses || [];
     const tabs = [
@@ -181,7 +195,37 @@ export default function Show() {
                         <p className='text-sm text-gray-500'>Employee ini dapat dipakai sebagai penanda tangan PO bila tercantum sebagai requester atau approver di master purchase_order_signers.</p>
                     </div>
                 </div>
-                {signerProfiles.length === 0 ? <div className='rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500'>Belum terhubung ke signer profile PO. Buat profile signer untuk jenis PO terkait dan pilih employee ini sebagai requester/approver.</div> : <div className='overflow-x-auto'>
+                <form onSubmit={submitSignerProfile} className='mb-4 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 md:grid-cols-6'>
+                    <div>
+                        <label className='mb-1 block text-xs font-semibold text-gray-500'>Jenis PO</label>
+                        <select value={signerForm.data.po_type} onChange={(e) => signerForm.setData('po_type', e.target.value)} className='w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-sm'>
+                            {Object.entries(poTypes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className='mb-1 block text-xs font-semibold text-gray-500'>Role Signer</label>
+                        <select value={signerForm.data.role} onChange={(e) => signerForm.setData('role', e.target.value)} className='w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-sm'>
+                            <option value='requester'>Requester / Pemohon</option>
+                            <option value='approver'>Approver / Persetujuan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className='mb-1 block text-xs font-semibold text-gray-500'>Nama Cetak</label>
+                        <input value={signerForm.data.print_name} onChange={(e) => signerForm.setData('print_name', e.target.value)} className='w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-sm' />
+                    </div>
+                    <div>
+                        <label className='mb-1 block text-xs font-semibold text-gray-500'>Jabatan Cetak</label>
+                        <input value={signerForm.data.print_title} onChange={(e) => signerForm.setData('print_title', e.target.value)} className='w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-sm' />
+                    </div>
+                    <div>
+                        <label className='mb-1 block text-xs font-semibold text-gray-500'>No Lisensi/SIPA</label>
+                        <input value={signerForm.data.license_no} onChange={(e) => signerForm.setData('license_no', e.target.value)} className='w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-sm' />
+                    </div>
+                    <div className='flex items-end'>
+                        <button type='submit' disabled={signerForm.processing} className='w-full rounded-lg border border-blue-500 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60'>Link Signer</button>
+                    </div>
+                </form>
+                {signerProfiles.length === 0 ? <div className='rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500'>Belum terhubung ke signer profile PO. Isi form di atas untuk membuat signer profile dan menghubungkan employee ini ke dokumen PO.</div> : <div className='overflow-x-auto'>
                     <table className='min-w-full text-sm'>
                         <thead><tr className='border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500'><th className='px-3 py-2'>Jenis PO</th><th className='px-3 py-2'>Role</th><th className='px-3 py-2'>Nama Cetak</th><th className='px-3 py-2'>Jabatan Cetak</th><th className='px-3 py-2'>No Lisensi</th><th className='px-3 py-2'>Status</th></tr></thead>
                         <tbody>{signerProfiles.map((profile) => {

@@ -122,6 +122,45 @@ class EmployeeController extends Controller
         ]);
     }
 
+
+    public function storeSignerProfile(Request $request, Employee $employee)
+    {
+        $companyId = (int) ($request->user()->company_id ?? 1);
+        abort_unless((int) $employee->company_id === $companyId, 404);
+
+        $data = $request->validate([
+            'po_type' => ['required', 'in:'.implode(',', PurchaseOrder::TYPES)],
+            'role' => ['required', 'in:requester,approver'],
+            'print_name' => ['nullable', 'string', 'max:255'],
+            'print_title' => ['nullable', 'string', 'max:255'],
+            'license_no' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $payload = ['po_type' => $data['po_type'], 'is_active' => true];
+        $defaults = [
+            'requester_name' => $employee->full_name,
+            'requester_title' => $employee->position?->name,
+            'approver_name' => $employee->full_name,
+            'approver_title' => $employee->position?->name,
+        ];
+
+        if ($data['role'] === 'requester') {
+            $payload['requester_employee_id'] = $employee->id;
+            $payload['requester_name'] = $data['print_name'] ?: $defaults['requester_name'];
+            $payload['requester_title'] = $data['print_title'] ?: $defaults['requester_title'];
+            $payload['requester_license_no'] = $data['license_no'] ?? null;
+        } else {
+            $payload['approver_employee_id'] = $employee->id;
+            $payload['approver_name'] = $data['print_name'] ?: $defaults['approver_name'];
+            $payload['approver_title'] = $data['print_title'] ?: $defaults['approver_title'];
+            $payload['approver_license_no'] = $data['license_no'] ?? null;
+        }
+
+        PurchaseOrderSigner::create($payload);
+
+        return back()->with('success', 'PO signer profile linked to employee.');
+    }
+
     public function edit(Request $request, Employee $employee)
     {
         $companyId = (int) ($request->user()->company_id ?? 1);

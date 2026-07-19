@@ -100,6 +100,7 @@ Route::group(['prefix' => 'apps', 'as' => 'apps.' , 'middleware' => ['auth', 're
     Route::prefix('human-resource')->name('human-resource.')->group(function () {
         Route::resource('/employees', HrEmployeeController::class);
         Route::post('/employees/{employee}/licenses', [EmployeeLicenseController::class, 'store'])->name('employees.licenses.store');
+        Route::post('/employees/{employee}/po-signers', [HrEmployeeController::class, 'storeSignerProfile'])->name('employees.po-signers.store');
     });
 
 
