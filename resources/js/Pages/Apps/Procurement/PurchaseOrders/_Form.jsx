@@ -145,17 +145,18 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
                 <div className='flex flex-col gap-2 md:col-span-3'><label className='text-sm text-gray-600'>Notes</label><textarea value={data.notes} onChange={(e) => setData('notes', e.target.value)} className='w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300' /></div>
             </div>
             <div className='mt-4 space-y-2'>
-                <div className='hidden md:grid md:grid-cols-8 md:gap-2 px-2 text-xs font-semibold text-gray-600'>
+                <div className={`hidden px-2 text-xs font-semibold text-gray-600 md:grid md:gap-2 ${needsRegulatoryFields ? 'md:grid-cols-10' : 'md:grid-cols-8'}`}>
                     <div className='px-1'>Produk Master</div>
                     <div className='px-1'>Nama Produk</div>
                     <div className='px-1'>{needsRegulatoryFields ? 'Zat Aktif' : 'UoM'}</div>
+                    {needsRegulatoryFields && <div className='px-1 md:col-span-2'>Bentuk &amp; Kekuatan</div>}
                     <div className='px-1'>Qty</div>
                     <div className='px-1'>Harga</div>
                     <div className='px-1'>Pajak</div>
                     <div className='px-1'>Total</div>
                     <div className='px-1'>Aksi</div>
                 </div>
-                {data.items.map((it, i) => <div key={i} className='grid grid-cols-1 gap-2 rounded border border-gray-200 p-2 md:grid-cols-8 dark:border-gray-800'>
+                {data.items.map((it, i) => <div key={i} className={`grid grid-cols-1 gap-2 rounded border border-gray-200 p-2 dark:border-gray-800 ${needsRegulatoryFields ? 'md:grid-cols-10' : 'md:grid-cols-8'}`}>
                     <select value={it.product_id || ''} onChange={(e) => setItem(i, 'product_id', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900'><option value=''>Product</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
                     <input value={it.product_name || ''} onChange={(e) => setItem(i, 'product_name', e.target.value)} placeholder='Nama produk' className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' />
                     {needsRegulatoryFields ? <input value={it.active_ingredient || ''} onChange={(e) => setItem(i, 'active_ingredient', e.target.value)} placeholder='Zat aktif/prekursor' className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900' /> : <select value={it.uom_id || ''} onChange={(e) => setItem(i, 'uom_id', e.target.value)} className='rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900'><option value=''>UOM</option>{uoms.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>}
