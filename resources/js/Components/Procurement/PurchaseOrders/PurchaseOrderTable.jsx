@@ -19,7 +19,7 @@ const FULFILLMENT_STATUS_STYLES = {
     closed: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
 };
 
-const formatPoType = (type) => ({ regular: 'PO Reguler', precursor: 'PO Prekursor', oot: 'PO OOT', alkes: 'PO Alkes' }[type] || type || '-');
+const formatPoType = (type) => ({ regular: 'PO Reguler', precursor: 'PO Prekursor', psychotropic: 'PO Psikotropika', oot: 'PO OOT', alkes: 'PO Alkes' }[type] || type || '-');
 
 const formatFulfillmentStatus = (status) => ({ not_received: 'Not Received', partially_received: 'Partial Receipt', fully_received: 'Fully Received', closed: 'Closed' }[status] || status || '-');
 

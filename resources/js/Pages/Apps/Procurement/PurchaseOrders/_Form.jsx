@@ -66,7 +66,7 @@ export default function Form({ purchaseOrder = null, vendors = [], products = []
     const productUomMap = useMemo(() => Object.fromEntries(products.map((p) => [String(p.id), p.base_uom_id ? String(p.base_uom_id) : ''])), [products]);
     const facilityMap = useMemo(() => Object.fromEntries(facilitySchemes.map((f) => [String(f.id), f])), [facilitySchemes]);
     const signerOptions = useMemo(() => signerProfiles.filter((profile) => !data.po_type || profile.po_type === data.po_type), [signerProfiles, data.po_type]);
-    const needsRegulatoryFields = ['precursor', 'oot'].includes(data.po_type);
+    const needsRegulatoryFields = ['precursor', 'psychotropic', 'oot'].includes(data.po_type);
 
     const setItem = (index, key, value) => {
         const items = [...data.items];
