@@ -515,6 +515,7 @@ class PurchaseOrderController extends Controller
     {
         return match ($poType) {
             'precursor' => 'POMedPre-',
+            'psychotropic' => 'POMedPsi-',
             'oot' => 'POMedOOT-',
             'alkes' => 'POAlk-',
             default => 'POMed-',

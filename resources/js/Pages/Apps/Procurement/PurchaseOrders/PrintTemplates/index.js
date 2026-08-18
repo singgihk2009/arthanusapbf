@@ -1,6 +1,7 @@
 export const PO_PRINT_TEMPLATES = {
     regular: { title: 'PURCHASE ORDER', requesterLabel: 'Pemohon', approverLabel: 'Persetujuan' },
     precursor: { title: 'SURAT PESANAN PREKURSOR', requesterLabel: 'Hormat saya', approverLabel: 'Mengetahui' },
+    psychotropic: { title: 'SURAT PESANAN PSIKOTROPIKA', requesterLabel: 'Hormat saya', approverLabel: 'Mengetahui' },
     oot: { title: 'PURCHASE ORDER OOT', requesterLabel: 'Pemohon', approverLabel: 'Persetujuan' },
     alkes: { title: 'PURCHASE ORDER ALKES', requesterLabel: 'Pemohon', approverLabel: 'Persetujuan' },
 };

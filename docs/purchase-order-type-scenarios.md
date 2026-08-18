@@ -1,6 +1,6 @@
 # Rekomendasi Dukungan 4 Jenis Purchase Order
 
-Struktur PO sekarang dapat dibedakan memakai `purchase_orders.po_type` dengan nilai `regular`, `precursor`, `oot`, dan `alkes`. Nomor PO dibuat otomatis sesuai jenis agar format dokumen dapat dipisahkan tanpa membuat tabel header/line baru.
+Struktur PO sekarang dapat dibedakan memakai `purchase_orders.po_type` dengan nilai `regular`, `precursor`, `psychotropic`, `oot`, dan `alkes`. Nomor PO dibuat otomatis sesuai jenis agar format dokumen dapat dipisahkan tanpa membuat tabel header/line baru.
 
 ## Mapping jenis, nomor, dan format cetak
 
@@ -8,6 +8,7 @@ Struktur PO sekarang dapat dibedakan memakai `purchase_orders.po_type` dengan ni
 | --- | --- | --- | --- | --- |
 | PO Reguler obat | `regular` | `POMed-YYYYMM-XXXX` | Template PO obat standar | Apoteker Penanggung Jawab dan Direktur |
 | PO Prekursor | `precursor` | `POMedPre-YYYYMM-XXXX` | Surat Pesanan Prekursor dengan identitas apoteker, daftar zat aktif/prekursor, kebutuhan, dan alamat gudang | Apoteker Penanggung Jawab dan Direktur |
+| PO Psikotropika | `psychotropic` | `POMedPsi-YYYYMM-XXXX` | Surat Pesanan Psikotropika dengan identitas apoteker dan detail obat yang dipesan | Apoteker Penanggung Jawab dan Direktur |
 | PO OOT | `oot` | `POMedOOT-YYYYMM-XXXX` | Template PO obat standar dengan label OOT serta lampiran/rujukan dokumen OOT bila diperlukan | Apoteker Penanggung Jawab dan Direktur |
 | PO Alkes | `alkes` | `POAlk-YYYYMM-XXXX` | Template PO alat kesehatan | Penanggung Jawab Teknis dan Direktur |
 
